@@ -2,7 +2,6 @@ extends Control
 const WorldView = preload("res://scripts/world_view.gd")
 const ResponsiveDialog = preload("res://scripts/responsive_dialog.gd")
 const Operations = preload("res://scripts/operations.gd")
-const ArtScreen = preload("res://scripts/art_screen.gd")
 # DailyCorp 0.1: original mobile mining and logistics prototype.
 const W := 42
 const H := 42
@@ -81,12 +80,6 @@ func _ready() -> void:
     mine_dialog.closed.connect(_mine_dialog_closed)
     mine_dialog.hide()
     world_mode = true
-    art_screen = ArtScreen.new()
-    art_screen.game = self
-    add_child(art_screen)
-    art_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    # v0.6: play on the real textured world, not on static poster/screenshots.
-    art_screen.hide()
     set_process(true)
     queue_redraw()
 
@@ -995,8 +988,6 @@ func enter_mine(index: int) -> void:
     world_view.hide()
     mine_dialog.hide()
     toast("Добыча: шахта №%d" % (index+1))
-    if art_screen != null:
-        art_screen.hide()
     queue_redraw()
     save_game()
 
@@ -1009,8 +1000,6 @@ func go_world() -> void:
     if world_view != null:
         world_view.show()
         world_view.queue_redraw()
-    if art_screen != null:
-        art_screen.hide()
     save_game()
 
 func _notification(what: int) -> void:
