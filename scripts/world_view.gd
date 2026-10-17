@@ -1063,42 +1063,96 @@ func rounded_plate(rect: Rect2, fill: Color, edge: Color, corners: int = 13) -> 
     draw_style_box(style,rect)
 
 func building(p: Vector2, kind: String, owned: bool, label: String, desc: String, index: int = 0) -> void:
-    var tile := atlas_building(kind,owned,index)
-    var sheet: Texture2D = ISO_BUILDINGS[tile.y]
-    var ratio := 1.0
-    if kind == "market" or kind == "contract":
-        ratio = 0.88
-    var width := ISO_W*world_zoom*1.58*ratio
-    var height := width
-    # One visual instance per purchased business, with gameplay-driven states.
-    # A shared diamond foundation fixes the building's contact point to the road grid.
-    var foot_w := ISO_W*world_zoom*0.47
-    var foot_h := ISO_H*world_zoom*0.34
-    var pad := PackedVector2Array([
-        p+Vector2(0,-foot_h),p+Vector2(foot_w,0),
-        p+Vector2(0,foot_h),p+Vector2(-foot_w,0)])
-    draw_colored_polygon(pad,Color("#667168",0.60))
-    for j in range(4):
-        draw_line(pad[j],pad[(j+1)%4],Color("#a49b7e",0.78),1.5*world_zoom,true)
-    var place := Rect2(p.x-width/2.0,p.y-height*0.85,width,height)
-    draw_texture_rect_region(sheet,place,Rect2(tile.x*244.0,0,244,244),Color.WHITE)
-    if not owned:
-        draw_rect(Rect2(p.x-width*0.47,p.y-height*0.27,width*0.94,16.0*world_zoom),Color(0.05,0.12,0.18,0.51))
-    if owned and kind == "factory":
-        for i in range(3):
-            var fraction := fposmod(time*0.34+float(i)*0.29,1.0)
-            var center := p+Vector2(5+sin(time*1.8+float(i))*7,-height*0.78-fraction*31.0*world_zoom)
-            draw_circle(center,(4.0+fraction*9.0)*world_zoom,Color(0.91,0.92,0.91,0.26*(1.0-fraction)))
-    if owned and kind == "mine":
-        var pulse := (sin(time*2.7)+1.0)*0.5
-        draw_circle(p+Vector2(5.0,-height*0.40),maxf(2.0,5.0*world_zoom),Color(1.0,0.70,0.18,0.12+0.12*pulse))
-    var w := clampf(153.0*world_zoom,104.0,190.0)
-    var label_rect := Rect2(p.x-w*0.5,p.y+8.0*world_zoom,w,44.0*world_zoom+8.0)
-    rounded_plate(label_rect,Color("#082238",0.94),Color("#c69c59",0.90) if owned else Color("#7894a0",0.62),6)
-    var font_size := clampi(roundi(world_zoom*15.0),11,17)
-    txt(label,Vector2(label_rect.position.x+7,label_rect.position.y+19*world_zoom+2),font_size,PAPER)
-    txt(desc,Vector2(label_rect.position.x+7,label_rect.position.y+40*world_zoom+2),maxi(10,font_size-1),YELLOW if owned else MUTED)
+    # Compatibility entry: the actual map draws all building bodies by depth first.
+    draw_building_body(p,kind,owned,index)
+    draw_building_label(p,owned,label,desc)
 
+func scene_entities() -> Array:
+    var entities: Array = []
+    for i in range(MINES.size()):
+        var data: Dictionary = MINES[i]
+        entities.append({"pos":data["pos"],"kind":"mine","owned":mine_owned[i],"label":data["name"],
+            "desc":"РАБОТАЕТ" if mine_owned[i] else "%d ₽" % data["cost"],"index":i})
+    for i in range(FACTORIES.size()):
+        var data: Dictionary = FACTORIES[i]
+        var desc := "%d ₽" % int(data["cost"])
+        if factory_owned[i]:
+            desc = str(RECIPES[factory_recipes[i]]["title"])+"  ·  УР."+str(factory_levels[i])
+        entities.append({"pos":data["pos"],"kind":"factory","owned":factory_owned[i],
+            "label":data["name"],"desc":desc,"index":i})
+    for i in range(WAREHOUSES.size()):
+        var data: Dictionary = WAREHOUSES[i]
+        entities.append({"pos":data["pos"],"kind":"warehouse","owned":warehouse_owned[i],
+            "label":data["name"],"desc":"АКТИВЕН" if warehouse_owned[i] else "%d ₽" % data["cost"],"index":i})
+    entities.append({"pos":BARRACKS_POS,"kind":"barracks","owned":true,"label":"Казарма","desc":"ПЕРСОНАЛ","index":0})
+    entities.append({"pos":HANGAR_POS,"kind":"hangar","owned":true,"label":"Ангар","desc":"ТРАНСПОРТ","index":0})
+    entities.append({"pos":CONTRACT_POS,"kind":"contract","owned":true,"label":"Контракты","desc":"ГОРОД","index":0})
+    entities.append({"pos":MARKET_POS,"kind":"market","owned":true,"label":"Рынок","desc":"ТОРГОВЛЯ","index":0})
+    entities.sort_custom(Callable(self,"sort_entity_depth"))
+    return entities
+
+func sort_entity_depth(a: Dictionary,b: Dictionary) -> bool:
+    # Isometric actors must be sorted by their ground-contact Y, not by type.
+    return (int(a["pos"].x)+int(a["pos"].y)) < (int(b["pos"].x)+int(b["pos"].y))
+
+func building_span(p: Vector2, entities: Array) -> float:
+    # Keep buildings within their neighborhood rather than painting over adjacent sites.
+    var normal_size := ISO_W*world_zoom*1.05
+    var nearest := INF
+    for item in entities:
+        var other := world_screen(Vector2(item["pos"]))
+        var distance := p.distance_to(other)
+        if distance > 0.5:
+            nearest = minf(nearest,distance)
+    return clampf(minf(normal_size,nearest*1.15),55.0*world_zoom,normal_size)
+
+func draw_building_body(p: Vector2,kind: String,owned: bool,index: int,span: float = -1.0) -> void:
+    var coord: Vector2i = atlas_building(kind,owned,index)
+    var atlas: Texture2D = ISO_BUILDINGS[coord.y]
+    var width := ISO_W*world_zoom*1.0 if span <= 0 else span
+    if kind == "contract" or kind == "market":
+        width *= 0.92
+    var height := width
+    var foot_w := minf(width*0.32,ISO_W*world_zoom*0.40)
+    var foot_h := minf(width*0.20,ISO_H*world_zoom*0.40)
+    var pad := PackedVector2Array([p+Vector2(0,-foot_h),p+Vector2(foot_w,0),
+        p+Vector2(0,foot_h),p+Vector2(-foot_w,0)])
+    draw_colored_polygon(pad,Color("#344146",0.26))
+    var shadow := Rect2(p.x-width*0.30,p.y-height*0.09,width*0.60,height*0.16)
+    draw_rect(shadow,Color("#101a21",0.18))
+    var place := Rect2(p.x-width*0.5,p.y-height*0.87,width,height)
+    # Source atlas pixels are cleaned in the asset build. Do not paint a dark stripe!
+    var tint := Color.WHITE if owned else Color(0.68,0.77,0.83,0.80)
+    draw_texture_rect_region(atlas,place,Rect2(coord.x*244.0,0.0,244.0,244.0),tint)
+    if owned and kind == "factory":
+        for i in range(2):
+            var phase := fposmod(time*0.30+float(i)*0.43,1.0)
+            var smoke := p+Vector2(width*0.08+sin(time*1.4+float(i))*5,-height*0.62-phase*21*world_zoom)
+            draw_circle(smoke,maxf(2.0,(3.0+phase*5.0)*world_zoom),Color(0.83,0.91,0.93,(1.0-phase)*0.23))
+    if owned and kind == "mine":
+        draw_circle(p+Vector2(0,-height*0.32),maxf(2.0,4.0*world_zoom),
+            Color("#efbc68",0.15+0.13*sin(time*2.1)*sin(time*2.1)))
+
+func draw_building_label(p: Vector2,owned: bool,label: String,desc: String) -> void:
+    # Text is composed last, on its own layer, so sprites never clip the HUD.
+    var width := clampf(139.0*world_zoom,97.0,171.0)
+    var height := clampf(44.0*world_zoom,35.0,55.0)
+    var rect := Rect2(p.x-width*0.5,p.y+11.0*world_zoom,width,height)
+    sci_plate(rect,owned)
+    var name_font := clampi(roundi(world_zoom*13.0),10,15)
+    txt(label,rect.position+Vector2(9,17),name_font,PAPER)
+    txt(desc,rect.position+Vector2(9,height-7),maxi(10,name_font-1),
+        Color("#76c7d6") if owned else MUTED)
+
+func sci_plate(rect: Rect2,selected: bool = false) -> void:
+    draw_rect(rect,Color("#081723",0.90))
+    var border := Color("#4c8497",0.78) if selected else Color("#3a6171",0.56)
+    draw_rect(Rect2(rect.position,Vector2(rect.size.x,1.0)),border)
+    draw_rect(Rect2(rect.position+Vector2(0,rect.size.y-1.0),Vector2(rect.size.x,1.0)),border)
+    draw_rect(Rect2(rect.position,Vector2(1.0,rect.size.y)),border)
+    draw_rect(Rect2(rect.position+Vector2(rect.size.x-1.0,0),Vector2(1.0,rect.size.y)),border)
+    draw_rect(Rect2(rect.position+Vector2(0,0),Vector2(minf(26,rect.size.x*0.28),2.5)),
+        Color("#e4b763") if selected else Color("#76b8c9"))
 func draw_truck(p: Vector2, moving: bool) -> void:
     var z := world_zoom
     var bounce := sin(time*11.0)*0.8 if moving else 0.0
@@ -1186,23 +1240,13 @@ func _draw() -> void:
         if center.x < -120 or center.x > size.x+120 or center.y < -120 or center.y > size.y+120:
             continue
         draw_empty_plot(center,index)
-    # Independently modeled buildings, one per game property, never baked into map.
-    for i in range(MINES.size()):
-        var site: Dictionary = MINES[i]
-        building(world_screen(Vector2(site["pos"])),"mine",mine_owned[i],str(site["name"]),"ОТКРЫТА" if mine_owned[i] else "%d ₽" % site["cost"],i)
-    for i in range(FACTORIES.size()):
-        var site: Dictionary = FACTORIES[i]
-        var caption := "%d ₽" % site["cost"]
-        if factory_owned[i]:
-            caption = str(RECIPES[factory_recipes[i]]["title"]) + " · ур." + str(factory_levels[i])
-        building(world_screen(Vector2(site["pos"])),"factory",factory_owned[i],str(site["name"]),caption,i)
-    for i in range(WAREHOUSES.size()):
-        var site: Dictionary = WAREHOUSES[i]
-        building(world_screen(Vector2(site["pos"])),"warehouse",warehouse_owned[i],str(site["name"]),"КУПЛЕН" if warehouse_owned[i] else "%d ₽" % site["cost"],i)
-    building(world_screen(Vector2(BARRACKS_POS)),"barracks",true,"КАЗАРМА","ПЕРСОНАЛ")
-    building(world_screen(Vector2(HANGAR_POS)),"hangar",true,"АНГАР","МАШИНЫ")
-    building(world_screen(Vector2(CONTRACT_POS)),"contract",true,"ЗАКАЗЫ","ГОРОД")
-    building(world_screen(Vector2(MARKET_POS)),"market",true,"РЫНОК","ТОРГОВЛЯ")
+    # The art layer follows actual depth, then one final text/marker pass.
+    var entities: Array = scene_entities()
+    for item in entities:
+        var point: Vector2 = world_screen(Vector2(item["pos"]))
+        if point.x < -200 or point.x > size.x+200 or point.y < -200 or point.y > size.y+200:
+            continue
+        draw_building_body(point,str(item["kind"]),bool(item["owned"]),int(item["index"]),building_span(point,entities))
     if game.operations != null:
         for truck in game.operations.vehicles:
             var origin: Vector2 = Vector2(MINES[int(truck["mine"])]["pos"])
@@ -1219,6 +1263,10 @@ func _draw() -> void:
                 progress = 1.0-progress
             var motion: Vector2 = road_planner.point_along(route,progress)
             draw_truck(world_screen(motion),true)
+    for item in entities:
+        var point: Vector2 = world_screen(Vector2(item["pos"]))
+        if point.x > -110 and point.x < size.x+110 and point.y > -110 and point.y < size.y+110:
+            draw_building_label(point,bool(item["owned"]),str(item["label"]),str(item["desc"]))
     draw_world_hud()
 
 func draw_popup() -> void:
