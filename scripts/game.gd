@@ -83,7 +83,7 @@ func show_mine_dialog() -> void:
         mine_dialog.hide()
         return
     var title := ""
-    var lines: Array[String] = []
+    var lines: Array = []
     match page:
         "stock":
             title = "Общий склад"
