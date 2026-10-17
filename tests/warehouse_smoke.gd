@@ -88,6 +88,11 @@ func _verify() -> void:
         fail("Factory did not resume when storage cleared")
         return
     # Digging cannot generate more ore than permitted capacity.
+    # Smoke tests share user:// saves: return to the staffed starter mine.
+    game.active_mine = 0
+    for person in game.operations.personnel:
+        if int(person["id"]) <= 2:
+            person["mine"] = 0
     game.fresh_game()
     game.operations.buffers[game.active_mine]["gold"] = 25
     var ore := Vector2i(20,9)
