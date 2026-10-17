@@ -1,5 +1,6 @@
 extends Control
 const ResponsiveDialog = preload("res://scripts/responsive_dialog.gd")
+const RoadNetwork = preload("res://scripts/road_network.gd")
 # Real independent transparent world sprites. Each corresponds to one gameplay entity.
 const WORLD_ART := {
     "mine": preload("res://assets/world/mine.webp"),
@@ -85,6 +86,7 @@ const PRODUCTS := {"coal":"Уголь","copper":"Медь","iron":"Железо"
 const PRICES := {"coal":12,"copper":28,"iron":42,"gold":110,"steel":160,"wire":60,"parts":495,"electronics":470}
 
 var world_roads: Dictionary = {}
+var road_planner = RoadNetwork.new()
 var expansion_owned: Array = [false,false,false,false,false,false,false,false,false,false,false,false]
 var game = null
 var dialog = null
@@ -382,6 +384,10 @@ func restore_state(data: Dictionary) -> void:
                     warehouse_slots[i].append({"key":str(entry["key"]), "level":clampi(int(entry.get("level",1)),1,MAX_SECTION_LEVEL)})
     mine_owned[0] = true
     warehouse_owned[3] = true
+    var plot_saved: Array = data.get("expansion_owned",[])
+    for i in range(EXPANSION_PLOTS.size()):
+        if i < plot_saved.size():
+            expansion_owned[i] = bool(plot_saved[i])
     var saved_camera: Array = data.get("camera", [])
     if saved_camera.size() == 2:
         world_camera = Vector2(clampf(float(saved_camera[0]),1.0,float(MAP_W-2)),clampf(float(saved_camera[1]),1.0,float(MAP_H-2)))
@@ -905,9 +911,16 @@ func field_kind(x: int, y: int) -> Vector2i:
     for place in [MARKET_POS,BARRACKS_POS,HANGAR_POS,CONTRACT_POS]:
         if cell.distance_to(Vector2(place)) < 1.5:
             close_to_property = true
-    # Open water is always away from properties and essential roads.
-    if not close_to_property and (x == 19 or x == 20) and y > 3 and y < 18:
+    for plot_pos in EXPANSION_PLOTS:
+        if cell.distance_to(Vector2(plot_pos)) < 2.6:
+            close_to_property = true
+    # The shoreline belongs to the far eastern edge, not under industrial roads.
+    if not close_to_property and x >= 33 and y > 2 and y < 24:
         return Vector2i(2,0 if y%3 == 0 else 1)
+    if x >= 20 and close_to_property:
+        return Vector2i(0,0)
+    if x >= 20 and h < 54:
+        return Vector2i(0,0 if h < 30 else 1)
     if not close_to_property and h < 13:
         return Vector2i(1,0 if h<6 else 1)
     if not close_to_property and h > 92:
@@ -926,46 +939,69 @@ func road_key(x: int,y: int) -> String:
     return "%d:%d" % [x,y]
 
 func make_road_network() -> Dictionary:
-    var network: Dictionary = {}
-    # Every road is built from discrete connected map cells, not overlay lines.
-    var connections: Array = [
-        [MARKET_POS,CONTRACT_POS], [MARKET_POS,Vector2i(13,3)],
-        [MARKET_POS,Vector2i(11,10)], [MARKET_POS,Vector2i(4,6)],
-        [MARKET_POS,Vector2i(15,8)], [Vector2i(15,8),Vector2i(16,5)],
-        [Vector2i(15,8),Vector2i(15,13)], [Vector2i(11,10),Vector2i(12,12)],
-        [Vector2i(11,10),Vector2i(8,9)], [Vector2i(8,9),Vector2i(7,7)],
-        [Vector2i(7,7),BARRACKS_POS], [BARRACKS_POS,Vector2i(3,11)],
-        [Vector2i(3,11),Vector2i(5,14)], [Vector2i(5,14),Vector2i(8,15)],
-        [Vector2i(8,15),Vector2i(13,17)], [HANGAR_POS,Vector2i(8,15)],
-        [Vector2i(11,10),HANGAR_POS], [Vector2i(8,9),Vector2i(8,15)]
-    ]
-    for link in connections:
-        var start: Vector2i = link[0]
-        var goal: Vector2i = link[1]
-        var cell := start
-        network[road_key(cell.x,cell.y)] = true
-        # Use Manhattan segments for a continuous grid-based road network.
-        while cell.x != goal.x:
-            cell.x += 1 if cell.x < goal.x else -1
-            network[road_key(cell.x,cell.y)] = true
-        while cell.y != goal.y:
-            cell.y += 1 if cell.y < goal.y else -1
-            network[road_key(cell.x,cell.y)] = true
-    return network
+    road_planner.build(EXPANSION_PLOTS)
+    world_roads = road_planner.cells
+    return world_roads
 
-func road_piece(x:int,y:int) -> int:
-    var a := world_roads.has(road_key(x-1,y))
-    var b := world_roads.has(road_key(x+1,y))
-    var c := world_roads.has(road_key(x,y-1))
-    var d := world_roads.has(road_key(x,y+1))
-    var count := int(a)+int(b)+int(c)+int(d)
-    if count >= 4:
-        return 3 # intersection
-    if count == 3:
-        return 2 # T-junction
-    if count == 2 and ((a or b) and (c or d)):
-        return 1 # corner
-    return 0 # straight
+func road_path(start: Vector2i, destination: Vector2i) -> Array:
+    if world_roads.is_empty():
+        make_road_network()
+    return road_planner.path(start,destination)
+
+func destination_cell(destination: Dictionary) -> Vector2i:
+    var index := int(destination.get("index",-1))
+    if destination.get("type","") == "warehouse" and index >= 0 and index < WAREHOUSES.size():
+        return WAREHOUSES[index]["pos"]
+    if destination.get("type","") == "factory" and index >= 0 and index < FACTORIES.size():
+        return FACTORIES[index]["pos"]
+    return Vector2i(-1,-1)
+
+func haul_route(mine: int, destination: Dictionary) -> Array:
+    if mine < 0 or mine >= MINES.size():
+        return []
+    return road_path(MINES[mine]["pos"],destination_cell(destination))
+
+func road_travel_steps(mine: int, destination: Dictionary) -> int:
+    var route: Array = haul_route(mine,destination)
+    return maxi(0,route.size()-1)
+
+func draw_road_link(a: Vector2,b: Vector2) -> void:
+    # Draw roads as continuous vector geometry on the same grid as truck routing.
+    # Never mix unmatched curve / straight atlas cells.
+    var width := maxf(5.0,18.0*world_zoom)
+    draw_line(a,b,Color("#1f3030"),width+6.0*world_zoom,true)
+    draw_line(a,b,Color("#92917e"),width+2.0*world_zoom,true)
+    draw_line(a,b,Color("#485653"),width-3.0*world_zoom,true)
+    var span := b-a
+    for i in range(2):
+        draw_line(a+span*((float(i)+0.20)*0.5),
+            a+span*((float(i)+0.47)*0.5),Color("#dfceaa"),
+            maxf(1.0,1.7*world_zoom),true)
+
+func draw_road_system() -> void:
+    if world_roads.is_empty():
+        make_road_network()
+    for x in range(MAP_W):
+        for y in range(MAP_H):
+            if not world_roads.has(road_key(x,y)):
+                continue
+            var p := world_screen(Vector2(x,y))
+            if p.x < -190 or p.x > size.x+190 or p.y < -190 or p.y > size.y+190:
+                continue
+            if world_roads.has(road_key(x+1,y)):
+                draw_road_link(p,world_screen(Vector2(x+1,y)))
+            if world_roads.has(road_key(x,y+1)):
+                draw_road_link(p,world_screen(Vector2(x,y+1)))
+    # Intersection caps share precisely one center coordinate.
+    for x in range(MAP_W):
+        for y in range(MAP_H):
+            if not world_roads.has(road_key(x,y)):
+                continue
+            var p := world_screen(Vector2(x,y))
+            if p.x < -100 or p.x > size.x+100 or p.y < -100 or p.y > size.y+100:
+                continue
+            if road_planner.neighbors(Vector2i(x,y)).size() >= 2:
+                draw_circle(p,maxf(3.0,8.5*world_zoom),Color("#485653"))
 
 func atlas_building(kind: String, owned: bool, index: int) -> Vector2i:
     match kind:
