@@ -99,6 +99,8 @@ var selected_route_material := "iron"
 var selected_route_target := 0
 var selected_slot := 0
 var selected_plot := 0
+var purchase_effect_plot := -1
+var purchase_effect_time := 0.0
 
 var mine_owned := [true, false, false, false]
 var factory_owned := [false, false, false, false]
@@ -410,6 +412,8 @@ func restore_state(data: Dictionary) -> void:
 
 func process_industry(delta: float) -> void:
     time += delta
+    if purchase_effect_time > 0.0:
+        purchase_effect_time = maxf(0.0,purchase_effect_time-delta)
     if game == null:
         return
     if game.operations != null:
@@ -586,7 +590,7 @@ func tapped(p: Vector2) -> void:
         show_panel()
         return
     for i in range(EXPANSION_PLOTS.size()):
-        if world_screen(Vector2(EXPANSION_PLOTS[i])).distance_to(p) < hit_radius*0.53:
+        if world_screen(plot_anchor(i)).distance_to(p) < hit_radius*0.53:
             selected_plot = i
             panel = "land"
             show_panel()
@@ -869,7 +873,10 @@ func action(i: int) -> void:
                 if game.cash >= price:
                     game.cash -= price
                     expansion_owned[selected_plot] = true
-                    pop("Участок приобретён!")
+                    purchase_effect_plot = selected_plot
+                    purchase_effect_time = 3.2
+                    panel = ""
+                    pop("Территория зарегистрирована · сектор %d" % (selected_plot+1))
                     game.save_game()
                 else:
                     pop("Нужно %d ₽" % price)
@@ -1174,24 +1181,69 @@ func premium_nav(rect: Rect2, caption: String, icon_index: int, active: bool = f
     var fontsize := clampi(roundi((rect.size.x-square-14)/maxf(3.0,float(caption.length()))*1.45),10,18)
     txt(caption,Vector2(icon_rect.end.x+1,rect.position.y+rect.size.y*0.62),fontsize,Color("#132a3a") if active else PAPER)
 
+func plot_anchor(index: int) -> Vector2:
+    # Purchase markers occupy undeveloped land adjacent to roads, not their corners.
+    if world_roads.is_empty():
+        make_road_network()
+    var start: Vector2i = EXPANSION_PLOTS[index]
+    var offsets: Array = [
+        Vector2i(-1,-1),Vector2i(1,-1),Vector2i(-1,1),Vector2i(1,1),
+        Vector2i(0,-2),Vector2i(2,0),Vector2i(-2,0),Vector2i(0,2)
+    ]
+    for offset in offsets:
+        var candidate: Vector2i = start + offset
+        if candidate.x <= 0 or candidate.y <= 0 or candidate.x >= MAP_W-2 or candidate.y >= MAP_H-2:
+            continue
+        if world_roads.has(road_key(candidate.x,candidate.y)):
+            continue
+        var busy := false
+        for item in scene_entities():
+            if Vector2(candidate).distance_to(Vector2(item["pos"])) < 1.4:
+                busy = true
+                break
+        if not busy:
+            return Vector2(candidate)
+    return Vector2(start) + Vector2(-0.65,-0.6)
+
 func draw_empty_plot(p: Vector2, index: int) -> void:
     var owned := bool(expansion_owned[index])
-    var rx := ISO_W*world_zoom*0.45
-    var ry := ISO_H*world_zoom*0.45
+    var rx := ISO_W*world_zoom*0.34
+    var ry := ISO_H*world_zoom*0.34
+    var color := Color("#79c5d2") if owned else Color("#758b97")
     var points := PackedVector2Array([
         p+Vector2(0,-ry),p+Vector2(rx,0),p+Vector2(0,ry),p+Vector2(-rx,0)
     ])
-    draw_colored_polygon(points,Color("#668a63",0.28) if owned else Color("#668b58",0.10))
+    draw_colored_polygon(points,Color("#12333f",0.39) if owned else Color("#18242a",0.21))
     for i in range(4):
-        draw_line(points[i],points[(i+1)%4],
-            Color("#ecc477",0.85) if owned else Color("#d9c39c",0.65),
-            maxf(1.0,2.0*world_zoom),true)
-    var label := "УЧАСТОК %d" % (index+1)
-    var width := maxf(90.0,108.0*world_zoom)
-    var box := Rect2(p.x-width*0.5,p.y+ry+3,width,maxf(24.0,30.0*world_zoom))
-    rounded_plate(box,Color("#112c3d",0.88),Color("#e3ba6a",0.65) if owned else Color("#547382",0.65),6)
-    txt(label,box.position+Vector2(6,box.size.y*0.67),clampi(roundi(12.0*world_zoom),10,14),
-        YELLOW if owned else PAPER)
+        draw_line(points[i],points[(i+1)%4],color,maxf(1.0,1.8*world_zoom),true)
+    var width := clampf(112.0*world_zoom,85.0,138.0)
+    var box := Rect2(p.x-width*0.5,p.y+ry+5,width,clampf(25.0*world_zoom,24.0,37.0))
+    sci_plate(box,owned)
+    txt("СЕКТОР %02d" % (index+1),box.position+Vector2(8,box.size.y*0.66),
+        clampi(roundi(12.0*world_zoom),10,14),PAPER)
+    if purchase_effect_plot == index and purchase_effect_time > 0.0:
+        draw_purchase_effect(p,rx,ry)
+
+func draw_purchase_effect(p: Vector2,rx: float,ry: float) -> void:
+    # Animated perimeter scan + expanding hologram. Does not cover adjacent roads.
+    var progress := 1.0-purchase_effect_time/3.2
+    var intensity := 0.55+0.45*sin(time*10.0)*sin(time*10.0)
+    for ring in range(3):
+        var phase := clampf(progress-float(ring)*0.12,0.0,1.0)
+        var scale := 0.78+phase*0.65
+        var alpha := (1.0-phase)*0.67
+        var pts := PackedVector2Array([p+Vector2(0,-ry*scale),p+Vector2(rx*scale,0),
+            p+Vector2(0,ry*scale),p+Vector2(-rx*scale,0)])
+        for edge in range(4):
+            draw_line(pts[edge],pts[(edge+1)%4],
+                Color(0.38,0.91,0.98,alpha*intensity),maxf(1.0,3.0*world_zoom),true)
+    var scan_h := 65.0*world_zoom*(1.0-progress)
+    draw_line(p+Vector2(0,-ry*0.72-scan_h),p+Vector2(0,ry*0.50-scan_h),
+        Color(0.40,0.91,1.0,(1.0-progress)*0.55),maxf(1.0,2.0*world_zoom),true)
+    if progress < 0.85:
+        txt("ЗЕМЛЯ ПРИОБРЕТЕНА",p+Vector2(-57.0*world_zoom,-ry-22.0*world_zoom),
+            clampi(roundi(11.0*world_zoom),9,14),
+            Color(0.77,0.94,0.98,1.0-progress*0.7))
 
 func draw_world_hud() -> void:
     var top_height := top_bar_height()
@@ -1236,7 +1288,7 @@ func _draw() -> void:
     draw_road_system()
     for index in range(EXPANSION_PLOTS.size()):
         var location: Vector2i = EXPANSION_PLOTS[index]
-        var center := world_screen(Vector2(location))
+        var center := world_screen(plot_anchor(index))
         if center.x < -120 or center.x > size.x+120 or center.y < -120 or center.y > size.y+120:
             continue
         draw_empty_plot(center,index)
