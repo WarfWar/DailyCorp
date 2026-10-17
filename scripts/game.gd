@@ -1,6 +1,7 @@
 extends Control
 const WorldView = preload("res://scripts/world_view.gd")
 const ResponsiveDialog = preload("res://scripts/responsive_dialog.gd")
+const Operations = preload("res://scripts/operations.gd")
 # DailyCorp 0.1: original mobile mining and logistics prototype.
 const W := 42
 const H := 42
@@ -22,6 +23,10 @@ const GOLDEN := Color("#e9bc73")
 const MUTED := Color("#9caebd")
 const TILE := 52.0
 
+var operations = null
+var operations_saved: Dictionary = {}
+var ore_amounts: Dictionary = {}
+var drop_serial := 0
 var world_view = null
 var mine_dialog = null
 var world_mode := true
@@ -64,6 +69,9 @@ func _ready() -> void:
     add_child(world_view)
     world_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     world_view.restore_state(world_saved)
+    operations = Operations.new()
+    operations.setup(self,world_view,operations_saved)
+    reset_units()
     mine_dialog = ResponsiveDialog.new()
     add_child(mine_dialog)
     mine_dialog.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -172,16 +180,44 @@ func fresh_game() -> void:
     set_tile(Vector2i(25, 10), IRON)
     camera = Vector2(21, 8)
     zoom = 1.0
+    seed_ore_counts()
     reset_units()
     toast("Шахта готова. Выбери ближайшую руду")
+
+func seed_ore_counts() -> void:
+    ore_amounts.clear()
+    for y in range(H):
+        for x in range(W):
+            var pos := Vector2i(x,y)
+            if KEYS.has(tile(pos)):
+                ore_amounts[vein_key(pos)] = rng.randi_range(3,11) + int(y/12)
+
+func vein_key(c: Vector2i) -> String:
+    return "%d:%d" % [c.x,c.y]
+
+func vein_left(c: Vector2i) -> int:
+    if not KEYS.has(tile(c)):
+        return 1
+    if not ore_amounts.has(vein_key(c)):
+        ore_amounts[vein_key(c)] = 3 + posmod(c.x*13+c.y*17,9)
+    return int(ore_amounts[vein_key(c)])
 
 func reset_units() -> void:
     workers.clear()
     carts.clear()
-    for i in range(worker_count):
-        workers.append({"cell": BASE, "pos": Vector2(BASE), "path": [], "state": "idle", "target": Vector2i(-1, -1), "timer": 0.0, "id": i})
+    var assigned: Array = []
+    if operations != null:
+        assigned = operations.mine_workers(active_mine)
+        worker_count = assigned.size()
+    else:
+        for i in range(worker_count):
+            assigned.append({"id":i+1,"level":1})
+    for record in assigned:
+        workers.append({"cell": BASE, "pos": Vector2(BASE), "path": [], "state": "idle",
+            "target": Vector2i(-1,-1), "timer": 0.0, "id":int(record["id"]), "level":int(record["level"])})
     for i in range(cart_count):
-        carts.append({"cell": BASE, "pos": Vector2(BASE), "path": [], "state": "idle", "bag": Vector2i(-1, -1), "cargo": -1})
+        carts.append({"cell": BASE, "pos": Vector2(BASE), "path": [], "state": "idle",
+            "bag": Vector2i(-1,-1), "bag_id":-1, "cargo":-1})
     for drop in drops:
         drop["reserved"] = false
 
@@ -278,7 +314,7 @@ func pick_job(worker: Dictionary) -> void:
         worker["target"] = chosen
         worker["path"] = chosen_path
         worker["state"] = "walk" if not chosen_path.is_empty() else "dig"
-        worker["timer"] = 1.6 + float(chosen.y) * 0.026
+        worker["timer"] = (1.6 + float(chosen.y) * 0.026) / (1.0+0.35*float(int(worker.get("level",1))-1))
 
 func walk(unit: Dictionary, delta: float, velocity: float) -> void:
     var path: Array = unit["path"]
@@ -308,16 +344,25 @@ func simulation(delta: float) -> void:
             worker["timer"] -= delta * (1.0 + speed_level * 0.2)
             if float(worker["timer"]) <= 0.0:
                 var kind := tile(cell)
-                if KEYS.has(kind) and queued_ore(kind) >= storage_capacity(str(KEYS[kind])):
-                    # Ore remains in the ground until a warehouse has room.
+                if KEYS.has(kind) and operations != null and (not operations.mine_accepts(active_mine,str(KEYS[kind])) or queued_ore(kind) >= 25):
+                    # Do not destroy ore if the mine loading area is congested.
                     worker["timer"] = 0.25
                     continue
-                set_tile(cell, AIR)
-                orders.erase(cell)
+                var left := vein_left(cell)
                 if KEYS.has(kind):
-                    drops.append({"cell": cell, "kind": kind, "reserved": false})
-                worker["target"] = Vector2i(-1, -1)
-                worker["state"] = "idle"
+                    ore_amounts[vein_key(cell)] = left-1
+                    drop_serial += 1
+                    var drop_at: Vector2i = worker["cell"] if left > 1 else cell
+                    drops.append({"cell":drop_at,"kind":kind,"reserved":false,"id":drop_serial})
+                if not KEYS.has(kind) or left <= 1:
+                    ore_amounts.erase(vein_key(cell))
+                    set_tile(cell,AIR)
+                    orders.erase(cell)
+                    worker["target"] = Vector2i(-1,-1)
+                    worker["state"] = "idle"
+                else:
+                    # Exactly one unit each cycle, improved miners are faster.
+                    worker["timer"] = (1.6 + float(cell.y)*0.026)/(1.0+0.35*float(int(worker.get("level",1))-1))
     for cart in carts:
         if cart["state"] == "idle":
             var selected := -1
@@ -334,6 +379,7 @@ func simulation(delta: float) -> void:
             if selected >= 0:
                 drops[selected]["reserved"] = true
                 cart["bag"] = drops[selected]["cell"]
+                cart["bag_id"] = drops[selected]["id"]
                 cart["path"] = route
                 cart["state"] = "collect"
         if cart["state"] == "collect":
@@ -341,7 +387,7 @@ func simulation(delta: float) -> void:
             if cart["path"].is_empty():
                 var index := -1
                 for i in range(drops.size()):
-                    if drops[i]["cell"] == cart["bag"]:
+                    if int(drops[i].get("id",-1)) == int(cart["bag_id"]):
                         index = i
                         break
                 if index >= 0:
@@ -356,7 +402,10 @@ func simulation(delta: float) -> void:
             if cart["path"].is_empty():
                 var key: String = KEYS.get(int(cart["cargo"]), "")
                 if key != "":
-                    stock[key] = int(stock[key]) + 1
+                    if operations != null:
+                        operations.mine_received(active_mine,key)
+                    else:
+                        stock[key] = int(stock[key]) + 1
                     delivered += 1
                 cart["cargo"] = -1
                 cart["state"] = "idle"
@@ -705,14 +754,17 @@ func save_game() -> void:
     var drop_data: Array = []
     for drop in drops:
         var c: Vector2i = drop["cell"]
-        drop_data.append([c.x, c.y, drop["kind"]])
-    var snapshot := {"version": 3, "grid": grid, "orders": order_data, "drops": drop_data, "cash": cash,
+        drop_data.append([c.x, c.y, drop["kind"], int(drop.get("id",0))])
+    var snapshot := {"version": 4, "grid": grid, "orders": order_data, "drops": drop_data, "cash": cash,
         "stock": stock, "workers": worker_count, "carts": cart_count, "speed": speed_level,
         "foundry": foundry, "delivered": delivered}
     mine_maps[str(active_mine)] = capture_mine()
     snapshot["mine_maps"] = mine_maps
     snapshot["active_mine"] = active_mine
     snapshot["surface"] = world_view.pack_state() if world_view != null else world_saved
+    snapshot["operations"] = operations.pack() if operations != null else operations_saved
+    snapshot["ore_amounts"] = ore_amounts
+    snapshot["drop_serial"] = drop_serial
     var file := FileAccess.open(SAVE_FILE, FileAccess.WRITE)
     if file != null:
         file.store_string(JSON.stringify(snapshot))
@@ -726,7 +778,7 @@ func load_game() -> bool:
         return false
     var data = JSON.parse_string(file.get_as_text())
     file.close()
-    if not (data is Dictionary) or int(data.get("version", 0)) not in [1, 2, 3]:
+    if not (data is Dictionary) or int(data.get("version", 0)) not in [1, 2, 3, 4]:
         return false
     var saved_grid: Array = data.get("grid", [])
     if saved_grid.size() != H:
@@ -736,6 +788,9 @@ func load_game() -> bool:
             return false
     grid = saved_grid
     world_saved = data.get("surface", {})
+    operations_saved = data.get("operations",{})
+    ore_amounts = data.get("ore_amounts",{})
+    drop_serial = maxi(0,int(data.get("drop_serial",0)))
     mine_maps = data.get("mine_maps", {})
     active_mine = clampi(int(data.get("active_mine", 0)), 0, 3)
     cash = maxi(0, int(data.get("cash", 350)))
@@ -759,7 +814,9 @@ func load_game() -> bool:
             var c := Vector2i(int(entry[0]), int(entry[1]))
             var kind := int(entry[2])
             if valid(c) and tile(c) == AIR and KEYS.has(kind):
-                drops.append({"cell": c, "kind": kind, "reserved": false})
+                drop_serial += 1
+                drops.append({"cell": c, "kind": kind, "reserved": false,"id":int(entry[3]) if entry.size()>3 else drop_serial})
+                drop_serial = maxi(drop_serial,int(drops.back()["id"]))
     reset_units()
     return true
 
@@ -770,15 +827,18 @@ func capture_mine() -> Dictionary:
     var drop_data: Array = []
     for drop in drops:
         var c: Vector2i = drop["cell"]
-        drop_data.append([c.x,c.y,drop["kind"]])
+        drop_data.append([c.x,c.y,drop["kind"],int(drop.get("id",0))])
     return {"grid":grid.duplicate(true),"orders":order_data,"drops":drop_data,
-        "workers":worker_count,"carts":cart_count,"speed":speed_level}
+        "workers":worker_count,"carts":cart_count,"speed":speed_level,
+        "ore_amounts":ore_amounts.duplicate(true),"drop_serial":drop_serial}
 
 func restore_mine(data: Dictionary) -> void:
     grid = data.get("grid", [])
     if grid.size() != H:
         create_mine()
         return
+    ore_amounts = data.get("ore_amounts",{}).duplicate(true)
+    drop_serial = maxi(0,int(data.get("drop_serial",0)))
     worker_count = clampi(int(data.get("workers",2)),1,10)
     cart_count = clampi(int(data.get("carts",1)),1,7)
     speed_level = clampi(int(data.get("speed",0)),0,5)
@@ -793,7 +853,10 @@ func restore_mine(data: Dictionary) -> void:
         if item is Array and item.size() == 3:
             var pos := Vector2i(int(item[0]),int(item[1]))
             if valid(pos) and tile(pos) == AIR:
-                drops.append({"cell":pos,"kind":int(item[2]),"reserved":false})
+                drop_serial += 1
+                var ident := int(item[3]) if item.size()>3 else drop_serial
+                drop_serial = maxi(drop_serial,ident)
+                drops.append({"cell":pos,"kind":int(item[2]),"reserved":false,"id":ident})
     reset_units()
 
 func create_mine() -> void:
@@ -833,6 +896,7 @@ func create_mine() -> void:
     set_tile(Vector2i(19,10),COAL)
     set_tile(Vector2i(23,9),COPPER)
     set_tile(Vector2i(25,10),IRON)
+    seed_ore_counts()
     reset_units()
 
 func enter_mine(index: int) -> void:
