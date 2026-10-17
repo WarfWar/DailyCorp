@@ -16,6 +16,11 @@ jobs:
       - name: Get source
         uses: actions/checkout@v4
 
+      - name: Clean generated sprite-atlas artifacts
+        run: |
+          python3 -m pip install --quiet pillow
+          python3 tools/clean_building_atlas.py
+
       - name: Install Java 17
         uses: actions/setup-java@v4
         with:
