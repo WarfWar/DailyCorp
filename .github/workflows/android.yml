@@ -95,6 +95,15 @@ jobs:
             exit 1
           fi
 
+      - name: Test real GUI taps and scrolling
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/touch_ui_smoke.gd 2>&1 | tee /tmp/input-test.log
+          grep -q "TOUCH UI TEST PASSED" /tmp/input-test.log
+          if grep -E "SCRIPT ERROR|Parse Error|TOUCH UI TEST FAILED" /tmp/input-test.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
