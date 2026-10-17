@@ -56,7 +56,7 @@ func _run() -> void:
     game.save_game()
     var saved := FileAccess.get_file_as_string("user://dailycorp_save.json")
     var data = JSON.parse_string(saved)
-    if not (data is Dictionary) or int(data.get("version", 0)) != 2:
+    if not (data is Dictionary) or int(data.get("version", 0)) != 3:
         failed("Save format is invalid")
         return
     var saved_world: Dictionary = data.get("surface", {})
