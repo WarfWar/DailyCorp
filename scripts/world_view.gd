@@ -1336,7 +1336,7 @@ func draw_world_hud() -> void:
     txt("DAILYCORP",Vector2(47,29 if compact else 32),20 if compact else 25,Color("#f4e4cb"))
     if not compact:
         txt("ПРОМЫШЛЕННЫЙ КОМПЛЕКС // УПРАВЛЕНИЕ",Vector2(49,51),12,Color("#749baa"))
-        txt("ALPHA 0.9",Vector2(w-121,24),13,Color("#7898a5"))
+        txt("ALPHA 0.10",Vector2(w-121,24),13,Color("#7898a5"))
     var stock_total := 0
     for val in game.stock.values():
         stock_total += int(val)
