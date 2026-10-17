@@ -43,6 +43,10 @@ func _run() -> void:
             return
     # A purchased parcel plays its own holographic animation; no fake building.
     game.cash = 10000
+    # Other CI tests share user:// state; isolate the parcel purchase.
+    world.expansion_owned[0] = false
+    world.purchase_effect_plot = -1
+    world.purchase_effect_time = 0.0
     world.selected_plot = 0
     world.panel = "land"
     world.action(0)
