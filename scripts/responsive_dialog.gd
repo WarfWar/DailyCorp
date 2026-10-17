@@ -10,7 +10,7 @@ var content: VBoxContainer
 var action_callback: Callable
 var heading_text := ""
 var detail_lines: Array[String] = []
-var commands: Array[String] = []
+var commands: Array = []
 
 func _ready() -> void:
     mouse_filter = Control.MOUSE_FILTER_STOP
@@ -85,7 +85,7 @@ func _ready() -> void:
     get_viewport().size_changed.connect(reflow)
     reflow()
 
-func present(title: String, details: Array[String], actions: Array[String], callback: Callable) -> void:
+func present(title: String, details: Array[String], actions: Array, callback: Callable) -> void:
     action_callback = callback
     heading_text = title
     detail_lines = details
