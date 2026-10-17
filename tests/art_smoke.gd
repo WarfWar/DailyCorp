@@ -1,62 +1,62 @@
 extends SceneTree
-# Smoke test generated art backgrounds as actual interactive Godot scenes.
+# v0.6: Verify that gameplay uses the true world scene with independent sprites.
+# No full-screen UI screenshots are mounted as the playable world.
 func _initialize() -> void:
-    call_deferred("_verify")
+    call_deferred("_run")
 
 func fail(reason: String) -> void:
-    push_error("ART TEST FAILED: " + reason)
+    push_error("WORLD ART TEST FAILED: " + reason)
     quit(1)
 
-func _verify() -> void:
-    var prefab: PackedScene = load("res://scenes/main.tscn")
-    if prefab == null:
-        fail("Missing DailyCorp game scene")
-        return
-    var game = prefab.instantiate()
+func _run() -> void:
+    var game = load("res://scenes/main.tscn").instantiate()
     root.add_child(game)
     await process_frame
-    var view = game.art_screen
-    if view == null or not view.visible or view.scene_name != "world":
-        fail("New world art scene must be visible on launch")
+    var world = game.world_view
+    if world == null or not world.visible or not game.world_mode:
+        fail("The editable world map is not visible on launch")
         return
-    for name in ["world","mine","factory","warehouse","hangar"]:
-        var path: String = "res://assets/scenes/"+str(name)+".webp"
-        var texture: Texture2D = load(path)
-        if texture == null or texture.get_width() < 300:
-            fail("Missing or undersized generated artwork: " + path)
+    if game.art_screen != null and game.art_screen.visible:
+        fail("A static illustration is covering gameplay")
+        return
+    for kind in ["mine","factory","warehouse","market","barracks","hangar"]:
+        var texture: Texture2D = world.WORLD_ART.get(kind)
+        if texture == null or texture.get_width() < 200:
+            fail("Missing independent isometric building texture: " + kind)
             return
-        view.present(name,0)
-        await process_frame
-        if not view.visible or view.background_image.texture != texture:
-            fail("Illustration switch failed: "+name)
+    for tile in world.TERRAIN_ART:
+        if tile == null or tile.get_width() < 128:
+            fail("Missing textured ground tile")
             return
-    view.present("world",0)
-    view._hotspot("factory",0)
-    if view.scene_name != "factory":
-        fail("World factory hotspot does not show its art")
+    if world.GROVE_ART == null or world.ROCK_ART == null:
+        fail("Missing forest and rocks props")
         return
-    view._control()
-    if view.visible or game.world_view.panel != "place" or game.world_view.selected_kind != "factory":
-        fail("Factory image cannot lead to live management screen")
+    # Selecting a real world coordinate must open the actual management dialog.
+    var index := 0
+    var factory_spot: Vector2 = world.world_screen(Vector2(world.FACTORIES[index]["pos"]))
+    world.tapped(factory_spot)
+    if world.panel != "place" or world.selected_kind != "factory" or world.selected_id != index:
+        fail("Factory texture no longer corresponds to a tappable factory")
         return
-    game.world_view.close_panel()
-    view.present("hangar",0)
-    view._control()
-    if view.visible or game.world_view.panel != "hangar":
-        fail("Hangar image cannot lead to live transport panel")
+    world.close_panel()
+    var warehouse_spot: Vector2 = world.world_screen(Vector2(world.WAREHOUSES[3]["pos"]))
+    world.tapped(warehouse_spot)
+    if world.panel != "warehouse" or world.selected_id != 3:
+        fail("Starter warehouse is not selectable")
         return
-    game.world_view.close_panel()
+    world.close_panel()
     game.enter_mine(0)
-    if game.world_mode or not view.visible or view.scene_name != "mine":
-        fail("Mine entry did not show illustrative mine scene")
+    if game.world_mode or world.visible:
+        fail("Entering mine did not expose the playable underground level")
         return
-    view._control()
-    if view.visible:
-        fail("Mining action did not expose functional tile grid")
+    if game.art_screen != null and game.art_screen.visible:
+        fail("Static underground illustration blocks live ore digging")
         return
     game.go_world()
-    if not game.world_mode or not view.visible or view.scene_name != "world":
-        fail("Returning from mine did not restore illustrated world")
+    if not game.world_mode or not world.visible:
+        fail("Cannot navigate back to the editable world")
         return
-    print("ART TEST PASSED: all 5 actual textures, hotspot navigation, factory/hangar management, mining and return")
+    world.queue_redraw()
+    await process_frame
+    print("ART TEST PASSED: six transparent site sprites, grass and forest tiles, live tapping, mining and return")
     quit(0)
