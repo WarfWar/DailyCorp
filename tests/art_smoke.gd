@@ -20,7 +20,7 @@ func _verify() -> void:
         fail("New world art scene must be visible on launch")
         return
     for name in ["world","mine","factory","warehouse","hangar"]:
-        var path := "res://assets/scenes/"+name+".webp"
+        var path: String = "res://assets/scenes/"+str(name)+".webp"
         var texture: Texture2D = load(path)
         if texture == null or texture.get_width() < 300:
             fail("Missing or undersized generated artwork: " + path)
