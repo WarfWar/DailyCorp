@@ -377,6 +377,12 @@ func toast(message: String) -> void:
     notice = message
     notice_time = 3.5
 
+func top_bar_height() -> float:
+    return clampf(size.y*0.12,78.0,153.0)
+
+func bottom_bar_height() -> float:
+    return clampf(size.y*0.13,82.0,164.0)
+
 func screen(c: Vector2) -> Vector2:
     return Vector2(size.x * 0.5, size.y * 0.5) + (c - camera) * TILE * zoom
 
@@ -414,7 +420,7 @@ func _gui_input(event: InputEvent) -> void:
         fingers[d.index] = d.position
         if d.position.distance_to(starts.get(d.index, d.position)) > 12.0:
             moved[d.index] = true
-        if page == "" and fingers.size() == 1 and d.position.y > 155 and d.position.y < size.y - 166:
+        if page == "" and fingers.size() == 1 and d.position.y > top_bar_height() and d.position.y < size.y - bottom_bar_height():
             pan(d.position - old)
         elif page == "" and fingers.size() == 2:
             var ids := fingers.keys()
@@ -445,7 +451,7 @@ func _gui_input(event: InputEvent) -> void:
         var m: InputEventMouseMotion = event
         if m.position.distance_to(mouse_from) > 12.0:
             mouse_moved = true
-        if mouse_moved and page == "" and m.position.y > 155 and m.position.y < size.y - 166:
+        if mouse_moved and page == "" and m.position.y > top_bar_height() and m.position.y < size.y - bottom_bar_height():
             pan(m.position - mouse_last)
         mouse_last = m.position
         accept_event()
@@ -454,7 +460,7 @@ func footer_box(i: int) -> Rect2:
     var margin := 12.0
     var gap := 9.0
     var width := (size.x - 2.0 * margin - 3.0 * gap) / 4.0
-    return Rect2(margin + float(i) * (width + gap), size.y - 100.0, width, 62.0)
+    return Rect2(margin + float(i) * (width + gap), size.y-bottom_bar_height()+minf(64.0,bottom_bar_height()-55.0), width, minf(62.0,bottom_bar_height()-42.0))
 
 func modal_box() -> Rect2:
     var w := minf(size.x - 38.0, 630.0)
@@ -477,7 +483,7 @@ func tapped(point: Vector2) -> void:
     if page != "":
         # Accessible dialogs consume their own input.
         return
-    if point.y > size.y - 133.0:
+    if point.y > size.y - bottom_bar_height():
         for i in range(4):
             if footer_box(i).has_point(point):
                 match i:
@@ -491,7 +497,7 @@ func tapped(point: Vector2) -> void:
                         toast("Игра сохранена")
                 show_mine_dialog()
                 return
-    if point.y >= 155.0 and point.y < size.y - 145.0:
+    if point.y >= top_bar_height() and point.y < size.y-bottom_bar_height():
         command(to_cell(point))
 
 func act(index: int) -> void:
@@ -572,7 +578,8 @@ func write(text: String, pos: Vector2, scale: int = 20, color: Color = LIGHT) ->
 
 func button(rect: Rect2, caption: String, bright: bool = false) -> void:
     draw_rect(rect, GOLDEN if bright else Color("#344d65"))
-    write(caption, rect.position + Vector2(10, rect.size.y * 0.64), 16, BG if bright else LIGHT)
+    var font_size := clampi(roundi((rect.size.x-9.0)/(maxf(1.0,float(caption.length()))*0.67)),10,16)
+    write(caption, rect.position + Vector2(6, rect.size.y * 0.66), font_size, BG if bright else LIGHT)
 
 func _draw() -> void:
     if world_mode:
@@ -627,17 +634,23 @@ func _draw() -> void:
     draw_rect(Rect2(depot - Vector2(21, 20) * zoom, Vector2(42, 28) * zoom), Color("#bf8653"))
     draw_rect(Rect2(depot - Vector2(24, 22) * zoom, Vector2(48, 7) * zoom), Color("#f4d58e"))
     # HUD is painted last to hide map tiles behind the header/footer.
-    draw_rect(Rect2(0, 0, size.x, 153), PANEL)
-    draw_rect(Rect2(0, size.y - 164, size.x, 164), PANEL)
-    write("DAILYCORP / ШАХТА", Vector2(20, 42), 26, GOLDEN)
-    write("АЛЬФА 0.2", Vector2(size.x - 154, 38), 15, MUTED)
-    write("₽ %d" % cash, Vector2(20, 92), 29, GOLDEN)
+    var top_height := top_bar_height()
+    var bottom_height := bottom_bar_height()
+    draw_rect(Rect2(0,0,size.x,top_height),PANEL)
+    draw_rect(Rect2(0,size.y-bottom_height,size.x,bottom_height),PANEL)
+    var narrow := size.x < 560 or size.y < 700
+    write("DAILYCORP" if narrow else "DAILYCORP / ШАХТА",Vector2(16,30 if narrow else 42),20 if narrow else 26,GOLDEN)
+    if not narrow:
+        write("АЛЬФА 0.3",Vector2(size.x-150,38),15,MUTED)
+    write("₽ %d" % cash,Vector2(16,65 if narrow else 92),22 if narrow else 29,GOLDEN)
     var sum := 0
     for amount in stock.values():
         sum += int(amount)
-    write("Склад: %d" % sum, Vector2(size.x * 0.56, 89), 20)
-    write("Шахтёры: %d  ·  Вагонетки: %d  ·  Доставлено: %d" % [worker_count, cart_count, delivered], Vector2(20, 129), 16, MUTED)
-    write(notice, Vector2(18, size.y - 129), 17, GOLDEN)
+    write("Склад: %d" % sum,Vector2(size.x*0.54,65 if narrow else 89),16 if narrow else 20)
+    if not narrow:
+        write("Шахтёры: %d  ·  Вагонетки: %d  ·  Доставлено: %d" % [worker_count,cart_count,delivered],Vector2(16,129),16,MUTED)
+    if size.y >= 600:
+        write(notice,Vector2(15,size.y-bottom_height-8),15 if narrow else 17,GOLDEN)
     for i in range(4):
         button(footer_box(i), ["СКЛАД", "РАЗВИТИЕ", "МИР", "СОХР."][i], i == 1)
     # Mine dialogs use the accessible scrollable overlay.
