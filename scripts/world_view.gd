@@ -25,6 +25,20 @@ const PAPER := Color("#f4e9d2")
 const YELLOW := Color("#f2c47c")
 const MUTED := Color("#b0bec5")
 const CELL := 112.0
+const ISO_W := 143.0
+const ISO_H := 83.0
+const ISO_TERRAIN := [
+    preload("res://assets/iso07/terrain_0.webp"),
+    preload("res://assets/iso07/terrain_1.webp"),
+    preload("res://assets/iso07/terrain_2.webp"),
+    preload("res://assets/iso07/terrain_3.webp")
+]
+const ISO_BUILDINGS := [
+    preload("res://assets/iso07/buildings_0.webp"),
+    preload("res://assets/iso07/buildings_1.webp"),
+    preload("res://assets/iso07/buildings_2.webp")
+]
+const ISO_ICONS = preload("res://assets/iso07/icons.webp")
 const MAP_W := 21
 const MAP_H := 21
 const MINES := [
@@ -64,6 +78,7 @@ const RECIPES := {
 const PRODUCTS := {"coal":"Уголь","copper":"Медь","iron":"Железо","gold":"Золото","steel":"Сталь","wire":"Провода","parts":"Механизмы","electronics":"Электроника"}
 const PRICES := {"coal":12,"copper":28,"iron":42,"gold":110,"steel":160,"wire":60,"parts":495,"electronics":470}
 
+var world_roads: Dictionary = {}
 var game = null
 var dialog = null
 var warehouse_owned := [false, false, false, true]
@@ -415,15 +430,21 @@ func bottom_bar_height() -> float:
     return clampf(size.y * 0.105, 82.0, 122.0)
 
 func world_screen(p: Vector2) -> Vector2:
-    return size * 0.5 + (p - world_camera) * CELL * world_zoom
+    var rel := p-world_camera
+    return size*0.5+Vector2((rel.x-rel.y)*ISO_W*world_zoom*0.5,(rel.x+rel.y)*ISO_H*world_zoom*0.5)
 
 func world_from_screen(p: Vector2) -> Vector2:
-    return world_camera + (p - size * 0.5) / (CELL * world_zoom)
+    var point := (p-size*0.5)
+    var a := point.x/maxf(1.0,ISO_W*world_zoom*0.5)
+    var b := point.y/maxf(1.0,ISO_H*world_zoom*0.5)
+    return world_camera+Vector2((a+b)*0.5,(b-a)*0.5)
 
 func pan(delta: Vector2) -> void:
-    world_camera -= delta / (CELL * world_zoom)
-    world_camera.x = clampf(world_camera.x, 1.0, MAP_W - 2.0)
-    world_camera.y = clampf(world_camera.y, 1.0, MAP_H - 2.0)
+    var a := delta.x/maxf(1.0,ISO_W*world_zoom*0.5)
+    var b := delta.y/maxf(1.0,ISO_H*world_zoom*0.5)
+    world_camera -= Vector2((a+b)*0.5,(b-a)*0.5)
+    world_camera.x = clampf(world_camera.x,1.0,MAP_W-2.0)
+    world_camera.y = clampf(world_camera.y,1.0,MAP_H-2.0)
 
 func _gui_input(event: InputEvent) -> void:
     if event is InputEventScreenTouch:
@@ -503,7 +524,7 @@ func tapped(p: Vector2) -> void:
             panel = "assets"
             show_panel()
         return
-    var hit_radius := CELL * world_zoom * 0.8
+    var hit_radius := ISO_W * world_zoom * 0.67
     for i in range(MINES.size()):
         if world_screen(Vector2(MINES[i]["pos"])).distance_to(p) < hit_radius:
             selected_kind = "mine"
@@ -851,165 +872,242 @@ func panel_button(rect: Rect2, caption: String, accent: bool = false) -> void:
     var max_font := clampi(roundi((rect.size.x-12.0)/(maxf(1.0,float(caption.length()))*0.66)),10,17)
     txt(caption, rect.position + Vector2(7,rect.size.y*0.66), max_font, DARK if accent else PAPER)
 
-func building(p: Vector2, kind: String, owned: bool, label: String, desc: String) -> void:
-    # One textured entity per purchasable site. World-to-screen positions
-    # are exactly the same coordinates used by the tap hit-testing logic.
-    var texture: Texture2D = WORLD_ART.get(kind,WORLD_ART["market"])
-    var w := 181.0 * world_zoom
-    if kind == "warehouse":
-        w = 168.0 * world_zoom
-    elif kind == "market" or kind == "contract":
-        w = 145.0 * world_zoom
-    elif kind == "hangar" or kind == "barracks":
-        w = 161.0 * world_zoom
-    var h := w * float(texture.get_height()) / maxf(1.0,float(texture.get_width()))
-    var rect := Rect2(p + Vector2(-w * 0.5,-h * 0.79),Vector2(w,h))
-    draw_circle(p + Vector2(0,14)*world_zoom,w*0.30,Color(0.02,0.09,0.10,0.30))
-    var tone := Color.WHITE if owned else Color(0.55,0.62,0.70,0.72)
-    draw_texture_rect(texture,rect,false,tone)
+func tile_source(row: int, column: int) -> Rect2:
+    return Rect2(float(column)*210.0, 0.0, 210.0, 195.0)
+
+func tile_draw(p: Vector2, row: int, column: int) -> void:
+    var w := ISO_W * world_zoom * 1.08
+    var h := ISO_H * world_zoom * 2.05
+    var region := tile_source(row, column)
+    draw_texture_rect_region(ISO_TERRAIN[row], Rect2(p.x-w*0.5,p.y-h*0.50,w,h), region)
+
+func field_kind(x: int, y: int) -> Vector2i:
+    # Deterministic geography, never re-randomized by a redraw or save.
+    var h := posmod(x*397+y*241+x*y*37,100)
+    var close_to_property := false
+    var cell := Vector2(x,y)
+    for data in MINES:
+        if cell.distance_to(Vector2(data["pos"])) < 1.7:
+            close_to_property = true
+    for data in FACTORIES:
+        if cell.distance_to(Vector2(data["pos"])) < 1.7:
+            close_to_property = true
+    for data in WAREHOUSES:
+        if cell.distance_to(Vector2(data["pos"])) < 1.6:
+            close_to_property = true
+    for place in [MARKET_POS,BARRACKS_POS,HANGAR_POS,CONTRACT_POS]:
+        if cell.distance_to(Vector2(place)) < 1.5:
+            close_to_property = true
+    # Open water is always away from properties and essential roads.
+    if not close_to_property and (x == 19 or x == 20) and y > 3 and y < 18:
+        return Vector2i(2,0 if y%3 == 0 else 1)
+    if not close_to_property and h < 13:
+        return Vector2i(1,0 if h<6 else 1)
+    if not close_to_property and h > 92:
+        return Vector2i(1,2 if h<96 else 3)
+    if h < 34:
+        return Vector2i(0,0)
+    if h < 64:
+        return Vector2i(0,1)
+    if h < 76:
+        return Vector2i(0,2)
+    if h < 89:
+        return Vector2i(0,3)
+    return Vector2i(0,5)
+
+func road_key(x: int,y: int) -> String:
+    return "%d:%d" % [x,y]
+
+func make_road_network() -> Dictionary:
+    var network: Dictionary = {}
+    # Every road is built from discrete connected map cells, not overlay lines.
+    var connections: Array = [
+        [MARKET_POS,CONTRACT_POS], [MARKET_POS,Vector2i(13,3)],
+        [MARKET_POS,Vector2i(11,10)], [MARKET_POS,Vector2i(4,6)],
+        [MARKET_POS,Vector2i(15,8)], [Vector2i(15,8),Vector2i(16,5)],
+        [Vector2i(15,8),Vector2i(15,13)], [Vector2i(11,10),Vector2i(12,12)],
+        [Vector2i(11,10),Vector2i(8,9)], [Vector2i(8,9),Vector2i(7,7)],
+        [Vector2i(7,7),BARRACKS_POS], [BARRACKS_POS,Vector2i(3,11)],
+        [Vector2i(3,11),Vector2i(5,14)], [Vector2i(5,14),Vector2i(8,15)],
+        [Vector2i(8,15),Vector2i(13,17)], [HANGAR_POS,Vector2i(8,15)],
+        [Vector2i(11,10),HANGAR_POS], [Vector2i(8,9),Vector2i(8,15)]
+    ]
+    for link in connections:
+        var start: Vector2i = link[0]
+        var goal: Vector2i = link[1]
+        var cell := start
+        network[road_key(cell.x,cell.y)] = true
+        # Use Manhattan segments for a continuous grid-based road network.
+        while cell.x != goal.x:
+            cell.x += 1 if cell.x < goal.x else -1
+            network[road_key(cell.x,cell.y)] = true
+        while cell.y != goal.y:
+            cell.y += 1 if cell.y < goal.y else -1
+            network[road_key(cell.x,cell.y)] = true
+    return network
+
+func road_piece(x:int,y:int) -> int:
+    var a := world_roads.has(road_key(x-1,y))
+    var b := world_roads.has(road_key(x+1,y))
+    var c := world_roads.has(road_key(x,y-1))
+    var d := world_roads.has(road_key(x,y+1))
+    var count := int(a)+int(b)+int(c)+int(d)
+    if count >= 4:
+        return 3 # intersection
+    if count == 3:
+        return 2 # T-junction
+    if count == 2 and ((a or b) and (c or d)):
+        return 1 # corner
+    return 0 # straight
+
+func atlas_building(kind: String, owned: bool, index: int) -> Vector2i:
+    match kind:
+        "mine": return Vector2i(0,0) if owned else Vector2i(1,0)
+        "factory": return Vector2i(2,0) if owned else Vector2i(3,0)
+        "warehouse":
+            if index == 3:
+                return Vector2i(3,2)
+            return Vector2i(0,1) if owned else Vector2i(3,0)
+        "market": return Vector2i(1,1)
+        "contract": return Vector2i(2,1)
+        "barracks": return Vector2i(3,1)
+        "hangar": return Vector2i(0,2)
+    return Vector2i(3,2)
+
+func rounded_plate(rect: Rect2, fill: Color, edge: Color, corners: int = 13) -> void:
+    var style := StyleBoxFlat.new()
+    style.bg_color=fill
+    style.border_color=edge
+    style.set_border_width_all(2)
+    style.set_corner_radius_all(corners)
+    style.shadow_color=Color(0,0,0,0.24)
+    style.shadow_size=4
+    draw_style_box(style,rect)
+
+func building(p: Vector2, kind: String, owned: bool, label: String, desc: String, index: int = 0) -> void:
+    var tile := atlas_building(kind,owned,index)
+    var sheet: Texture2D = ISO_BUILDINGS[tile.y]
+    var ratio := 1.0
+    if kind == "market" or kind == "contract":
+        ratio = 0.88
+    var width := ISO_W*world_zoom*1.58*ratio
+    var height := width
+    # One visual instance per purchased business, with gameplay-driven states.
+    var place := Rect2(p.x-width/2.0,p.y-height*0.85,width,height)
+    draw_texture_rect_region(sheet,place,Rect2(tile.x*244.0,0,244,244),Color.WHITE)
+    if not owned:
+        draw_rect(Rect2(p.x-width*0.47,p.y-height*0.27,width*0.94,16.0*world_zoom),Color(0.05,0.12,0.18,0.51))
     if owned and kind == "factory":
-        # Functional smoke is animated over the real factory sprite.
-        for puff in range(3):
-            var age := fposmod(time*0.32 + puff*0.28,1.0)
-            var center := p + Vector2(w*0.08 + sin(time*1.6+float(puff))*10,-h*0.68-age*38.0*world_zoom)
-            draw_circle(center,(5.0+age*10.0)*world_zoom,Color(0.80,0.87,0.86,(1.0-age)*0.29))
+        for i in range(3):
+            var fraction := fposmod(time*0.34+float(i)*0.29,1.0)
+            var center := p+Vector2(5+sin(time*1.8+float(i))*7,-height*0.78-fraction*31.0*world_zoom)
+            draw_circle(center,(4.0+fraction*9.0)*world_zoom,Color(0.91,0.92,0.91,0.26*(1.0-fraction)))
     if owned and kind == "mine":
-        var glow := 0.10+0.06*(1.0+sin(time*3.0))
-        draw_circle(p + Vector2(w*0.06,-h*0.39),6.0*world_zoom,Color(1.0,0.75,0.35,glow))
-    var text_width := clampf(147.0*world_zoom,104,180)
-    var font_size := clampi(roundi(14.0*world_zoom),11,16)
-    var lx := p.x-text_width*0.5
-    var ly := p.y+maxf(18.0,25.0*world_zoom)
-    var panel_rect := Rect2(lx,ly, text_width,41*world_zoom+8)
-    draw_rect(panel_rect,Color("#10293a",0.95))
-    draw_rect(Rect2(lx,ly,text_width,3.0),YELLOW if owned else Color("#748a97"))
-    txt(label,Vector2(lx+7,ly+19*world_zoom+4),font_size,PAPER)
-    txt(desc,Vector2(lx+7,ly+39*world_zoom+3),maxi(10,font_size-1),YELLOW if owned else MUTED)
+        var pulse := (sin(time*2.7)+1.0)*0.5
+        draw_circle(p+Vector2(5.0,-height*0.40),maxf(2.0,5.0*world_zoom),Color(1.0,0.70,0.18,0.12+0.12*pulse))
+    var w := clampf(153.0*world_zoom,104.0,190.0)
+    var label_rect := Rect2(p.x-w*0.5,p.y+8.0*world_zoom,w,44.0*world_zoom+8.0)
+    rounded_plate(label_rect,Color("#082238",0.94),Color("#c69c59",0.90) if owned else Color("#7894a0",0.62),6)
+    var font_size := clampi(roundi(world_zoom*15.0),11,17)
+    txt(label,Vector2(label_rect.position.x+7,label_rect.position.y+19*world_zoom+2),font_size,PAPER)
+    txt(desc,Vector2(label_rect.position.x+7,label_rect.position.y+40*world_zoom+2),maxi(10,font_size-1),YELLOW if owned else MUTED)
 
-func draw_road(a: Vector2, b: Vector2) -> void:
-    var width := maxf(4.0,19.0*world_zoom)
-    draw_line(a+Vector2(1,3),b+Vector2(1,3),Color("#152c29",0.7),width+8.0*world_zoom,true)
-    draw_line(a,b,Color("#9b8f77"),width+5.0*world_zoom,true)
-    draw_line(a,b,Color("#515b59"),width,true)
-    # Dashed center stripe - visually follows the actual editable road link.
-    var direction := b-a
-    var length := direction.length()
-    if length < 2.0:
-        return
-    direction /= length
-    var steps := int(length/(30.0*world_zoom))
-    for i in range(steps):
-        var t := (float(i)+0.2) / float(maxi(1,steps))
-        var begin := a + (b-a)*t
-        draw_line(begin,begin+direction*minf(12.0*world_zoom,length/float(maxi(1,steps))),Color("#d4c5a0",0.9),maxf(1.0,2.0*world_zoom),true)
+func draw_truck(p: Vector2, moving: bool) -> void:
+    var z := world_zoom
+    var bounce := sin(time*11.0)*0.8 if moving else 0.0
+    var center := p+Vector2(0,bounce)
+    draw_rect(Rect2(center+Vector2(-16,-9)*z,Vector2(25,14)*z),Color("#d49c37"))
+    draw_rect(Rect2(center+Vector2(9,-6)*z,Vector2(11,11)*z),Color("#86b4c7"))
+    draw_circle(center+Vector2(-9,7)*z,4*z,Color("#172533"))
+    draw_circle(center+Vector2(12,7)*z,4*z,Color("#172533"))
+    draw_rect(Rect2(center+Vector2(-11,-10)*z,Vector2(14,3)*z),Color("#edd4a5"))
 
-func world_forest(p: Vector2, x: int, y: int) -> void:
-    if (x*31+y*19)%7 == 0:
-        var s := (0.36+float(posmod(x+y,4))*0.035)*world_zoom
-        var w := float(GROVE_ART.get_width())*s
-        var h := float(GROVE_ART.get_height())*s
-        draw_texture_rect(GROVE_ART,Rect2(p.x-w*0.5,p.y-h*0.6,w,h),false)
-    elif (x*17+y*11)%23 == 0:
-        var s := 0.34*world_zoom
-        draw_texture_rect(ROCK_ART,Rect2(p.x-35*world_zoom,p.y-41*world_zoom,70*world_zoom,82*world_zoom),false,Color(0.92,0.95,0.93))
+func hud_icon(i: int, rect: Rect2) -> void:
+    draw_texture_rect_region(ISO_ICONS,rect,Rect2(float(i)*112.0,0.0,112.0,112.0))
+
+func premium_nav(rect: Rect2, caption: String, icon_index: int, active: bool = false) -> void:
+    rounded_plate(rect,Color("#eebf67") if active else Color("#0b2b46",0.98),Color("#facf81") if active else Color("#557c95"),9)
+    var square := minf(rect.size.y-8.0,45.0)
+    var icon_rect := Rect2(rect.position.x+5,rect.position.y+(rect.size.y-square)/2,square,square)
+    hud_icon(icon_index,icon_rect)
+    var fontsize := clampi(roundi((rect.size.x-square-14)/maxf(3.0,float(caption.length()))*1.45),10,18)
+    txt(caption,Vector2(icon_rect.end.x+1,rect.position.y+rect.size.y*0.62),fontsize,Color("#132a3a") if active else PAPER)
+
+func draw_world_hud() -> void:
+    var top_height := top_bar_height()
+    var bottom_height := bottom_bar_height()
+    draw_rect(Rect2(0,0,size.x,top_height),Color("#071b2d",0.96))
+    draw_rect(Rect2(0,top_height-2,size.x,2),Color("#d0a660"))
+    draw_rect(Rect2(0,size.y-bottom_height,size.x,bottom_height),Color("#071b2d",0.97))
+    draw_rect(Rect2(0,size.y-bottom_height,size.x,2),Color("#d0a660"))
+    var narrow := size.x < 560 or size.y < 700
+    txt("DAILYCORP / МИР" if not narrow else "DAILYCORP",Vector2(17,30 if narrow else 36),21 if narrow else 26,YELLOW)
+    if not narrow:
+        txt("АЛЬФА 0.7",Vector2(size.x-144,30),14,MUTED)
+    txt("₽ %d" % game.cash,Vector2(16,66 if narrow else 86),25 if narrow else 29,YELLOW)
+    var amount := 0
+    for count in game.stock.values():
+        amount += int(count)
+    var inventory := Rect2(size.x*0.55,43 if narrow else 53,size.x*0.40,40)
+    rounded_plate(inventory,Color("#102d44"),Color("#caa666"),9)
+    txt("СКЛАД: %d" % amount,Vector2(inventory.position.x+11,inventory.position.y+26),16,PAPER)
+    if not narrow:
+        txt("Шахты %d/4  ·  Заводы %d/4  ·  Склады %d/4" % [mine_owned.count(true),factory_owned.count(true),warehouse_owned.count(true)],Vector2(17,127),15,MUTED)
+    for i in range(4):
+        premium_nav(bottom_button(i),["РЫНОК","ОБЪЕКТЫ","ПОМОЩЬ","СОХР."][i],i,i==0)
 
 func _draw() -> void:
     if game == null:
         return
-    draw_rect(Rect2(Vector2.ZERO,size),GREEN)
-    var scale := CELL * world_zoom
-    var left := maxi(0, floori(world_camera.x - size.x/2.0/scale) - 2)
-    var right := mini(MAP_W-1, ceili(world_camera.x + size.x/2.0/scale) + 2)
-    var top := maxi(0, floori(world_camera.y - size.y/2.0/scale) - 2)
-    var bottom := mini(MAP_H-1, ceili(world_camera.y + size.y/2.0/scale) + 2)
-    # Living terrain: three organic textured grass variants, scattered real forest
-    # assets and individually connected roads rather than flat debug squares.
-    for y in range(top,bottom+1):
-        for x in range(left,right+1):
-            var p := world_screen(Vector2(x,y))
-            var terrain_index := posmod(x*19+y*41,3)
-            var terrain: Texture2D = TERRAIN_ART[terrain_index]
-            draw_texture_rect(terrain,Rect2(p-Vector2.ONE*scale*0.5,Vector2.ONE*(scale+1.0)),false)
-            var near_site := false
-            for site in MINES:
-                if Vector2(site["pos"]).distance_to(Vector2(x,y)) < 1.4:
-                    near_site = true
-            for site in FACTORIES:
-                if Vector2(site["pos"]).distance_to(Vector2(x,y)) < 1.3:
-                    near_site = true
-            for site in WAREHOUSES:
-                if Vector2(site["pos"]).distance_to(Vector2(x,y)) < 1.2:
-                    near_site = true
-            if Vector2(MARKET_POS).distance_to(Vector2(x,y)) < 1.3:
-                near_site = true
-            if not near_site:
-                world_forest(p,x,y)
-    # A clean, editable road network: link important intersections to sites.
-    var hub := Vector2i(10,8)
-    var links: Array = [
-        [hub,MARKET_POS],[hub,Vector2i(8,9)],[hub,Vector2i(11,10)],
-        [hub,Vector2i(7,7)],[hub,Vector2i(15,8)],[Vector2i(15,8),Vector2i(16,5)],
-        [Vector2i(15,8),Vector2i(15,13)],[hub,Vector2i(12,12)],
-        [Vector2i(12,12),Vector2i(13,17)],[Vector2i(12,12),Vector2i(8,15)],
-        [Vector2i(8,15),Vector2i(5,14)],[Vector2i(7,7),BARRACKS_POS],
-        [BARRACKS_POS,Vector2i(4,6)],[BARRACKS_POS,Vector2i(3,11)],
-        [MARKET_POS,CONTRACT_POS],[MARKET_POS,Vector2i(13,3)],
-        [Vector2i(8,9),Vector2i(8,15)]
-    ]
-    for segment in links:
-        draw_road(world_screen(Vector2(segment[0])),world_screen(Vector2(segment[1])))
+    draw_rect(Rect2(Vector2.ZERO,size),Color("#173e47"))
+    if world_roads.is_empty():
+        world_roads = make_road_network()
+    # Back-to-front depth order keeps isometric cliff edges and trees coherent.
+    for depth in range(MAP_W+MAP_H-1):
+        for x in range(MAP_W):
+            var y := depth-x
+            if y < 0 or y >= MAP_H:
+                continue
+            var position := world_screen(Vector2(x,y))
+            var ground := field_kind(x,y)
+            if world_roads.has(road_key(x,y)):
+                tile_draw(position,3,road_piece(x,y))
+            else:
+                tile_draw(position,ground.x,ground.y)
+    # Independently modeled buildings, one per game property, never baked into map.
     for i in range(MINES.size()):
-        var data: Dictionary = MINES[i]
-        building(world_screen(Vector2(data["pos"])),"mine",mine_owned[i],str(data["name"]),"ОТКРЫТА" if mine_owned[i] else "%d ₽" % data["cost"])
+        var site: Dictionary = MINES[i]
+        building(world_screen(Vector2(site["pos"])),"mine",mine_owned[i],str(site["name"]),"ОТКРЫТА" if mine_owned[i] else "%d ₽" % site["cost"],i)
     for i in range(FACTORIES.size()):
-        var data: Dictionary = FACTORIES[i]
-        var note := "%d ₽" % data["cost"]
+        var site: Dictionary = FACTORIES[i]
+        var caption := "%d ₽" % site["cost"]
         if factory_owned[i]:
-            note = str(RECIPES[factory_recipes[i]]["title"]) + " · ур." + str(factory_levels[i])
-        building(world_screen(Vector2(data["pos"])),"factory",factory_owned[i],str(data["name"]),note)
+            caption = str(RECIPES[factory_recipes[i]]["title"]) + " · ур." + str(factory_levels[i])
+        building(world_screen(Vector2(site["pos"])),"factory",factory_owned[i],str(site["name"]),caption,i)
     for i in range(WAREHOUSES.size()):
-        var warehouse: Dictionary = WAREHOUSES[i]
-        var name: String = str(warehouse["name"])
-        var status := "КУПЛЕН" if warehouse_owned[i] else "%d ₽" % warehouse["cost"]
-        building(world_screen(Vector2(warehouse["pos"])),"warehouse",warehouse_owned[i],name,status)
-    building(world_screen(Vector2(BARRACKS_POS)),"barracks",true,"КАЗАРМА","РАБОЧИЕ")
+        var site: Dictionary = WAREHOUSES[i]
+        building(world_screen(Vector2(site["pos"])),"warehouse",warehouse_owned[i],str(site["name"]),"КУПЛЕН" if warehouse_owned[i] else "%d ₽" % site["cost"],i)
+    building(world_screen(Vector2(BARRACKS_POS)),"barracks",true,"КАЗАРМА","ПЕРСОНАЛ")
     building(world_screen(Vector2(HANGAR_POS)),"hangar",true,"АНГАР","МАШИНЫ")
     building(world_screen(Vector2(CONTRACT_POS)),"contract",true,"ЗАКАЗЫ","ГОРОД")
-    building(world_screen(Vector2(MARKET_POS)),"market",true,"РЫНОК","ПРОДАЖА")
+    building(world_screen(Vector2(MARKET_POS)),"market",true,"РЫНОК","ТОРГОВЛЯ")
     if game.operations != null:
         for truck in game.operations.vehicles:
+            var origin := Vector2(MINES[int(truck["mine"])]["pos"])
             if truck["state"] == "idle":
+                draw_truck(world_screen(origin),false)
                 continue
-            var place: Vector2 = Vector2(MINES[int(truck["mine"])]["pos"])
             var target: Dictionary = truck["destination"]
-            var destination := Vector2(WAREHOUSES[int(target["index"])]["pos"]) if target["type"] == "warehouse" else Vector2(FACTORIES[int(target["index"])]["pos"])
+            var dest := Vector2(WAREHOUSES[int(target["index"])]["pos"]) if target["type"] == "warehouse" else Vector2(FACTORIES[int(target["index"])]["pos"])
             var duration: float = game.operations.road_seconds(int(truck["mine"]),target,int(truck["level"]))
-            var progress := clampf(1.0-float(truck["remaining"])/duration,0.0,1.0)
-            var position: Vector2 = place.lerp(destination,progress) if truck["state"] == "delivery" else destination.lerp(place,progress)
-            var point := world_screen(position)
-            draw_rect(Rect2(point-Vector2(14,8)*world_zoom,Vector2(29,17)*world_zoom),Color("#f0c873"))
-            draw_circle(point+Vector2(-8,11)*world_zoom,4*world_zoom,Color("#1c2a33"))
-            draw_circle(point+Vector2(8,11)*world_zoom,4*world_zoom,Color("#1c2a33"))
-    var top_height := top_bar_height()
-    var bottom_height := bottom_bar_height()
-    draw_rect(Rect2(0,0,size.x,top_height),PANEL)
-    draw_rect(Rect2(0,size.y-bottom_height,size.x,bottom_height),PANEL)
-    var narrow := size.x < 560 or size.y < 700
-    txt("DAILYCORP / МИР" if not narrow else "DAILYCORP",Vector2(15,30 if narrow else 38),20 if narrow else 27,YELLOW)
-    if not narrow:
-        txt("АЛЬФА 0.6",Vector2(size.x-145,36),15,MUTED)
-    txt("₽ %d" % game.cash,Vector2(15,65 if narrow else 90),22 if narrow else 29,YELLOW)
-    var total := 0
-    for amount in game.stock.values():
-        total += int(amount)
-    txt("Склад: %d" % total,Vector2(size.x*0.52,65 if narrow else 89),16 if narrow else 19,PAPER)
-    if not narrow:
-        txt("Шахты: %d/4  ·  Заводы: %d/4  ·  Склады: %d/4" % [mine_owned.count(true),factory_owned.count(true),warehouse_owned.count(true)],Vector2(15,125),16,MUTED)
-    if size.y >= 600:
-        txt(info,Vector2(15,size.y-bottom_height-8),14 if narrow else 16,YELLOW)
-    for i in range(4):
-        panel_button(bottom_button(i),["РЫНОК","ОБЪЕКТЫ","ПОМОЩЬ","СОХР."][i],i==0)
-    # World dialogs are real controls; no off-screen draw commands are used.
+            var t := clampf(1.0-float(truck["remaining"])/maxf(0.01,duration),0.0,1.0)
+            if truck["state"] == "return":
+                t = 1.0-t
+            # Two-stage road motion instead of teleporting or straight-line dragging.
+            var corner := Vector2(dest.x,origin.y)
+            var motion: Vector2 = origin.lerp(corner,t*2.0) if t < 0.5 else corner.lerp(dest,(t-0.5)*2.0)
+            draw_truck(world_screen(motion),true)
+    draw_world_hud()
 
 func draw_popup() -> void:
     draw_rect(Rect2(Vector2.ZERO,size),Color(0.02,0.05,0.08,0.86))
