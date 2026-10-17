@@ -11,7 +11,7 @@ config/description="Mobile mining logistics strategy"
 window/size/viewport_width=720
 window/size/viewport_height=1280
 window/stretch/mode="canvas_items"
-window/handheld/orientation=1
+window/handheld/orientation=6
 
 [rendering]
 textures/vram_compression/import_etc2_astc=true
