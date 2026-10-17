@@ -66,6 +66,30 @@ func _run() -> void:
         if box.size.x < 40 or box.size.y < 40:
             fail("Bottom control is too small to tap")
             return
+    # The old opaque centered modal is gone: market docks to the right and
+    # retains live button actions on a readable, translucent map.
+    world.panel = "trade"
+    world.tab = 0
+    world.show_panel()
+    await process_frame
+    if world.dialog.blocker.color.a > 0.45:
+        fail("Market still obscures the whole world with an opaque blackout")
+        return
+    if world.dialog.size.x >= 780:
+        if world.dialog.frame.position.x < world.dialog.size.x*0.47:
+            fail("Trade terminal is still centered rather than right-docked")
+            return
+    var trade_buttons := 0
+    for node in world.dialog.content.get_children():
+        if node is Button and node.text.begins_with("ПРОДАТЬ"):
+            trade_buttons += 1
+    if trade_buttons != 4:
+        fail("Trading terminal does not present four live commodity cards")
+        return
+    world.close_panel()
+    if world.dialog.visible:
+        fail("Docked trading terminal cannot be closed")
+        return
     world.queue_redraw()
     await process_frame
     print("VISUAL UI TEST PASSED: depth sorting, fitted sprites, off-road lots, animated purchase, console buttons")
