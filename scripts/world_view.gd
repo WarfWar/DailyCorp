@@ -1149,7 +1149,7 @@ func draw_world_hud() -> void:
     var narrow := size.x < 560 or size.y < 700
     txt("DAILYCORP / МИР" if not narrow else "DAILYCORP",Vector2(17,30 if narrow else 36),21 if narrow else 26,YELLOW)
     if not narrow:
-        txt("АЛЬФА 0.7",Vector2(size.x-144,30),14,MUTED)
+        txt("АЛЬФА 0.8",Vector2(size.x-144,30),14,MUTED)
     txt("₽ %d" % game.cash,Vector2(16,66 if narrow else 86),25 if narrow else 29,YELLOW)
     var amount := 0
     for count in game.stock.values():
