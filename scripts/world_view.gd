@@ -1180,7 +1180,7 @@ func draw_console_icon(kind: int,center: Vector2,accent: Color) -> void:
             draw_line(Vector2(x-rr,y-rr*0.65),Vector2(x-rr,y+rr*0.60),accent,2.0,true)
             draw_line(Vector2(x-rr,y+rr*0.60),Vector2(x+rr,y+rr*0.60),accent,2.0,true)
             for i in range(3):
-                var bar_height := [0.40,0.95,0.67][i]*rr
+                var bar_height: float = [0.40,0.95,0.67][i]*rr
                 draw_rect(Rect2(x-rr*0.75+float(i)*rr*0.66,y+rr*0.34-bar_height,rr*0.38,bar_height),accent)
         1:
             draw_circle(Vector2(x,y-rr*0.75),rr*0.34,accent)
