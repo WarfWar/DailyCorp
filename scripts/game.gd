@@ -85,7 +85,8 @@ func _ready() -> void:
     art_screen.game = self
     add_child(art_screen)
     art_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    art_screen.present("world",0)
+    # v0.6: play on the real textured world, not on static poster/screenshots.
+    art_screen.hide()
     set_process(true)
     queue_redraw()
 
@@ -627,8 +628,8 @@ func tapped(point: Vector2) -> void:
                 show_mine_dialog()
                 return
     if point.y <= top_bar_height() and point.x >= size.x*0.69:
-        if art_screen != null:
-            art_screen.present("mine",active_mine)
+        page = "upgrade"
+        show_mine_dialog()
         return
     if point.y >= top_bar_height() and point.y < size.y-bottom_bar_height():
         command(to_cell(point))
@@ -768,7 +769,7 @@ func _draw() -> void:
     var narrow := size.x < 560 or size.y < 700
     write("DAILYCORP" if narrow else "DAILYCORP / ШАХТА",Vector2(16,30 if narrow else 42),20 if narrow else 26,GOLDEN)
     if not narrow:
-        write("АЛЬФА 0.3",Vector2(size.x-150,38),15,MUTED)
+        write("АЛЬФА 0.6",Vector2(size.x-150,38),15,MUTED)
     write("₽ %d" % cash,Vector2(16,65 if narrow else 92),22 if narrow else 29,GOLDEN)
     var sum := 0
     for amount in stock.values():
@@ -995,7 +996,7 @@ func enter_mine(index: int) -> void:
     mine_dialog.hide()
     toast("Добыча: шахта №%d" % (index+1))
     if art_screen != null:
-        art_screen.present("mine",index)
+        art_screen.hide()
     queue_redraw()
     save_game()
 
@@ -1009,7 +1010,7 @@ func go_world() -> void:
         world_view.show()
         world_view.queue_redraw()
     if art_screen != null:
-        art_screen.present("world",0)
+        art_screen.hide()
     save_game()
 
 func _notification(what: int) -> void:
