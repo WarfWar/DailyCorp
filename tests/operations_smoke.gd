@@ -29,6 +29,11 @@ func _check() -> void:
         for key in ops.ORES:
             ops.factory_inputs[i][key] = 0
     # A single ore tile has finite inventory; mine produces a single unit per cycle.
+    # Smoke tests share user:// saves: return to the staffed starter mine.
+    game.active_mine = 0
+    for person in game.operations.personnel:
+        if int(person["id"]) <= 2:
+            person["mine"] = 0
     game.fresh_game()
     var cell := Vector2i(20,9)
     if game.tile(cell) != game.GOLD:
