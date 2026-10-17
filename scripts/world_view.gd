@@ -1076,6 +1076,25 @@ func premium_nav(rect: Rect2, caption: String, icon_index: int, active: bool = f
     var fontsize := clampi(roundi((rect.size.x-square-14)/maxf(3.0,float(caption.length()))*1.45),10,18)
     txt(caption,Vector2(icon_rect.end.x+1,rect.position.y+rect.size.y*0.62),fontsize,Color("#132a3a") if active else PAPER)
 
+func draw_empty_plot(p: Vector2, index: int) -> void:
+    var owned := bool(expansion_owned[index])
+    var rx := ISO_W*world_zoom*0.45
+    var ry := ISO_H*world_zoom*0.45
+    var points := PackedVector2Array([
+        p+Vector2(0,-ry),p+Vector2(rx,0),p+Vector2(0,ry),p+Vector2(-rx,0)
+    ])
+    draw_colored_polygon(points,Color("#668a63",0.28) if owned else Color("#668b58",0.10))
+    for i in range(4):
+        draw_line(points[i],points[(i+1)%4],
+            Color("#ecc477",0.85) if owned else Color("#d9c39c",0.65),
+            maxf(1.0,2.0*world_zoom),true)
+    var label := "УЧАСТОК %d" % (index+1)
+    var width := maxf(90.0,108.0*world_zoom)
+    var box := Rect2(p.x-width*0.5,p.y+ry+3,width,maxf(24.0,30.0*world_zoom))
+    rounded_plate(box,Color("#112c3d",0.88),Color("#e3ba6a",0.65) if owned else Color("#547382",0.65),6)
+    txt(label,box.position+Vector2(6,box.size.y*0.67),clampi(roundi(12.0*world_zoom),10,14),
+        YELLOW if owned else PAPER)
+
 func draw_world_hud() -> void:
     var top_height := top_bar_height()
     var bottom_height := bottom_bar_height()
@@ -1113,10 +1132,16 @@ func _draw() -> void:
                 continue
             var position := world_screen(Vector2(x,y))
             var ground := field_kind(x,y)
-            if world_roads.has(road_key(x,y)):
-                tile_draw(position,3,road_piece(x,y))
-            else:
-                tile_draw(position,ground.x,ground.y)
+            if position.x < -220 or position.x > size.x+220 or position.y < -220 or position.y > size.y+220:
+                continue
+            tile_draw(position,ground.x,ground.y)
+    draw_road_system()
+    for index in range(EXPANSION_PLOTS.size()):
+        var location: Vector2i = EXPANSION_PLOTS[index]
+        var center := world_screen(Vector2(location))
+        if center.x < -120 or center.x > size.x+120 or center.y < -120 or center.y > size.y+120:
+            continue
+        draw_empty_plot(center,index)
     # Independently modeled buildings, one per game property, never baked into map.
     for i in range(MINES.size()):
         var site: Dictionary = MINES[i]
@@ -1136,19 +1161,19 @@ func _draw() -> void:
     building(world_screen(Vector2(MARKET_POS)),"market",true,"РЫНОК","ТОРГОВЛЯ")
     if game.operations != null:
         for truck in game.operations.vehicles:
-            var origin := Vector2(MINES[int(truck["mine"])]["pos"])
+            var origin: Vector2 = Vector2(MINES[int(truck["mine"])]["pos"])
             if truck["state"] == "idle":
                 draw_truck(world_screen(origin),false)
                 continue
             var target: Dictionary = truck["destination"]
-            var dest := Vector2(WAREHOUSES[int(target["index"])]["pos"]) if target["type"] == "warehouse" else Vector2(FACTORIES[int(target["index"])]["pos"])
+            var route: Array = haul_route(int(truck["mine"]),target)
+            if route.is_empty():
+                continue
             var duration: float = game.operations.road_seconds(int(truck["mine"]),target,int(truck["level"]))
-            var t := clampf(1.0-float(truck["remaining"])/maxf(0.01,duration),0.0,1.0)
+            var progress := clampf(1.0-float(truck["remaining"])/maxf(0.01,duration),0.0,1.0)
             if truck["state"] == "return":
-                t = 1.0-t
-            # Two-stage road motion instead of teleporting or straight-line dragging.
-            var corner := Vector2(dest.x,origin.y)
-            var motion: Vector2 = origin.lerp(corner,t*2.0) if t < 0.5 else corner.lerp(dest,(t-0.5)*2.0)
+                progress = 1.0-progress
+            var motion: Vector2 = road_planner.point_along(route,progress)
             draw_truck(world_screen(motion),true)
     draw_world_hud()
 
