@@ -108,7 +108,10 @@ func show_mine_dialog() -> void:
         "confirm":
             title = "Новая шахта"
             lines = ["Внимание! Это сбросит текущую подземную карту."]
-    mine_dialog.present(title, lines, modal_buttons(), Callable(self,"act"))
+    var commands_to_show: Array = modal_buttons()
+    if not commands_to_show.is_empty() and commands_to_show.back() == "ЗАКРЫТЬ":
+        commands_to_show.pop_back()
+    mine_dialog.present(title, lines, commands_to_show, Callable(self,"act"))
 
 func storage_capacity(key: String) -> int:
     return world_view.capacity(key) if world_view != null else 20
