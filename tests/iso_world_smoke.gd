@@ -43,7 +43,7 @@ func _check() -> void:
     if restored.distance_to(Vector2(12,8)) > 0.02:
         fail("Screen-to-world inverse broke tap hit-testing")
         return
-    var original := world.world_camera
+    var original: Vector2 = world.world_camera
     world.pan(Vector2(40,-30))
     if world.world_camera.distance_to(original) < 0.01:
         fail("Map cannot be panned")
