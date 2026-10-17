@@ -79,6 +79,14 @@ jobs:
             exit 1
           fi
 
+      - name: Test factory economics and purchased mine saves
+        run: |
+          godot --headless --path . --script res://tests/economy_smoke.gd 2>&1 | tee /tmp/economy-test.log
+          grep -q "ECONOMY TEST PASSED" /tmp/economy-test.log
+          if grep -E "SCRIPT ERROR|Parse Error|ECONOMY TEST FAILED" /tmp/economy-test.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
