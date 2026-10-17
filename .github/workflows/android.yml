@@ -47,6 +47,12 @@ jobs:
           godot --version
           test -f "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_debug.apk"
 
+      - name: Restore reusable debug-signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/dailycorp-debug.keystore
+          key: dailycorp-debug-key-v1
+
       - name: Configure Android export and debug signing
         run: |
           mkdir -p "$HOME/.config/godot"
@@ -58,7 +64,9 @@ jobs:
           export/android/java_sdk_path = "${JAVA_HOME}"
           EOF
           mkdir -p "$HOME/.android"
-          keytool -genkeypair -keystore "$HOME/.android/dailycorp-debug.keystore" -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=DailyCorp,C=US"
+          if [ ! -f "$HOME/.android/dailycorp-debug.keystore" ]; then
+            keytool -genkeypair -keystore "$HOME/.android/dailycorp-debug.keystore" -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=DailyCorp,C=US"
+          fi
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$HOME/.android/dailycorp-debug.keystore" >> "$GITHUB_ENV"
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> "$GITHUB_ENV"
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> "$GITHUB_ENV"
