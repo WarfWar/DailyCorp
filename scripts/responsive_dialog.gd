@@ -214,15 +214,16 @@ func rebuild() -> void:
         child.queue_free()
     if is_trade():
         # Market becomes a live commodity terminal: individual clickable trade cards.
-        append_info("Торговый терминал · продажа всего запаса выбранного материала.",true)
+        append_info("РЕСУРСНАЯ БИРЖА   /   живые цены и запасы",true)
+        if commands.size() > 4:
+            append_section("ПЕРЕКЛЮЧИТЬ РЫНОК")
+            append_action(4,str(commands[4]))
         append_section("КОТИРОВКИ И ОСТАТКИ")
         for i in range(mini(4,commands.size())):
             var detail := str(detail_lines[i+1]) if detail_lines.size() > i+1 else ""
             append_action(i,str(commands[i]),detail)
-        if commands.size() > 4:
-            append_section("ДРУГИЕ РАЗДЕЛЫ")
-            for i in range(4,commands.size()):
-                append_action(i,str(commands[i]))
+        if commands.size() > 5:
+            append_action(5,str(commands[5]))
     else:
         append_section("ДАННЫЕ ОБЪЕКТА / ТЕЛЕМЕТРИЯ")
         for i in range(detail_lines.size()):
