@@ -39,8 +39,8 @@ const ISO_BUILDINGS := [
     preload("res://assets/iso07/buildings_2.webp")
 ]
 const ISO_ICONS = preload("res://assets/iso07/icons.webp")
-const MAP_W := 21
-const MAP_H := 21
+const MAP_W := 36
+const MAP_H := 34
 const MINES := [
     {"name":"Шахта Сокол","pos":Vector2i(8,9),"cost":0},
     {"name":"Шахта Гранит","pos":Vector2i(5,14),"cost":490},
@@ -63,6 +63,12 @@ const WAREHOUSES := [
     {"name":"Склад Север","pos":Vector2i(13,3),"cost":1300},
     {"name":"Пришахтный склад","pos":Vector2i(7,7),"cost":0}
 ]
+const EXPANSION_PLOTS := [
+    Vector2i(22,5),Vector2i(26,6),Vector2i(30,7),
+    Vector2i(22,11),Vector2i(27,12),Vector2i(32,13),
+    Vector2i(21,17),Vector2i(26,18),Vector2i(31,20),
+    Vector2i(22,25),Vector2i(27,27),Vector2i(32,28)
+]
 const MATERIALS := ["coal","copper","iron","gold","steel","wire","parts","electronics"]
 const SHARED_CAP := 20
 const GENERAL_BONUS := 10
@@ -79,6 +85,7 @@ const PRODUCTS := {"coal":"Уголь","copper":"Медь","iron":"Железо"
 const PRICES := {"coal":12,"copper":28,"iron":42,"gold":110,"steel":160,"wire":60,"parts":495,"electronics":470}
 
 var world_roads: Dictionary = {}
+var expansion_owned: Array = [false,false,false,false,false,false,false,false,false,false,false,false]
 var game = null
 var dialog = null
 var warehouse_owned := [false, false, false, true]
@@ -95,7 +102,7 @@ var factory_owned := [false, false, false, false]
 var factory_recipes := ["steel","wire","parts","electronics"]
 var factory_levels := [1,1,1,1]
 var factory_progress := [0.0,0.0,0.0,0.0]
-var world_camera := Vector2(9.5, 9.5)
+var world_camera := Vector2(11.0, 10.0)
 var world_zoom := 0.88
 var time := 0.0
 var selected_kind := ""
@@ -342,7 +349,7 @@ func pack_state() -> Dictionary:
     return {"mines":mine_owned,"factories":factory_owned,"recipes":factory_recipes,
         "warehouse_owned":warehouse_owned,"warehouse_slots":warehouse_slots,
         "levels":factory_levels,"progress":factory_progress,
-        "camera":[world_camera.x,world_camera.y],"zoom":world_zoom}
+        "camera":[world_camera.x,world_camera.y],"zoom":world_zoom,"expansion_owned":expansion_owned}
 
 func restore_state(data: Dictionary) -> void:
     for i in range(4):
@@ -377,7 +384,7 @@ func restore_state(data: Dictionary) -> void:
     warehouse_owned[3] = true
     var saved_camera: Array = data.get("camera", [])
     if saved_camera.size() == 2:
-        world_camera = Vector2(clampf(float(saved_camera[0]), 1, 20), clampf(float(saved_camera[1]), 1, 20))
+        world_camera = Vector2(clampf(float(saved_camera[0]),1.0,float(MAP_W-2)),clampf(float(saved_camera[1]),1.0,float(MAP_H-2)))
     world_zoom = clampf(float(data.get("zoom", 0.88)), 0.5, 1.45)
 
 func process_industry(delta: float) -> void:
