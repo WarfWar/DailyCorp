@@ -40,6 +40,7 @@ func _verify() -> void:
         world.dialog.size = dimensions
         world.dialog.reflow()
         var box: Rect2 = Rect2(world.dialog.frame.position,world.dialog.frame.size)
+        print("RESPONSIVE DEBUG: wanted ", dimensions, ", overlay ", world.dialog.size, ", dialog bounds ", box, ", min ", world.dialog.frame.get_combined_minimum_size())
         if box.position.x < 0 or box.position.y < 0 or box.end.x > dimensions.x+1 or box.end.y > dimensions.y+1:
             fail("Dialog escapes screen at " + str(dimensions))
             return
