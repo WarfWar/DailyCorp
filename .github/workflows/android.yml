@@ -22,9 +22,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Android tools
-        uses: android-actions/setup-android@v3
-
+      # Ubuntu hosted runners already include Android SDK and sdkmanager.
       - name: Required Android SDK packages
         run: |
           yes | sdkmanager --licenses >/dev/null || true
