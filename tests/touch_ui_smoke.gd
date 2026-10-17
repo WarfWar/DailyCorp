@@ -105,7 +105,9 @@ func _test() -> void:
     if world.dialog.viewport_scroll.scroll_vertical <= 0:
         fail("Scroll container does not react to dispatched GUI wheel input")
         return
-    # Finger swipe should scroll on an Android touchscreen as well.
+    # Godot's native ScrollContainer enables touchscreen dragging on Android/iOS.
+    # On headless Linux the equivalent platform hint is needed to exercise this path.
+    ProjectSettings.set_setting("input_devices/pointing/emulate_touch_from_mouse", true)
     world.dialog.viewport_scroll.scroll_vertical = 0
     await process_frame
     var start := center + Vector2(0, 80)
