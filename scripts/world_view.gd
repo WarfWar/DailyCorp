@@ -96,7 +96,7 @@ func show_panel() -> void:
     if panel == "":
         dialog.hide()
         return
-    var lines: Array[String] = []
+    var lines: Array = []
     var title := ""
     match panel:
         "place":
