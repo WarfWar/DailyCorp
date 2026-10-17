@@ -105,5 +105,32 @@ func _test() -> void:
     if world.dialog.viewport_scroll.scroll_vertical <= 0:
         fail("Scroll container does not react to dispatched GUI wheel input")
         return
-    print("TOUCH UI TEST PASSED: touch emulation enabled; real viewport clicks purchase and close; wheel scroll works")
+    # Finger swipe should scroll on an Android touchscreen as well.
+    world.dialog.viewport_scroll.scroll_vertical = 0
+    await process_frame
+    var start := center + Vector2(0, 80)
+    var finger_down := InputEventScreenTouch.new()
+    finger_down.index = 0
+    finger_down.pressed = true
+    finger_down.position = start
+    root.get_viewport().push_input(finger_down, true)
+    await process_frame
+    for step in range(1, 6):
+        var finger_drag := InputEventScreenDrag.new()
+        finger_drag.index = 0
+        finger_drag.position = start - Vector2(0, 28*step)
+        finger_drag.relative = Vector2(0, -28)
+        finger_drag.velocity = Vector2(0, -600)
+        root.get_viewport().push_input(finger_drag, true)
+        await process_frame
+    var finger_up := InputEventScreenTouch.new()
+    finger_up.index = 0
+    finger_up.pressed = false
+    finger_up.position = start - Vector2(0, 140)
+    root.get_viewport().push_input(finger_up, true)
+    await process_frame
+    if world.dialog.viewport_scroll.scroll_vertical <= 0:
+        fail("Touch drag did not scroll the list")
+        return
+    print("TOUCH UI TEST PASSED: real viewport clicks, close buttons, wheel and finger scrolling")
     quit(0)
