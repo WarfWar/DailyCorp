@@ -589,7 +589,7 @@ func buttons() -> Array:
         "truck": return ["УЛУЧШИТЬ ГРУЗОВИК","ПЕРЕНАЗНАЧИТЬ ШАХТУ","НАЗАД"]
         "truck_transfer": return ["ШАХТА №1","ШАХТА №2","ШАХТА №3","ШАХТА №4","НАЗАД"]
         "contracts": return ["СДАТЬ ЗАКАЗ","НАЗАД"]
-        "assets": return ["К КАРТЕ","ТОРГОВЛЯ"]
+        "assets": return ["К КАРТЕ","ТОРГОВЛЯ","КАЗАРМА","АНГАР","КОНТРАКТЫ"]
         "help": return ["ЗАКРЫТЬ"]
     return []
 
@@ -792,7 +792,12 @@ func action(i: int) -> void:
             else:
                 panel = ""
         "assets":
-            panel = "" if i == 0 else "trade"
+            match i:
+                0: panel = ""
+                1: panel = "trade"
+                2: panel = "barracks"
+                3: panel = "hangar"
+                4: panel = "contracts"
         "help":
             panel = ""
     if dialog != null:
