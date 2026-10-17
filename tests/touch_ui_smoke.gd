@@ -32,7 +32,8 @@ func _test() -> void:
     await process_frame
     var world = game.world_view
     # Explicitly test the classic management layer, not the illustration layer.
-    game.art_screen.hide()
+    if game.art_screen != null:
+        game.art_screen.hide()
     game.cash = 4000
     # Previous smoke tests share the same user:// data directory on CI.
     world.warehouse_owned[0] = false
