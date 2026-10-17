@@ -185,9 +185,11 @@ func truck_capacity(truck: Dictionary) -> int:
     return 3 + (int(truck["level"])-1)*3
 
 func road_seconds(mine: int, target: Dictionary, level: int) -> float:
-    var from_pos: Vector2 = Vector2(world.MINES[mine]["pos"])
-    var to_pos: Vector2 = Vector2(world.WAREHOUSES[int(target["index"])]["pos"]) if str(target["type"]) == "warehouse" else Vector2(world.FACTORIES[int(target["index"])]["pos"])
-    return maxf(1.5,from_pos.distance_to(to_pos)*1.6/(1.0+0.2*(level-1)))
+    # Transit time is based on the shortest connected street route, not a straight line.
+    var steps: int = world.road_travel_steps(mine,target)
+    if steps <= 0:
+        return 1.5
+    return maxf(1.5,float(steps)*1.6/(1.0+0.2*float(level-1)))
 
 func target_capacity(destination: Dictionary, material: String) -> int:
     var index := int(destination.get("index",-1))
@@ -233,7 +235,8 @@ func process_transport(delta: float) -> void:
                     continue
                 var target: Dictionary = routes[mine][key]
                 var space := target_capacity(target,key)
-                if space <= 0:
+                if space <= 0 or world.road_travel_steps(mine,target) <= 0:
+                    # No available drivable road -> no loading and no teleportation.
                     continue
                 var amount := mini(truck_capacity(truck),mini(count,space))
                 buffers[mine][key] -= amount
