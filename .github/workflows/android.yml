@@ -114,6 +114,15 @@ jobs:
             exit 1
           fi
 
+      - name: Test cinematic art textures and management navigation
+        run: |
+          set -o pipefail
+          timeout 75s godot --headless --path . --script res://tests/art_smoke.gd 2>&1 | tee /tmp/art-test.log
+          grep -q "ART TEST PASSED" /tmp/art-test.log
+          if grep -E "SCRIPT ERROR|Parse Error|ART TEST FAILED" /tmp/art-test.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
