@@ -123,6 +123,15 @@ jobs:
             exit 1
           fi
 
+      - name: Verify dynamic isometric world and map interaction
+        run: |
+          set -o pipefail
+          timeout 75s godot --headless --path . --script res://tests/iso_world_smoke.gd 2>&1 | tee /tmp/iso-world-test.log
+          grep -q "ISO WORLD TEST PASSED" /tmp/iso-world-test.log
+          if grep -E "SCRIPT ERROR|Parse Error|ISO WORLD TEST FAILED" /tmp/iso-world-test.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
