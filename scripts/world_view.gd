@@ -351,7 +351,7 @@ func upgrade_factory(index: int) -> void:
 func txt(value: String, p: Vector2, scale: int = 19, color: Color = PAPER) -> void:
     var font := get_theme_default_font()
     if font != null:
-        draw_string(font, p, HORIZONTAL_ALIGNMENT_LEFT, -1, scale, color)
+        draw_string(font, p, value, HORIZONTAL_ALIGNMENT_LEFT, -1, scale, color)
 
 func panel_button(rect: Rect2, caption: String, accent: bool = false) -> void:
     draw_rect(rect, YELLOW if accent else Color("#355269"))
