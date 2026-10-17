@@ -406,8 +406,7 @@ func _gui_input(event: InputEvent) -> void:
             if fingers.size() > 1:
                 pinched = true
         else:
-            if fingers.has(e.index) and not pinched and fingers.size() == 1 and not bool(moved[e.index]):
-                tapped(e.position)
+            # Native controls receive emulated mouse clicks; avoid duplicate tap dispatch.
             fingers.erase(e.index)
             starts.erase(e.index)
             moved.erase(e.index)
@@ -447,7 +446,7 @@ func _gui_input(event: InputEvent) -> void:
                     tapped(m.position)
                 mouse_on = false
         accept_event()
-    elif event is InputEventMouseMotion and mouse_on:
+    elif event is InputEventMouseMotion and mouse_on and fingers.is_empty():
         var m: InputEventMouseMotion = event
         if m.position.distance_to(mouse_from) > 12.0:
             mouse_moved = true
