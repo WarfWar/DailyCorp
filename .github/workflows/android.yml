@@ -137,6 +137,15 @@ jobs:
             exit 1
           fi
 
+      - name: Verify modern console, sprite depth and parcel animation
+        run: |
+          set -o pipefail
+          timeout 75s godot --headless --path . --script res://tests/visual_ui_smoke.gd 2>&1 | tee /tmp/visual-ui.log
+          grep -q "VISUAL UI TEST PASSED" /tmp/visual-ui.log
+          if grep -E "SCRIPT ERROR|Parse Error|VISUAL UI TEST FAILED" /tmp/visual-ui.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
