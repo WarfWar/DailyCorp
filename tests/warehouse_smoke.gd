@@ -47,11 +47,12 @@ func _verify() -> void:
     world.dialog.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     world.selected_id = 0
     world.panel = "warehouse"
+    var base_capacity := int(world.capacity("coal"))
     world.action(0)
     if not world.warehouse_owned[0]:
         fail("Warehouse cannot be purchased")
         return
-    if world.capacity("coal") != 30:
+    if world.capacity("coal") != base_capacity + 10:
         fail("Warehouse does not increase general capacity")
         return
     world.action(0)
@@ -59,7 +60,7 @@ func _verify() -> void:
         fail("Cannot open warehouse storage construction")
         return
     world.action(0)
-    if world.panel != "warehouse_slot" or world.capacity("coal") != 80 or world.capacity("copper") != 30:
+    if world.panel != "warehouse_slot" or world.capacity("coal") != base_capacity + 60 or world.capacity("copper") != base_capacity + 10:
         fail("Material-specific warehouse did not build")
         return
     var before := int(world.capacity("coal"))
@@ -67,7 +68,7 @@ func _verify() -> void:
     if int(world.capacity("coal")) != before + 50:
         fail("Warehouse section upgrade failed")
         return
-    if int(world.capacity("copper")) != 30:
+    if int(world.capacity("copper")) != base_capacity + 10:
         fail("Upgrading coal increased other resources")
         return
     # Production must stop when target material storage is full.
@@ -88,7 +89,7 @@ func _verify() -> void:
         return
     # Digging cannot generate more ore than permitted capacity.
     game.fresh_game()
-    game.stock["gold"] = world.capacity("gold")
+    game.operations.buffers[game.active_mine]["gold"] = 25
     var ore := Vector2i(20,9)
     if game.tile(ore) != game.GOLD:
         fail("Known test deposit not found")
@@ -108,7 +109,7 @@ func _verify() -> void:
         return
     var surface: Dictionary = snapshot.get("surface",{})
     var depots: Array = surface.get("warehouse_slots",[])
-    if int(snapshot.get("version",0)) != 3 or depots.size() < 1 or depots[0].size() != 1:
+    if int(snapshot.get("version",0)) != 4 or depots.size() < 1 or depots[0].size() != 1:
         fail("Warehouse data not persisted")
         return
     print("WAREHOUSE TEST PASSED: closing dialogs, both screen sizes, purchase, section, upgrade, full-stock blocking, saves")
