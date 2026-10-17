@@ -931,7 +931,7 @@ func _draw() -> void:
             var place: Vector2 = Vector2(MINES[int(truck["mine"])]["pos"])
             var target: Dictionary = truck["destination"]
             var destination := Vector2(WAREHOUSES[int(target["index"])]["pos"]) if target["type"] == "warehouse" else Vector2(FACTORIES[int(target["index"])]["pos"])
-            var duration := game.operations.road_seconds(int(truck["mine"]),target,int(truck["level"]))
+            var duration: float = game.operations.road_seconds(int(truck["mine"]),target,int(truck["level"]))
             var progress := clampf(1.0-float(truck["remaining"])/duration,0.0,1.0)
             var position: Vector2 = place.lerp(destination,progress) if truck["state"] == "delivery" else destination.lerp(place,progress)
             var point := world_screen(position)
