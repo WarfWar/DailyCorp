@@ -98,6 +98,7 @@ var selected_truck := 0
 var selected_route_material := "iron"
 var selected_route_target := 0
 var selected_slot := 0
+var selected_plot := 0
 
 var mine_owned := [true, false, false, false]
 var factory_owned := [false, false, false, false]
@@ -309,6 +310,20 @@ func show_panel() -> void:
             title = "Переназначение грузовика"
             lines = ["Между шахтами перемещается пустой транспорт.",
                 "У каждой шахты могут быть свои машины."]
+        "land":
+            title = "Земельный участок №%d" % (selected_plot+1)
+            if expansion_owned[selected_plot]:
+                lines = ["Приобретённая территория компании.",
+                    "Участок зарезервирован для будущих предприятий.",
+                    "Здесь пока нельзя строить завод или шахту.",
+                    "Дорога к участку уже проведена."]
+            else:
+                var price := 210+75*selected_plot
+                lines = ["Свободная территория под развитие компании.",
+                    "Площадка №%d соединена с дорожной сетью." % (selected_plot+1),
+                    "Стоимость земли: %d ₽" % price,
+                    "Пока покупка даёт только право владения.",
+                    "Новые типы построек добавим в дальнейшем."]
         "contracts":
             var task: Dictionary = game.operations.contract()
             title = "Городские контракты"
@@ -569,6 +584,13 @@ func tapped(p: Vector2) -> void:
     if world_screen(Vector2(MARKET_POS)).distance_to(p) < hit_radius:
         panel = "trade"
         show_panel()
+        return
+    for i in range(EXPANSION_PLOTS.size()):
+        if world_screen(Vector2(EXPANSION_PLOTS[i])).distance_to(p) < hit_radius*0.53:
+            selected_plot = i
+            panel = "land"
+            show_panel()
+            return
 
 func modal_rect() -> Rect2:
     var width := minf(size.x - 32.0, 660.0)
@@ -642,6 +664,7 @@ func buttons() -> Array:
             return result
         "truck": return ["УЛУЧШИТЬ ГРУЗОВИК","ПЕРЕНАЗНАЧИТЬ ШАХТУ","НАЗАД"]
         "truck_transfer": return ["ШАХТА №1","ШАХТА №2","ШАХТА №3","ШАХТА №4","НАЗАД"]
+        "land": return ["ЗАКРЫТЬ"] if expansion_owned[selected_plot] else ["КУПИТЬ УЧАСТОК","ЗАКРЫТЬ"]
         "contracts": return ["СДАТЬ ЗАКАЗ","НАЗАД"]
         "assets": return ["К КАРТЕ","ТОРГОВЛЯ","КАЗАРМА","АНГАР","КОНТРАКТЫ"]
         "help": return ["ЗАКРЫТЬ"]
@@ -840,6 +863,18 @@ func action(i: int) -> void:
                     pop("Нельзя перевести занятый транспорт или шахта закрыта")
             else:
                 panel = "truck"
+        "land":
+            if not expansion_owned[selected_plot] and i == 0:
+                var price := 210+75*selected_plot
+                if game.cash >= price:
+                    game.cash -= price
+                    expansion_owned[selected_plot] = true
+                    pop("Участок приобретён!")
+                    game.save_game()
+                else:
+                    pop("Нужно %d ₽" % price)
+            else:
+                panel = ""
         "contracts":
             if i == 0:
                 pop("Заказ сдан, город доволен!" if game.operations.fulfill_contract() else "Нужно больше товара на главном складе")
@@ -1036,6 +1071,15 @@ func building(p: Vector2, kind: String, owned: bool, label: String, desc: String
     var width := ISO_W*world_zoom*1.58*ratio
     var height := width
     # One visual instance per purchased business, with gameplay-driven states.
+    # A shared diamond foundation fixes the building's contact point to the road grid.
+    var foot_w := ISO_W*world_zoom*0.47
+    var foot_h := ISO_H*world_zoom*0.34
+    var pad := PackedVector2Array([
+        p+Vector2(0,-foot_h),p+Vector2(foot_w,0),
+        p+Vector2(0,foot_h),p+Vector2(-foot_w,0)])
+    draw_colored_polygon(pad,Color("#667168",0.60))
+    for j in range(4):
+        draw_line(pad[j],pad[(j+1)%4],Color("#a49b7e",0.78),1.5*world_zoom,true)
     var place := Rect2(p.x-width/2.0,p.y-height*0.85,width,height)
     draw_texture_rect_region(sheet,place,Rect2(tile.x*244.0,0,244,244),Color.WHITE)
     if not owned:
