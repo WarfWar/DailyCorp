@@ -316,8 +316,7 @@ func _gui_input(event: InputEvent) -> void:
             if contacts.size() >= 2:
                 pinch = true
         else:
-            if contacts.has(t.index) and not pinch and contacts.size() == 1 and not bool(touch_moved[t.index]):
-                tapped(t.position)
+            # Native controls receive emulated mouse clicks; avoid duplicate tap dispatch.
             contacts.erase(t.index)
             touch_origin.erase(t.index)
             touch_moved.erase(t.index)
@@ -355,7 +354,7 @@ func _gui_input(event: InputEvent) -> void:
                     tapped(m.position)
                 dragging_mouse = false
         accept_event()
-    elif event is InputEventMouseMotion and dragging_mouse:
+    elif event is InputEventMouseMotion and dragging_mouse and contacts.is_empty():
         var m: InputEventMouseMotion = event
         if m.position.distance_to(mouse_start) > 12.0:
             did_move = true
