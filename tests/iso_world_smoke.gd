@@ -52,6 +52,44 @@ func _check() -> void:
     if path.size() < 18 or not path.has(world.road_key(8,9)) or not path.has(world.road_key(11,10)):
         fail("Modular road network not connected to economy sites")
         return
+    if world.MAP_W <= 21 or world.MAP_H <= 21 or world.EXPANSION_PLOTS.size() < 10:
+        fail("Expanded map or free construction areas missing")
+        return
+    if world.road_path(Vector2i(8,9),Vector2i(11,10)).is_empty():
+        fail("Original mine and factory are no longer connected")
+        return
+    for m in range(world.MINES.size()):
+        for f in range(world.FACTORIES.size()):
+            var route: Array = world.haul_route(m,{"type":"factory","index":f})
+            if route.size() < 2:
+                fail("Factory route missing from mine %d to factory %d" % [m,f])
+                return
+            if route[0] != world.MINES[m]["pos"] or route.back() != world.FACTORIES[f]["pos"]:
+                fail("Road path endpoints do not match gameplay sites")
+                return
+            for i in range(route.size()-1):
+                var a: Vector2i = route[i]
+                var b: Vector2i = route[i+1]
+                if absi(a.x-b.x)+absi(a.y-b.y) != 1:
+                    fail("Truck route contains an off-road shortcut")
+                    return
+                if not world.world_roads.has(world.road_key(a.x,a.y)):
+                    fail("Truck route leaves visible road network")
+                    return
+    for plot in world.EXPANSION_PLOTS:
+        if not world.world_roads.has(world.road_key(plot.x,plot.y)):
+            fail("Expansion lot has no road access")
+            return
+    var saved_cash: int = game.cash
+    game.cash = 50000
+    world.selected_plot = 0
+    world.panel = "land"
+    world.action(0)
+    if not world.expansion_owned[0] or game.cash >= 50000:
+        fail("Unable to purchase expansion land")
+        return
+    world.close_panel()
+    game.cash = saved_cash
     if world.atlas_building("mine",true,0) == world.atlas_building("mine",false,0):
         fail("Active and closed mines do not have distinct art")
         return
@@ -65,5 +103,5 @@ func _check() -> void:
     if not FileAccess.file_exists(game.SAVE_FILE):
         fail("Save broken after graphics overhaul")
         return
-    print("ISO WORLD TEST PASSED: atlases, isometric projection, panning, block roads, live business dialogs, save")
+    print("ISO WORLD TEST PASSED: atlases, isometric projection, panning, connected roads, plots, live dialogs, save")
     quit(0)
