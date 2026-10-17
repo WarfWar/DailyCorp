@@ -25,6 +25,7 @@ const TILE := 52.0
 
 var operations = null
 var operations_saved: Dictionary = {}
+var passive_progress: Dictionary = {}
 var ore_amounts: Dictionary = {}
 var drop_serial := 0
 var world_view = null
@@ -411,9 +412,78 @@ func simulation(delta: float) -> void:
                 cart["cargo"] = -1
                 cart["state"] = "idle"
 
+func simulate_remote_mines(delta: float) -> void:
+    # Remote mines use the same finite deposits and loading buffers, but not
+    # per-frame pathfinding or cart animation while offscreen.
+    if operations == null or world_view == null:
+        return
+    for mine_id in range(4):
+        if mine_id == active_mine or not world_view.mine_owned[mine_id]:
+            continue
+        var map_key := str(mine_id)
+        if not mine_maps.has(map_key):
+            continue
+        var staff: Array = operations.mine_workers(mine_id)
+        if staff.is_empty():
+            continue
+        var work_rate := 0.0
+        for person in staff:
+            work_rate += 1.0 + 0.35*float(int(person["level"])-1)
+        passive_progress[map_key] = minf(5.0,float(passive_progress.get(map_key,0.0)) + delta*work_rate/2.4)
+        var steps := mini(3,floori(float(passive_progress[map_key])))
+        if steps <= 0:
+            continue
+        var state: Dictionary = mine_maps[map_key]
+        var terrain: Array = state.get("grid",[])
+        var jobs: Array = state.get("orders",[])
+        var counts: Dictionary = state.get("ore_amounts",{})
+        if terrain.size() != H:
+            continue
+        var extracted := 0
+        for tick in range(steps):
+            var chosen := -1
+            for j in range(jobs.size()):
+                var point: Array = jobs[j]
+                if point.size() < 2:
+                    continue
+                var x := int(point[0])
+                var y := int(point[1])
+                if x < 0 or y < 0 or x >= W or y >= H:
+                    continue
+                var ore_kind := int(terrain[y][x])
+                if ore_kind == AIR:
+                    continue
+                if KEYS.has(ore_kind) and not operations.mine_accepts(mine_id,str(KEYS[ore_kind])):
+                    continue
+                chosen = j
+                break
+            if chosen < 0:
+                break
+            var point: Array = jobs[chosen]
+            var x := int(point[0])
+            var y := int(point[1])
+            var kind := int(terrain[y][x])
+            var address := "%d:%d" % [x,y]
+            var remaining := int(counts.get(address,3+posmod(x*13+y*17,9))) if KEYS.has(kind) else 1
+            if KEYS.has(kind):
+                operations.mine_received(mine_id,str(KEYS[kind]))
+                counts[address] = remaining-1
+            if remaining <= 1:
+                terrain[y][x] = AIR
+                jobs.remove_at(chosen)
+                counts.erase(address)
+            extracted += 1
+        passive_progress[map_key] = float(passive_progress[map_key]) - extracted
+        state["grid"] = terrain
+        state["orders"] = jobs
+        state["ore_amounts"] = counts
+        mine_maps[map_key] = state
+
 func _process(delta: float) -> void:
-    if not grid.is_empty() and not world_mode:
+    if not grid.is_empty():
         simulation(minf(delta, 0.10))
+    if operations != null:
+        simulate_remote_mines(minf(delta,0.10))
     if world_view != null:
         world_view.process_industry(minf(delta, 0.10))
     save_time += delta
@@ -760,6 +830,7 @@ func save_game() -> void:
     snapshot["operations"] = operations.pack() if operations != null else operations_saved
     snapshot["ore_amounts"] = ore_amounts
     snapshot["drop_serial"] = drop_serial
+    snapshot["passive_progress"] = passive_progress
     var file := FileAccess.open(SAVE_FILE, FileAccess.WRITE)
     if file != null:
         file.store_string(JSON.stringify(snapshot))
@@ -786,6 +857,7 @@ func load_game() -> bool:
     operations_saved = data.get("operations",{})
     ore_amounts = data.get("ore_amounts",{})
     drop_serial = maxi(0,int(data.get("drop_serial",0)))
+    passive_progress = data.get("passive_progress",{})
     mine_maps = data.get("mine_maps", {})
     active_mine = clampi(int(data.get("active_mine", 0)), 0, 3)
     cash = maxi(0, int(data.get("cash", 350)))
