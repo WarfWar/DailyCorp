@@ -1,5 +1,6 @@
 extends Control
 const WorldView = preload("res://scripts/world_view.gd")
+const ResponsiveDialog = preload("res://scripts/responsive_dialog.gd")
 # DailyCorp 0.1: original mobile mining and logistics prototype.
 const W := 42
 const H := 42
@@ -22,6 +23,7 @@ const MUTED := Color("#9caebd")
 const TILE := 52.0
 
 var world_view = null
+var mine_dialog = null
 var world_mode := true
 var active_mine := 0
 var mine_maps: Dictionary = {}
@@ -32,7 +34,7 @@ var orders: Array[Vector2i] = []
 var drops: Array[Dictionary] = []
 var workers: Array[Dictionary] = []
 var carts: Array[Dictionary] = []
-var stock: Dictionary = {"coal": 0, "copper": 0, "iron": 0, "gold": 0, "steel": 0}
+var stock: Dictionary = {"coal": 0, "copper": 0, "iron": 0, "gold": 0, "steel": 0, "wire": 0, "parts": 0, "electronics": 0}
 var cash := 350
 var worker_count := 2
 var cart_count := 1
@@ -62,9 +64,67 @@ func _ready() -> void:
     add_child(world_view)
     world_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     world_view.restore_state(world_saved)
+    mine_dialog = ResponsiveDialog.new()
+    add_child(mine_dialog)
+    mine_dialog.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    mine_dialog.closed.connect(_mine_dialog_closed)
+    mine_dialog.hide()
     world_mode = true
     set_process(true)
     queue_redraw()
+
+func _mine_dialog_closed() -> void:
+    page = ""
+
+func show_mine_dialog() -> void:
+    if mine_dialog == null:
+        return
+    if page == "" or world_mode:
+        mine_dialog.hide()
+        return
+    var title := ""
+    var lines: Array[String] = []
+    match page:
+        "stock":
+            title = "Общий склад"
+            lines = ["Ресурсы доступны всей компании и заводам.",
+                "Уголь: %d / %d" % [stock["coal"], world_view.capacity("coal")],
+                "Медь: %d / %d" % [stock["copper"], world_view.capacity("copper")],
+                "Железо: %d / %d" % [stock["iron"], world_view.capacity("iron")],
+                "Золото: %d / %d" % [stock["gold"], world_view.capacity("gold")],
+                "Изделия и продажа — через рынок на поверхности."]
+        "upgrade":
+            title = "Улучшение шахты"
+            lines = ["Шахтёров: %d  ·  вагонеток: %d" % [worker_count,cart_count],
+                "Шахтёр: %d ₽ (после 4 нужен механизм)" % (150+maxi(0,worker_count-2)*80),
+                "Вагонетка: %d ₽ (после 2 нужны провода)" % (200+maxi(0,cart_count-1)*110),
+                "Скорость: %d ₽ и %d стали" % [240+speed_level*190,speed_level+1],
+                "Производи ресурсы на заводах в открытом мире."]
+        "help":
+            title = "Как играть"
+            lines = ["Выбирай руду рядом с открытыми тоннелями.",
+                "Шахтёры будут копать, а вагонетки вывезут руду.",
+                "Кнопка МИР возвращает на поверхность."]
+        "confirm":
+            title = "Новая шахта"
+            lines = ["Внимание! Это сбросит текущую подземную карту."]
+    mine_dialog.present(title, lines, modal_buttons(), Callable(self,"act"))
+
+func storage_capacity(key: String) -> int:
+    return world_view.capacity(key) if world_view != null else 20
+
+func queued_ore(kind: int) -> int:
+    var key: String = KEYS.get(kind, "")
+    if key == "":
+        return 0
+    var total: int = int(stock.get(key, 0))
+    for drop in drops:
+        if int(drop["kind"]) == kind:
+            total += 1
+    for cart in carts:
+        if int(cart.get("cargo", -1)) == kind:
+            total += 1
+    return total
 
 func fresh_game() -> void:
     rng.randomize()
@@ -245,6 +305,10 @@ func simulation(delta: float) -> void:
             worker["timer"] -= delta * (1.0 + speed_level * 0.2)
             if float(worker["timer"]) <= 0.0:
                 var kind := tile(cell)
+                if KEYS.has(kind) and queued_ore(kind) >= storage_capacity(str(KEYS[kind])):
+                    # Ore remains in the ground until a warehouse has room.
+                    worker["timer"] = 0.25
+                    continue
                 set_tile(cell, AIR)
                 orders.erase(cell)
                 if KEYS.has(kind):
@@ -411,11 +475,7 @@ func modal_button_rect(i: int, count: int) -> Rect2:
 
 func tapped(point: Vector2) -> void:
     if page != "":
-        var buttons := modal_buttons()
-        for i in range(buttons.size()):
-            if modal_button_rect(i, buttons.size()).has_point(point):
-                act(i)
-                return
+        # Accessible dialogs consume their own input.
         return
     if point.y > size.y - 133.0:
         for i in range(4):
@@ -429,6 +489,7 @@ func tapped(point: Vector2) -> void:
                     3:
                         save_game()
                         toast("Игра сохранена")
+                show_mine_dialog()
                 return
     if point.y >= 155.0 and point.y < size.y - 145.0:
         command(to_cell(point))
@@ -493,6 +554,7 @@ func act(index: int) -> void:
                 page = "help"
     if message != "":
         toast(message)
+    show_mine_dialog()
     save_game()
 
 func ore_color(kind: int) -> Color:
@@ -578,8 +640,7 @@ func _draw() -> void:
     write(notice, Vector2(18, size.y - 129), 17, GOLDEN)
     for i in range(4):
         button(footer_box(i), ["СКЛАД", "РАЗВИТИЕ", "МИР", "СОХР."][i], i == 1)
-    if page != "":
-        draw_modal()
+    # Mine dialogs use the accessible scrollable overlay.
 
 func draw_modal() -> void:
     draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.04, 0.07, 0.85))
@@ -630,7 +691,7 @@ func save_game() -> void:
     for drop in drops:
         var c: Vector2i = drop["cell"]
         drop_data.append([c.x, c.y, drop["kind"]])
-    var snapshot := {"version": 2, "grid": grid, "orders": order_data, "drops": drop_data, "cash": cash,
+    var snapshot := {"version": 3, "grid": grid, "orders": order_data, "drops": drop_data, "cash": cash,
         "stock": stock, "workers": worker_count, "carts": cart_count, "speed": speed_level,
         "foundry": foundry, "delivered": delivered}
     mine_maps[str(active_mine)] = capture_mine()
@@ -650,7 +711,7 @@ func load_game() -> bool:
         return false
     var data = JSON.parse_string(file.get_as_text())
     file.close()
-    if not (data is Dictionary) or int(data.get("version", 0)) not in [1, 2]:
+    if not (data is Dictionary) or int(data.get("version", 0)) not in [1, 2, 3]:
         return false
     var saved_grid: Array = data.get("grid", [])
     if saved_grid.size() != H:
@@ -772,7 +833,9 @@ func enter_mine(index: int) -> void:
     page = ""
     camera = Vector2(21,8)
     world_mode = false
+    world_view.close_panel()
     world_view.hide()
+    mine_dialog.hide()
     toast("Добыча: шахта №%d" % (index+1))
     queue_redraw()
     save_game()
@@ -781,6 +844,8 @@ func go_world() -> void:
     mine_maps[str(active_mine)] = capture_mine()
     world_mode = true
     page = ""
+    if mine_dialog != null:
+        mine_dialog.hide()
     if world_view != null:
         world_view.show()
         world_view.queue_redraw()
