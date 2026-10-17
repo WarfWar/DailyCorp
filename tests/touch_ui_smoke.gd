@@ -32,6 +32,9 @@ func _test() -> void:
     await process_frame
     var world = game.world_view
     game.cash = 4000
+    # Previous smoke tests share the same user:// data directory on CI.
+    world.warehouse_owned[0] = false
+    world.warehouse_slots[0] = []
     world.panel = "warehouse"
     world.selected_id = 0
     world.show_panel()
