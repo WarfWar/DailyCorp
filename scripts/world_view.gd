@@ -23,10 +23,14 @@ const FACTORIES := [
     {"name":"Завод №4","pos":Vector2i(4,6),"cost":2800}
 ]
 const MARKET_POS := Vector2i(10,5)
+const BARRACKS_POS := Vector2i(5,8)
+const HANGAR_POS := Vector2i(12,12)
+const CONTRACT_POS := Vector2i(9,3)
 const WAREHOUSES := [
     {"name":"Склад Восток","pos":Vector2i(13,17),"cost":180},
     {"name":"Склад Запад","pos":Vector2i(3,11),"cost":650},
-    {"name":"Склад Север","pos":Vector2i(13,3),"cost":1300}
+    {"name":"Склад Север","pos":Vector2i(13,3),"cost":1300},
+    {"name":"Пришахтный склад","pos":Vector2i(7,7),"cost":0}
 ]
 const MATERIALS := ["coal","copper","iron","gold","steel","wire","parts","electronics"]
 const SHARED_CAP := 20
@@ -45,9 +49,13 @@ const PRICES := {"coal":12,"copper":28,"iron":42,"gold":110,"steel":160,"wire":6
 
 var game = null
 var dialog = null
-var warehouse_owned := [false, false, false]
+var warehouse_owned := [false, false, false, true]
 # Each warehouse holds at most 3 single-material sections.
-var warehouse_slots: Array = [[],[],[]]
+var warehouse_slots: Array = [[],[],[],[]]
+var selected_worker := 0
+var selected_truck := 0
+var selected_route_material := "iron"
+var selected_route_target := 0
 var selected_slot := 0
 
 var mine_owned := [true, false, false, false]
@@ -106,7 +114,11 @@ func show_panel() -> void:
                 lines = ["Месторождение №%d" % (selected_id + 1),
                     "Статус: ваша шахта" if mine_owned[selected_id] else "Участок свободен",
                     "Открыть для подземной добычи" if mine_owned[selected_id] else "Стоимость покупки: %d ₽" % mine["cost"],
-                    "Руда доставляется на общий склад."]
+                    "Добыча копится на погрузочной площадке.",
+                    "Грузовики развозят руду на склад или завод."]
+                if mine_owned[selected_id]:
+                    for key in game.operations.ORES:
+                        lines.append("%s на погрузке: %d" % [PRODUCTS[key],game.operations.buffers[selected_id][key]])
             else:
                 var factory: Dictionary = FACTORIES[selected_id]
                 title = str(factory["name"])
@@ -139,7 +151,8 @@ func show_panel() -> void:
                 "Баланс компании: %d ₽" % game.cash,
                 "Общая ёмкость: 20 ед. на каждый материал.",
                 "Покупка склада увеличивает её на 10 ед.",
-                "Специализированная секция: +50 ед. за уровень."]
+                "Специализированная секция: +50 ед. за уровень.",
+                "Перевезено: %d ед." % game.operations.shipping_total]
         "help":
             title = "Управление"
             lines = ["Касайся шахт, заводов, складов и рынка.",
@@ -148,6 +161,9 @@ func show_panel() -> void:
                 "Заводы автоматически делают выбранные изделия.",
                 "Один складской отсек хранит один материал.",
                 "Склад и производство используют общий запас.",
+                "На участке есть казарма и ангар.",
+                "Шахтам задаются маршруты для 4 видов руды.",
+                "Контракты дают повышенную прибыль.",
                 "Все окна закрываются крестиком сверху."]
         "warehouse":
             var data: Dictionary = WAREHOUSES[selected_id]
@@ -189,6 +205,74 @@ func show_panel() -> void:
                     "Ёмкость этого отсека: %d единиц" % (SECTION_CAP * level),
                     "Общий запас: %d / %d ед." % [game.stock.get(key,0),capacity(key)],
                     "Улучшение: %d ₽ и %d стали" % [120*level, 1 if level >= 2 else 0]]
+        "routing":
+            title = "Логистика · " + str(MINES[selected_id]["name"])
+            lines = ["Выбери ресурс для задания маршрута.","Доступно руды в шахте:"]
+            for key in game.operations.ORES:
+                var route: Dictionary = game.operations.route_for(selected_id,key)
+                var caption := "склад " if route["type"] == "warehouse" else "завод "
+                lines.append("%s: %d ед. → %s%d" % [PRODUCTS[key],game.operations.buffers[selected_id][key],caption,int(route["index"])+1])
+        "route_target":
+            title = "Отправлять · " + str(PRODUCTS[selected_route_material])
+            lines = ["Транспорт вывезет материал из шахты №%d." % (selected_id+1),
+                "Склад размещает ресурс в общем хранилище.",
+                "Завод получает сырьё непосредственно на производство.",
+                "При заполнении места перевозка ждёт.",
+                "Для отправки должен быть назначен грузовик."]
+        "barracks":
+            title = "Казарма · персонал"
+            lines = ["Шахтёров в компании: %d" % game.operations.personnel.size(),
+                "Новый шахтёр: %d ₽" % (155+game.operations.personnel.size()*65),
+                "Назначай рабочих в разные купленные шахты.",
+                "Уровень улучшает скорость добычи,",
+                "но не увеличивает количество за удар."]
+            for person in game.operations.personnel:
+                lines.append("Шахтёр #%d · шахта %d · уровень %d" % [person["id"],int(person["mine"])+1,person["level"]])
+        "worker":
+            var person: Dictionary = game.operations.personnel[selected_worker]
+            var lvl := int(person["level"])
+            title = "Шахтёр #%d" % person["id"]
+            lines = ["Место работы: шахта %d" % (int(person["mine"])+1),
+                "Уровень: %d / 5" % lvl,
+                "Скорость: +%d%% к обычной" % int((lvl-1)*35),
+                "Улучшение: %d ₽" % (110*lvl),
+                "С уровня 4 понадобится сталь."]
+        "worker_transfer":
+            title = "Перевод шахтёра"
+            lines = ["Назначай работника только в купленную шахту.",
+                "При переводе текущая работа отменяется.",
+                "Выработка и улучшения сохраняются."]
+        "hangar":
+            title = "Ангар · транспорт"
+            lines = ["Грузовиков компании: %d" % game.operations.vehicles.size(),
+                "Новый грузовик: %d ₽" % (250+game.operations.vehicles.size()*125),
+                "Грузоподъёмность растёт с уровнем.",
+                "Чем выше уровень, тем быстрее перевозка."]
+            for truck in game.operations.vehicles:
+                lines.append("Грузовик #%d · шахта %d · ур.%d · %s" % [truck["id"],int(truck["mine"])+1,truck["level"],str(truck["state"])])
+        "truck":
+            var truck: Dictionary = game.operations.vehicles[selected_truck]
+            var lvl := int(truck["level"])
+            title = "Грузовик #%d" % truck["id"]
+            lines = ["Назначен: шахта %d" % (int(truck["mine"])+1),
+                "Груз: %d единиц за рейс" % game.operations.truck_capacity(truck),
+                "Уровень %d / 5 · %s" % [lvl,str(truck["state"])],
+                "Улучшение: %d ₽" % (145*lvl),
+                "После 2 уровня дополнительно нужны провода.",
+                "Переброска возможна только после завершения рейса."]
+        "truck_transfer":
+            title = "Переназначение грузовика"
+            lines = ["Между шахтами перемещается пустой транспорт.",
+                "У каждой шахты могут быть свои машины."]
+        "contracts":
+            var task: Dictionary = game.operations.contract()
+            title = "Городские контракты"
+            lines = ["Заказ: " + str(task["title"]),
+                "Нужно: %d ед. · %s" % [task["quantity"],PRODUCTS[str(task["key"])]],
+                "Есть на общем складе: %d ед." % game.stock.get(task["key"],0),
+                "Выплата: %d ₽" % task["reward"],
+                "Выполнено контрактов: %d" % game.operations.reputation,
+                "Следующий контракт откроется после сдачи."]
     if info_seconds > 0.0:
         lines.push_front(info)
     var commands_to_show: Array = buttons()
@@ -254,6 +338,7 @@ func restore_state(data: Dictionary) -> void:
                 if entry is Dictionary and MATERIALS.has(str(entry.get("key",""))):
                     warehouse_slots[i].append({"key":str(entry["key"]), "level":clampi(int(entry.get("level",1)),1,MAX_SECTION_LEVEL)})
     mine_owned[0] = true
+    warehouse_owned[3] = true
     var saved_camera: Array = data.get("camera", [])
     if saved_camera.size() == 2:
         world_camera = Vector2(clampf(float(saved_camera[0]), 1, 20), clampf(float(saved_camera[1]), 1, 20))
@@ -263,6 +348,8 @@ func process_industry(delta: float) -> void:
     time += delta
     if game == null:
         return
+    if game.operations != null:
+        game.operations.process_transport(delta)
     for i in range(FACTORIES.size()):
         if not factory_owned[i]:
             continue
@@ -270,21 +357,29 @@ func process_industry(delta: float) -> void:
         var need: Dictionary = recipe["need"]
         var available := true
         for key in need.keys():
-            if int(game.stock.get(key, 0)) < int(need[key]):
+            var raw_at_factory := 0
+            if game.operations != null:
+                raw_at_factory = int(game.operations.factory_inputs[i].get(key,0))
+            if raw_at_factory + int(game.stock.get(key,0)) < int(need[key]):
                 available = false
                 break
         var product: String = factory_recipes[i]
-        if int(game.stock.get(product, 0)) + int(recipe["out"]) > capacity(product):
+        if int(game.stock.get(product,0)) + int(recipe["out"]) > capacity(product):
             available = false
         if not available:
-            # A waiting factory does not consume inputs while storage is full.
             continue
-        factory_progress[i] += delta * (1.0 + float(factory_levels[i] - 1) * 0.45)
+        factory_progress[i] += delta * (1.0 + float(factory_levels[i]-1)*0.45)
         if factory_progress[i] >= float(recipe["time"]):
             factory_progress[i] = 0.0
             for key in need.keys():
-                game.stock[key] = int(game.stock[key]) - int(need[key])
-            game.stock[product] = int(game.stock.get(product, 0)) + int(recipe["out"])
+                var needed := int(need[key])
+                if game.operations != null:
+                    var from_factory := mini(needed,int(game.operations.factory_inputs[i].get(key,0)))
+                    game.operations.factory_inputs[i][key] = int(game.operations.factory_inputs[i].get(key,0)) - from_factory
+                    needed -= from_factory
+                if needed > 0:
+                    game.stock[key] = int(game.stock.get(key,0)) - needed
+            game.stock[product] = int(game.stock.get(product,0)) + int(recipe["out"])
     if visible:
         if info_seconds > 0.0:
             info_seconds -= delta
@@ -431,7 +526,7 @@ func buttons() -> Array:
     match panel:
         "place":
             if selected_kind == "mine":
-                return ["ОТКРЫТЬ ШАХТУ","ЗАКРЫТЬ"] if mine_owned[selected_id] else ["КУПИТЬ ШАХТУ","ЗАКРЫТЬ"]
+                return ["ОТКРЫТЬ ШАХТУ","МАРШРУТЫ РУДЫ","ЗАКРЫТЬ"] if mine_owned[selected_id] else ["КУПИТЬ ШАХТУ","ЗАКРЫТЬ"]
             return ["ВЫБРАТЬ ПРОДУКЦИЮ","УЛУЧШИТЬ ЗАВОД","ЗАКРЫТЬ"] if factory_owned[selected_id] else ["КУПИТЬ ЗАВОД","ЗАКРЫТЬ"]
         "recipes": return ["СТАЛЬ  •  Fe + уголь","ПРОВОДА  •  медь","МЕХАНИЗМЫ  •  сталь + провода","ЭЛЕКТРОНИКА  •  золото + провода","НАЗАД"]
         "trade":
@@ -458,6 +553,31 @@ func buttons() -> Array:
             return result
         "warehouse_slot":
             return ["УЛУЧШИТЬ ОТСЕК","НАЗАД"]
+        "routing":
+            return ["УГОЛЬ","МЕДЬ","ЖЕЛЕЗО","ЗОЛОТО","НАЗАД"]
+        "route_target":
+            var result: Array = []
+            for warehouse in WAREHOUSES:
+                result.append("СКЛАД: "+str(warehouse["name"]))
+            for factory in FACTORIES:
+                result.append("ЗАВОД: "+str(factory["name"]))
+            result.append("НАЗАД")
+            return result
+        "barracks":
+            var result: Array = ["НАНЯТЬ ШАХТЁРА"]
+            for person in game.operations.personnel:
+                result.append("ШАХТЁР #%d · ШАХТА %d" % [person["id"],int(person["mine"])+1])
+            return result
+        "worker": return ["УЛУЧШИТЬ ШАХТЁРА","ПЕРЕВЕСТИ В ШАХТУ","НАЗАД"]
+        "worker_transfer": return ["ШАХТА №1","ШАХТА №2","ШАХТА №3","ШАХТА №4","НАЗАД"]
+        "hangar":
+            var result: Array = ["КУПИТЬ ГРУЗОВИК"]
+            for truck in game.operations.vehicles:
+                result.append("ГРУЗОВИК #%d · УРОВЕНЬ %d" % [truck["id"],truck["level"]])
+            return result
+        "truck": return ["УЛУЧШИТЬ ГРУЗОВИК","ПЕРЕНАЗНАЧИТЬ ШАХТУ","НАЗАД"]
+        "truck_transfer": return ["ШАХТА №1","ШАХТА №2","ШАХТА №3","ШАХТА №4","НАЗАД"]
+        "contracts": return ["СДАТЬ ЗАКАЗ","НАЗАД"]
         "assets": return ["К КАРТЕ","ТОРГОВЛЯ"]
         "help": return ["ЗАКРЫТЬ"]
     return []
