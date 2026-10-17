@@ -482,6 +482,8 @@ func tapped(p: Vector2) -> void:
                 show_panel()
                 return
     if p.y < top_bar_height():
+        if p.x > size.x*0.67 and game.art_screen != null:
+            game.art_screen.present("world",0)
         return
     var hit_radius := CELL * world_zoom * 0.8
     for i in range(MINES.size()):
@@ -537,8 +539,8 @@ func buttons() -> Array:
     match panel:
         "place":
             if selected_kind == "mine":
-                return ["ОТКРЫТЬ ШАХТУ","МАРШРУТЫ РУДЫ","ЗАКРЫТЬ"] if mine_owned[selected_id] else ["КУПИТЬ ШАХТУ","ЗАКРЫТЬ"]
-            return ["ВЫБРАТЬ ПРОДУКЦИЮ","УЛУЧШИТЬ ЗАВОД","ЗАКРЫТЬ"] if factory_owned[selected_id] else ["КУПИТЬ ЗАВОД","ЗАКРЫТЬ"]
+                return ["ОТКРЫТЬ ШАХТУ","МАРШРУТЫ РУДЫ","ОСМОТРЕТЬ ШАХТУ","ЗАКРЫТЬ"] if mine_owned[selected_id] else ["КУПИТЬ ШАХТУ","ЗАКРЫТЬ"]
+            return ["ВЫБРАТЬ ПРОДУКЦИЮ","УЛУЧШИТЬ ЗАВОД","ОСМОТРЕТЬ ЗАВОД","ЗАКРЫТЬ"] if factory_owned[selected_id] else ["КУПИТЬ ЗАВОД","ОСМОТРЕТЬ ЗАВОД","ЗАКРЫТЬ"]
         "recipes": return ["СТАЛЬ  •  Fe + уголь","ПРОВОДА  •  медь","МЕХАНИЗМЫ  •  сталь + провода","ЭЛЕКТРОНИКА  •  золото + провода","НАЗАД"]
         "trade":
             if tab == 0:
@@ -546,7 +548,7 @@ func buttons() -> Array:
             return ["ПРОДАТЬ СТАЛЬ","ПРОДАТЬ ПРОВОДА","ПРОДАТЬ МЕХАНИЗМЫ","ПРОДАТЬ ЭЛЕКТРОНИКУ","← РУДА","ЗАКРЫТЬ"]
         "warehouse":
             if not warehouse_owned[selected_id]:
-                return ["КУПИТЬ КОМПЛЕКС", "ЗАКРЫТЬ"]
+                return ["КУПИТЬ КОМПЛЕКС","ОСМОТРЕТЬ СКЛАД","ЗАКРЫТЬ"]
             var result: Array[String] = []
             for i in range(MAX_SLOTS):
                 if i < warehouse_slots[selected_id].size():
@@ -554,6 +556,7 @@ func buttons() -> Array:
                     result.append("ОТСЕК %d · %s" % [i+1, PRODUCTS[str(section["key"])]])
                 else:
                     result.append("ПОСТРОИТЬ ОТСЕК %d" % (i+1))
+            result.append("ОСМОТРЕТЬ СКЛАД")
             result.append("ЗАКРЫТЬ")
             return result
         "warehouse_types":
@@ -585,6 +588,7 @@ func buttons() -> Array:
             var result: Array = ["КУПИТЬ ГРУЗОВИК"]
             for truck in game.operations.vehicles:
                 result.append("ГРУЗОВИК #%d · УРОВЕНЬ %d" % [truck["id"],truck["level"]])
+            result.append("ОСМОТРЕТЬ АНГАР")
             return result
         "truck": return ["УЛУЧШИТЬ ГРУЗОВИК","ПЕРЕНАЗНАЧИТЬ ШАХТУ","НАЗАД"]
         "truck_transfer": return ["ШАХТА №1","ШАХТА №2","ШАХТА №3","ШАХТА №4","НАЗАД"]
@@ -594,6 +598,26 @@ func buttons() -> Array:
     return []
 
 func action(i: int) -> void:
+    # Cinematic scenes never execute simulated economy actions themselves.
+    # They return to the live game dialog when the player chooses Manage.
+    if game.art_screen != null:
+        if panel == "place" and selected_kind == "factory" and i == (2 if factory_owned[selected_id] else 1):
+            close_panel()
+            game.art_screen.present("factory",selected_id)
+            return
+        if panel == "place" and selected_kind == "mine" and mine_owned[selected_id] and i == 2:
+            var location_id := selected_id
+            close_panel()
+            game.enter_mine(location_id)
+            return
+        if panel == "warehouse" and i == (MAX_SLOTS if warehouse_owned[selected_id] else 1):
+            close_panel()
+            game.art_screen.present("warehouse",selected_id)
+            return
+        if panel == "hangar" and i == game.operations.vehicles.size()+1:
+            close_panel()
+            game.art_screen.present("hangar",0)
+            return
     match panel:
         "place":
             if selected_kind == "mine":
