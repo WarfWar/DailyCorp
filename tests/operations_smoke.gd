@@ -119,6 +119,24 @@ func _check() -> void:
     if not ops.upgrade_truck(truck_id) or ops.truck_capacity(ops.vehicles[0]) <= old_capacity:
         die("Transport improvements unavailable")
         return
+    # Remote-mine extraction continues while managing another location.
+    world.mine_owned[1] = true
+    if not ops.transfer_worker(original_id,1):
+        die("Unable to prepare worker for remote operation")
+        return
+    var original_buffer := int(ops.buffers[1]["gold"])
+    var remote_terrain: Array = game.grid.duplicate(true)
+    remote_terrain[9][20] = game.GOLD
+    game.mine_maps["1"] = {"grid":remote_terrain,"orders":[[20,9]],"ore_amounts":{"20:9":3},
+        "drops":[],"workers":1,"carts":1,"speed":0}
+    game.simulate_remote_mines(3.0)
+    if int(ops.buffers[1]["gold"]) <= original_buffer:
+        die("Staffed remote mine stopped producing when not visible")
+        return
+    if int(game.mine_maps["1"]["ore_amounts"]["20:9"]) != 2:
+        die("Remote mining did not decrease vein reserve")
+        return
+    ops.transfer_worker(original_id,0)
     # A city contract gives a goal and pays a bonus.
     var task: Dictionary = ops.contract()
     game.stock[str(task["key"])] = int(task["quantity"])
