@@ -419,7 +419,7 @@ func bottom_button(i: int) -> Rect2:
     var w := (size.x - 26.0 - 3*gap) / 4.0
     return Rect2(13.0 + i*(w+gap), size.y - 90.0, w, 60.0)
 
-func buttons() -> Array[String]:
+func buttons() -> Array:
     match panel:
         "place":
             if selected_kind == "mine":
