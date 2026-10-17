@@ -1,4 +1,5 @@
 extends Control
+const ResponsiveDialog = preload("res://scripts/responsive_dialog.gd")
 # DailyCorp surface world (v0.2) - mines, factories and the product market.
 const GREEN := Color("#244c3f")
 const DARK := Color("#12232b")
@@ -22,6 +23,17 @@ const FACTORIES := [
     {"name":"Завод №4","pos":Vector2i(4,6),"cost":2800}
 ]
 const MARKET_POS := Vector2i(10,5)
+const WAREHOUSES := [
+    {"name":"Склад Восток","pos":Vector2i(13,17),"cost":180},
+    {"name":"Склад Запад","pos":Vector2i(3,11),"cost":650},
+    {"name":"Склад Север","pos":Vector2i(13,3),"cost":1300}
+]
+const MATERIALS := ["coal","copper","iron","gold","steel","wire","parts","electronics"]
+const SHARED_CAP := 20
+const GENERAL_BONUS := 10
+const SECTION_CAP := 50
+const MAX_SLOTS := 3
+const MAX_SECTION_LEVEL := 5
 const RECIPES := {
     "steel":{"title":"СТАЛЬ","need":{"iron":2,"coal":1},"out":1,"time":12.0},
     "wire":{"title":"ПРОВОДА","need":{"copper":2},"out":2,"time":9.0},
@@ -32,6 +44,12 @@ const PRODUCTS := {"coal":"Уголь","copper":"Медь","iron":"Железо"
 const PRICES := {"coal":12,"copper":28,"iron":42,"gold":110,"steel":160,"wire":60,"parts":495,"electronics":470}
 
 var game = null
+var dialog = null
+var warehouse_owned := [false, false, false]
+# Each warehouse holds at most 3 single-material sections.
+var warehouse_slots: Array = [[],[],[]]
+var selected_slot := 0
+
 var mine_owned := [true, false, false, false]
 var factory_owned := [false, false, false, false]
 var factory_recipes := ["steel","wire","parts","electronics"]
@@ -57,7 +75,141 @@ var did_move := false
 
 func _ready() -> void:
     mouse_filter = MOUSE_FILTER_STOP
+    dialog = ResponsiveDialog.new()
+    add_child(dialog)
+    dialog.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    dialog.closed.connect(_dialog_closed)
+    dialog.hide()
     queue_redraw()
+
+func _dialog_closed() -> void:
+    panel = ""
+
+func close_panel() -> void:
+    panel = ""
+    if dialog != null:
+        dialog.hide()
+
+func show_panel() -> void:
+    if dialog == null:
+        return
+    if panel == "":
+        dialog.hide()
+        return
+    var lines: Array[String] = []
+    var title := ""
+    match panel:
+        "place":
+            if selected_kind == "mine":
+                var mine: Dictionary = MINES[selected_id]
+                title = str(mine["name"])
+                lines = ["Месторождение №%d" % (selected_id + 1),
+                    "Статус: ваша шахта" if mine_owned[selected_id] else "Участок свободен",
+                    "Открыть для подземной добычи" if mine_owned[selected_id] else "Стоимость покупки: %d ₽" % mine["cost"],
+                    "Руда доставляется на общий склад."]
+            else:
+                var factory: Dictionary = FACTORIES[selected_id]
+                title = str(factory["name"])
+                lines = ["Производство на поверхности",
+                    "Статус: ваш завод" if factory_owned[selected_id] else "Стоимость: %d ₽" % factory["cost"],
+                    "Изделие: " + str(RECIPES[factory_recipes[selected_id]]["title"]),
+                    "Уровень: %d" % factory_levels[selected_id]]
+                if factory_owned[selected_id]:
+                    var lev: int = factory_levels[selected_id]
+                    lines.append("Модернизация: %d ₽, %d стали и %d проводов" % [180*lev,lev,maxi(0,lev-2)])
+        "recipes":
+            title = "Выбор продукции"
+            lines = ["Один завод выпускает один вид продукции.",
+                "Сталь: 2 железа + 1 уголь → 1 шт.",
+                "Провода: 2 меди → 2 шт.",
+                "Механизмы: 2 стали + 1 провод → 1 шт.",
+                "Электроника: 1 золото + 2 провода → 1 шт.",
+                "Если нет сырья или свободного места, завод ждёт."]
+        "trade":
+            title = "Рынок · " + ("сырьё" if tab == 0 else "изделия")
+            lines = ["Выбери позицию — продастся весь запас."]
+            var names: Array[String] = ["coal","copper","iron","gold"] if tab == 0 else ["steel","wire","parts","electronics"]
+            for key in names:
+                lines.append("%s: %d / %d ед. — %d ₽ за шт." % [PRODUCTS[key],game.stock.get(key,0),capacity(key),PRICES[key]])
+        "assets":
+            title = "Компания"
+            lines = ["Шахты: %d / 4" % mine_owned.count(true),
+                "Заводы: %d / 4" % factory_owned.count(true),
+                "Складские комплексы: %d / 3" % warehouse_owned.count(true),
+                "Баланс компании: %d ₽" % game.cash,
+                "Общая ёмкость: 20 ед. на каждый материал.",
+                "Покупка склада увеличивает её на 10 ед.",
+                "Специализированная секция: +50 ед. за уровень."]
+        "help":
+            title = "Управление"
+            lines = ["Касайся шахт, заводов, складов и рынка.",
+                "Внутри шахты тап по руде назначает добычу.",
+                "Кнопка МИР возвращает на поверхность.",
+                "Заводы автоматически делают выбранные изделия.",
+                "Один складской отсек хранит один материал.",
+                "Склад и производство используют общий запас.",
+                "Все окна закрываются крестиком сверху."]
+        "warehouse":
+            var data: Dictionary = WAREHOUSES[selected_id]
+            title = str(data["name"])
+            if not warehouse_owned[selected_id]:
+                lines = ["Участок для хранения материалов.",
+                    "Покупка: %d ₽" % data["cost"],
+                    "После покупки: +10 мест каждому материалу.",
+                    "Можно строить до 3 отдельных отсеков.",
+                    "Каждый отсек обслуживает лишь один материал."]
+            else:
+                lines = ["Купленный складской комплекс",
+                    "Базовый объём: +10 мест каждому материалу.",
+                    "Построй отдельный отсек для выбранного ресурса."]
+                for i in range(MAX_SLOTS):
+                    if i < warehouse_slots[selected_id].size():
+                        var section: Dictionary = warehouse_slots[selected_id][i]
+                        var key: String = str(section["key"])
+                        lines.append("Отсек %d: %s · уровень %d" % [i+1, PRODUCTS[key], int(section["level"])])
+                    else:
+                        lines.append("Отсек %d: пустое место" % (i+1))
+        "warehouse_types":
+            title = "Строительство отсека"
+            lines = ["Один отсек принимает только один вид товара.",
+                "Выбери материал для нового отсека.",
+                "Цена строительства: %d ₽" % slot_cost(),
+                "После постройки добавится 50 мест.",
+                "Улучшение повышает ёмкость ещё на 50."]
+            for key in MATERIALS:
+                lines.append("%s — %d / %d ед." % [PRODUCTS[key],game.stock.get(key,0),capacity(key)])
+        "warehouse_slot":
+            var sections: Array = warehouse_slots[selected_id]
+            if selected_slot < sections.size():
+                var section: Dictionary = sections[selected_slot]
+                var key: String = str(section["key"])
+                var level := int(section["level"])
+                title = "Отсек · " + str(PRODUCTS[key])
+                lines = ["Уровень: %d / %d" % [level, MAX_SECTION_LEVEL],
+                    "Ёмкость этого отсека: %d единиц" % (SECTION_CAP * level),
+                    "Общий запас: %d / %d ед." % [game.stock.get(key,0),capacity(key)],
+                    "Улучшение: %d ₽ и %d стали" % [120*level, 1 if level >= 2 else 0]]
+    if info_seconds > 0.0:
+        lines.push_front(info)
+    dialog.present(title, lines, buttons(), Callable(self,"action"))
+
+func slot_cost() -> int:
+    var built := 0
+    for sections in warehouse_slots:
+        built += sections.size()
+    return 120 + built * 50
+
+func capacity(key: String) -> int:
+    var cap := SHARED_CAP + warehouse_owned.count(true) * GENERAL_BONUS
+    for i in range(WAREHOUSES.size()):
+        if warehouse_owned[i]:
+            for section in warehouse_slots[i]:
+                if str(section["key"]) == key:
+                    cap += SECTION_CAP * int(section["level"])
+    return cap
+
+func available_capacity(key: String) -> int:
+    return maxi(0, capacity(key) - int(game.stock.get(key, 0)))
 
 func pop(text: String) -> void:
     info = text
@@ -65,6 +217,7 @@ func pop(text: String) -> void:
 
 func pack_state() -> Dictionary:
     return {"mines":mine_owned,"factories":factory_owned,"recipes":factory_recipes,
+        "warehouse_owned":warehouse_owned,"warehouse_slots":warehouse_slots,
         "levels":factory_levels,"progress":factory_progress,
         "camera":[world_camera.x,world_camera.y],"zoom":world_zoom}
 
@@ -85,6 +238,18 @@ func restore_state(data: Dictionary) -> void:
             factory_levels[i] = clampi(int(levels[i]), 1, 6)
         if i < progress.size():
             factory_progress[i] = maxf(0.0, float(progress[i]))
+    var warehouse_bought: Array = data.get("warehouse_owned", [])
+    var warehouse_sections: Array = data.get("warehouse_slots", [])
+    for i in range(WAREHOUSES.size()):
+        if i < warehouse_bought.size():
+            warehouse_owned[i] = bool(warehouse_bought[i])
+        warehouse_slots[i] = []
+        if i < warehouse_sections.size() and warehouse_sections[i] is Array and warehouse_owned[i]:
+            for entry in warehouse_sections[i]:
+                if warehouse_slots[i].size() >= MAX_SLOTS:
+                    break
+                if entry is Dictionary and MATERIALS.has(str(entry.get("key",""))):
+                    warehouse_slots[i].append({"key":str(entry["key"]), "level":clampi(int(entry.get("level",1)),1,MAX_SECTION_LEVEL)})
     mine_owned[0] = true
     var saved_camera: Array = data.get("camera", [])
     if saved_camera.size() == 2:
@@ -105,15 +270,17 @@ func process_industry(delta: float) -> void:
             if int(game.stock.get(key, 0)) < int(need[key]):
                 available = false
                 break
+        var product: String = factory_recipes[i]
+        if int(game.stock.get(product, 0)) + int(recipe["out"]) > capacity(product):
+            available = false
         if not available:
-            # A waiting factory does not store progress beyond its active cycle.
+            # A waiting factory does not consume inputs while storage is full.
             continue
         factory_progress[i] += delta * (1.0 + float(factory_levels[i] - 1) * 0.45)
         if factory_progress[i] >= float(recipe["time"]):
             factory_progress[i] = 0.0
             for key in need.keys():
                 game.stock[key] = int(game.stock[key]) - int(need[key])
-            var product: String = factory_recipes[i]
             game.stock[product] = int(game.stock.get(product, 0)) + int(recipe["out"])
     if visible:
         if info_seconds > 0.0:
@@ -193,11 +360,7 @@ func _gui_input(event: InputEvent) -> void:
 
 func tapped(p: Vector2) -> void:
     if panel != "":
-        var commands := buttons()
-        for i in range(commands.size()):
-            if modal_button(i, commands.size()).has_point(p):
-                action(i)
-                return
+        # Modal controls handle all taps, including the fixed Close button.
         return
     if p.y > size.y - 112.0:
         for i in range(4):
@@ -209,6 +372,7 @@ func tapped(p: Vector2) -> void:
                     3:
                         game.save_game()
                         pop("Компания сохранена")
+                show_panel()
                 return
     if p.y < 142.0:
         return
@@ -218,15 +382,25 @@ func tapped(p: Vector2) -> void:
             selected_kind = "mine"
             selected_id = i
             panel = "place"
+            show_panel()
             return
     for i in range(FACTORIES.size()):
         if world_screen(Vector2(FACTORIES[i]["pos"])).distance_to(p) < hit_radius:
             selected_kind = "factory"
             selected_id = i
             panel = "place"
+            show_panel()
+            return
+    for i in range(WAREHOUSES.size()):
+        if world_screen(Vector2(WAREHOUSES[i]["pos"])).distance_to(p) < hit_radius:
+            selected_kind = "warehouse"
+            selected_id = i
+            panel = "warehouse"
+            show_panel()
             return
     if world_screen(Vector2(MARKET_POS)).distance_to(p) < hit_radius:
         panel = "trade"
+        show_panel()
 
 func modal_rect() -> Rect2:
     var width := minf(size.x - 32.0, 660.0)
@@ -256,6 +430,26 @@ func buttons() -> Array[String]:
             if tab == 0:
                 return ["ПРОДАТЬ УГОЛЬ","ПРОДАТЬ МЕДЬ","ПРОДАТЬ ЖЕЛЕЗО","ПРОДАТЬ ЗОЛОТО","ИЗДЕЛИЯ →","ЗАКРЫТЬ"]
             return ["ПРОДАТЬ СТАЛЬ","ПРОДАТЬ ПРОВОДА","ПРОДАТЬ МЕХАНИЗМЫ","ПРОДАТЬ ЭЛЕКТРОНИКУ","← РУДА","ЗАКРЫТЬ"]
+        "warehouse":
+            if not warehouse_owned[selected_id]:
+                return ["КУПИТЬ КОМПЛЕКС", "ЗАКРЫТЬ"]
+            var result: Array[String] = []
+            for i in range(MAX_SLOTS):
+                if i < warehouse_slots[selected_id].size():
+                    var section: Dictionary = warehouse_slots[selected_id][i]
+                    result.append("ОТСЕК %d · %s" % [i+1, PRODUCTS[str(section["key"])]])
+                else:
+                    result.append("ПОСТРОИТЬ ОТСЕК %d" % (i+1))
+            result.append("ЗАКРЫТЬ")
+            return result
+        "warehouse_types":
+            var result: Array[String] = []
+            for key in MATERIALS:
+                result.append("ХРАНИТЬ: " + str(PRODUCTS[key]))
+            result.append("НАЗАД")
+            return result
+        "warehouse_slot":
+            return ["УЛУЧШИТЬ ОТСЕК","НАЗАД"]
         "assets": return ["К КАРТЕ","ТОРГОВЛЯ"]
         "help": return ["ЗАКРЫТЬ"]
     return []
@@ -325,10 +519,70 @@ func action(i: int) -> void:
                 tab = 1-tab
             else:
                 panel = ""
+        "warehouse":
+            if not warehouse_owned[selected_id]:
+                if i == 0:
+                    var amount: int = int(WAREHOUSES[selected_id]["cost"])
+                    if game.cash >= amount:
+                        game.cash -= amount
+                        warehouse_owned[selected_id] = true
+                        pop("Склад куплен. Выбери отдельный отсек")
+                        game.save_game()
+                    else:
+                        pop("Не хватает %d ₽" % amount)
+                else:
+                    panel = ""
+            elif i == MAX_SLOTS:
+                panel = ""
+            elif i >= 0 and i < MAX_SLOTS:
+                selected_slot = i
+                if i < warehouse_slots[selected_id].size():
+                    panel = "warehouse_slot"
+                elif i == warehouse_slots[selected_id].size():
+                    panel = "warehouse_types"
+                else:
+                    pop("Сначала построй предыдущий отсек")
+        "warehouse_types":
+            if i == MATERIALS.size():
+                panel = "warehouse"
+            elif i >= 0 and i < MATERIALS.size():
+                var cost := slot_cost()
+                if game.cash < cost:
+                    pop("Строительство стоит %d ₽" % cost)
+                elif warehouse_slots[selected_id].size() >= MAX_SLOTS:
+                    pop("В комплексе нет свободных отсеков")
+                    panel = "warehouse"
+                else:
+                    game.cash -= cost
+                    warehouse_slots[selected_id].append({"key":MATERIALS[i],"level":1})
+                    pop("Построен отсек для: " + str(PRODUCTS[MATERIALS[i]]))
+                    panel = "warehouse_slot"
+                    game.save_game()
+        "warehouse_slot":
+            if i == 0:
+                var section: Dictionary = warehouse_slots[selected_id][selected_slot]
+                var level := int(section["level"])
+                var price := 120 * level
+                var steel := 1 if level >= 2 else 0
+                if level >= MAX_SECTION_LEVEL:
+                    pop("Максимальный уровень склада")
+                elif game.cash < price or int(game.stock.get("steel",0)) < steel:
+                    pop("Нужно %d ₽ и %d стали" % [price,steel])
+                else:
+                    game.cash -= price
+                    game.stock["steel"] -= steel
+                    section["level"] = level + 1
+                    warehouse_slots[selected_id][selected_slot] = section
+                    pop("Ёмкость увеличена на 50 единиц")
+                    game.save_game()
+            else:
+                panel = "warehouse"
         "assets":
             panel = "" if i == 0 else "trade"
         "help":
             panel = ""
+    if dialog != null:
+        show_panel()
 
 func upgrade_factory(index: int) -> void:
     var level: int = int(factory_levels[index])
@@ -375,6 +629,12 @@ func building(p: Vector2, kind: String, owned: bool, label: String, desc: String
         draw_rect(Rect2(p+Vector2(15,-49)*scale,Vector2(13,35)*scale),Color("#ab775c") if owned else Color("#6a7776"))
         if owned:
             draw_circle(p+Vector2(20,-56+sin(time*1.3)*4)*scale,11*scale,Color("#d6dddd",0.4))
+    elif kind == "warehouse":
+        draw_rect(Rect2(p+Vector2(-34,-19)*scale,Vector2(68,50)*scale),Color("#9db7be") if owned else Color("#7b8282"))
+        draw_polygon(PackedVector2Array([p+Vector2(-39,-19)*scale,p+Vector2(0,-39)*scale,p+Vector2(39,-19)*scale]),PackedColorArray([color,color,color]))
+        draw_rect(Rect2(p+Vector2(-19,-1)*scale,Vector2(38,32)*scale),Color("#365466"))
+        draw_line(p+Vector2(-19,11)*scale,p+Vector2(19,11)*scale,Color("#d9e3df"),2.0)
+        draw_line(p+Vector2(-19,21)*scale,p+Vector2(19,21)*scale,Color("#d9e3df"),2.0)
     else:
         draw_rect(Rect2(p+Vector2(-31,-17)*scale,Vector2(62,47)*scale),Color("#e3bd8d"))
         draw_rect(Rect2(p+Vector2(-36,-25)*scale,Vector2(72,14)*scale),Color("#da795b"))
@@ -422,6 +682,9 @@ func _draw() -> void:
     road.append(Vector2i(8,9))
     road.append(Vector2i(11,10))
     road.append(MARKET_POS)
+    road.append(Vector2i(13,3))
+    road.append(Vector2i(3,11))
+    road.append(Vector2i(13,17))
     for i in range(road.size()-1):
         var a := world_screen(Vector2(road[i]))
         var b := world_screen(Vector2(road[i+1]))
@@ -437,6 +700,11 @@ func _draw() -> void:
         if factory_owned[i]:
             note = str(RECIPES[factory_recipes[i]]["title"]) + " · ур." + str(factory_levels[i])
         building(world_screen(Vector2(data["pos"])),"factory",factory_owned[i],str(data["name"]),note)
+    for i in range(WAREHOUSES.size()):
+        var warehouse: Dictionary = WAREHOUSES[i]
+        var name: String = str(warehouse["name"])
+        var status := "КУПЛЕН" if warehouse_owned[i] else "%d ₽" % warehouse["cost"]
+        building(world_screen(Vector2(warehouse["pos"])),"warehouse",warehouse_owned[i],name,status)
     building(world_screen(Vector2(MARKET_POS)),"market",true,"РЫНОК","ПРОДАЖА")
     draw_rect(Rect2(0,0,size.x,145),PANEL)
     draw_rect(Rect2(0,size.y-122,size.x,122),PANEL)
@@ -451,8 +719,7 @@ func _draw() -> void:
     txt(info,Vector2(15,size.y-102),16,YELLOW)
     for i in range(4):
         panel_button(bottom_button(i),["РЫНОК","ОБЪЕКТЫ","ПОМОЩЬ","СОХР."][i],i==0)
-    if panel != "":
-        draw_popup()
+    # World dialogs are real controls; no off-screen draw commands are used.
 
 func draw_popup() -> void:
     draw_rect(Rect2(Vector2.ZERO,size),Color(0.02,0.05,0.08,0.86))
