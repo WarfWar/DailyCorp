@@ -191,7 +191,10 @@ func show_panel() -> void:
                     "Улучшение: %d ₽ и %d стали" % [120*level, 1 if level >= 2 else 0]]
     if info_seconds > 0.0:
         lines.push_front(info)
-    dialog.present(title, lines, buttons(), Callable(self,"action"))
+    var commands_to_show: Array = buttons()
+    if not commands_to_show.is_empty() and commands_to_show.back() == "ЗАКРЫТЬ":
+        commands_to_show.pop_back()
+    dialog.present(title, lines, commands_to_show, Callable(self,"action"))
 
 func slot_cost() -> int:
     var built := 0
