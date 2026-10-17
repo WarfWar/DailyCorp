@@ -461,7 +461,7 @@ func modal_box() -> Rect2:
     var h := minf(size.y - 90.0, 620.0)
     return Rect2((size.x - w) * 0.5, (size.y - h) * 0.5, w, h)
 
-func modal_buttons() -> Array[String]:
+func modal_buttons() -> Array:
     match page:
         "stock": return ["ТОРГОВАТЬ В МИРЕ", "ЗАКРЫТЬ"]
         "upgrade": return ["НАНЯТЬ ШАХТЁРА", "КУПИТЬ ВАГОНЕТКУ", "УСКОРИТЬ ДОБЫЧУ", "ЗАКРЫТЬ"]
