@@ -21,7 +21,7 @@ func _ready() -> void:
     set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
     blocker = ColorRect.new()
-    blocker.color = Color(0.01, 0.03, 0.05, 0.86)
+    blocker.color = Color(0.01, 0.025, 0.038, 0.83)
     blocker.mouse_filter = Control.MOUSE_FILTER_STOP
     add_child(blocker)
     blocker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -29,21 +29,21 @@ func _ready() -> void:
     frame = Panel.new()
     frame.mouse_filter = Control.MOUSE_FILTER_STOP
     var style := StyleBoxFlat.new()
-    style.bg_color = Color("#213747")
-    style.set_corner_radius_all(14)
-    style.set_border_width_all(2)
-    style.border_color = Color("#5d7b8d")
+    style.bg_color = Color("#111d2a",0.985)
+    style.set_corner_radius_all(8)
+    style.set_border_width_all(1)
+    style.border_color = Color("#61889c")
     frame.add_theme_stylebox_override("panel",style)
     add_child(frame)
 
     header = Label.new()
     header.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     header.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-    header.add_theme_color_override("font_color",Color("#f3c47d"))
+    header.add_theme_color_override("font_color",Color("#e1be7f"))
     frame.add_child(header)
 
     close_top = Button.new()
-    close_top.text = "✕"
+    close_top.text = "×"
     close_top.tooltip_text = "Закрыть окно"
     close_top.custom_minimum_size = Vector2.ZERO
     close_top.pressed.connect(close_dialog)
@@ -63,7 +63,7 @@ func _ready() -> void:
     viewport_scroll.add_child(content)
 
     close_bottom = Button.new()
-    close_bottom.text = "ЗАКРЫТЬ"
+    close_bottom.text = "ЗАКРЫТЬ / ESC"
     close_bottom.custom_minimum_size = Vector2.ZERO
     close_bottom.pressed.connect(close_dialog)
     frame.add_child(close_bottom)
@@ -93,7 +93,7 @@ func rebuild() -> void:
         var row := Label.new()
         row.text = str(item)
         row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        row.add_theme_color_override("font_color",Color("#f5eddf"))
+        row.add_theme_color_override("font_color",Color("#cadbe1"))
         row.add_theme_font_size_override("font_size",body_font)
         row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         content.add_child(row)
@@ -107,6 +107,21 @@ func rebuild() -> void:
         action.add_theme_font_size_override("font_size",clampi(roundi(size.x*0.023),14,20))
         action.clip_text = true
         action.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        action.add_theme_color_override("font_color",Color("#ddebef"))
+        action.add_theme_color_override("font_hover_color",Color("#e6c17a"))
+        var normal := StyleBoxFlat.new()
+        normal.bg_color = Color("#142b3b")
+        normal.border_color = Color("#496d7c")
+        normal.set_border_width_all(1)
+        normal.set_corner_radius_all(5)
+        action.add_theme_stylebox_override("normal",normal)
+        var hover: StyleBoxFlat = normal.duplicate()
+        hover.bg_color = Color("#29465b")
+        hover.border_color = Color("#a2cbd4")
+        action.add_theme_stylebox_override("hover",hover)
+        var active: StyleBoxFlat = normal.duplicate()
+        active.bg_color = Color("#3d5661")
+        action.add_theme_stylebox_override("pressed",active)
         action.pressed.connect(_choose.bind(i))
         content.add_child(action)
     viewport_scroll.scroll_vertical = 0
