@@ -13,6 +13,8 @@ var action_callback: Callable
 var heading_text := ""
 var detail_lines: Array = []
 var commands: Array = []
+# Mobile drag fallback: ScrollContainer's built-in touch scrolling is platform-specific.
+var tracked_touch: Dictionary = {}
 
 func _ready() -> void:
     mouse_filter = Control.MOUSE_FILTER_STOP
@@ -50,6 +52,8 @@ func _ready() -> void:
     viewport_scroll = ScrollContainer.new()
     viewport_scroll.custom_minimum_size = Vector2.ZERO
     viewport_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    # Touch gestures are handled explicitly for deterministic scrolling on every device.
+    viewport_scroll.scroll_deadzone = 100000
     viewport_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
     frame.add_child(viewport_scroll)
 
@@ -71,6 +75,7 @@ func _ready() -> void:
 func present(title: String, details: Array, actions: Array, callback: Callable) -> void:
     heading_text = title
     detail_lines = details
+    tracked_touch.clear()
     commands = actions
     action_callback = callback
     rebuild()
@@ -111,8 +116,30 @@ func _choose(index: int) -> void:
         action_callback.call(index)
 
 func close_dialog() -> void:
+    tracked_touch.clear()
     hide()
     closed.emit()
+
+func _input(event: InputEvent) -> void:
+    if not visible or viewport_scroll == null:
+        return
+    if event is InputEventScreenTouch:
+        var touch: InputEventScreenTouch = event
+        if touch.pressed:
+            if viewport_scroll.get_global_rect().has_point(touch.position):
+                tracked_touch[touch.index] = touch.position
+        else:
+            tracked_touch.erase(touch.index)
+    elif event is InputEventScreenDrag:
+        var drag: InputEventScreenDrag = event
+        if tracked_touch.has(drag.index):
+            var previous: Vector2 = tracked_touch[drag.index]
+            tracked_touch[drag.index] = drag.position
+            var pixels := roundi(previous.y - drag.position.y)
+            if pixels != 0:
+                viewport_scroll.scroll_vertical += pixels
+                get_viewport().set_input_as_handled()
+
 
 func reflow() -> void:
     if frame == null:
