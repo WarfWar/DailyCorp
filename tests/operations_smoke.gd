@@ -39,7 +39,7 @@ func _check() -> void:
     if game.tile(cell) != game.GOLD:
         die("Expected gold test deposit")
         return
-    var initial := game.vein_left(cell)
+    var initial: int = game.vein_left(cell)
     if initial < 3:
         die("Ore vein must contain multiple units")
         return
@@ -115,14 +115,14 @@ func _check() -> void:
     # Better trucks have more capacity and enhanced speed.
     game.stock["wire"] = 5
     var truck_id := int(ops.vehicles[0]["id"])
-    var old_capacity := ops.truck_capacity(ops.vehicles[0])
+    var old_capacity: int = ops.truck_capacity(ops.vehicles[0])
     if not ops.upgrade_truck(truck_id) or ops.truck_capacity(ops.vehicles[0]) <= old_capacity:
         die("Transport improvements unavailable")
         return
     # A city contract gives a goal and pays a bonus.
-    var task := ops.contract()
+    var task: Dictionary = ops.contract()
     game.stock[str(task["key"])] = int(task["quantity"])
-    var before_cash := game.cash
+    var before_cash: int = game.cash
     if not ops.fulfill_contract() or game.cash != before_cash + int(task["reward"]) or ops.reputation < 1:
         die("City order payout or reputation incorrect")
         return
