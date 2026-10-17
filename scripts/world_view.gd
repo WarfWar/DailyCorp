@@ -128,7 +128,7 @@ func show_panel() -> void:
         "trade":
             title = "Рынок · " + ("сырьё" if tab == 0 else "изделия")
             lines = ["Выбери позицию — продастся весь запас."]
-            var names: Array[String] = ["coal","copper","iron","gold"] if tab == 0 else ["steel","wire","parts","electronics"]
+            var names: Array = ["coal","copper","iron","gold"] if tab == 0 else ["steel","wire","parts","electronics"]
             for key in names:
                 lines.append("%s: %d / %d ед. — %d ₽ за шт." % [PRODUCTS[key],game.stock.get(key,0),capacity(key),PRICES[key]])
         "assets":
