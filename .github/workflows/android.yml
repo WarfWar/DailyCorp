@@ -87,6 +87,14 @@ jobs:
             exit 1
           fi
 
+      - name: Test responsive dialogs and warehousing
+        run: |
+          godot --headless --path . --script res://tests/warehouse_smoke.gd 2>&1 | tee /tmp/warehouse-test.log
+          grep -q "WAREHOUSE TEST PASSED" /tmp/warehouse-test.log
+          if grep -E "SCRIPT ERROR|Parse Error|WAREHOUSE TEST FAILED" /tmp/warehouse-test.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
