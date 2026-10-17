@@ -2,6 +2,7 @@ extends Control
 const WorldView = preload("res://scripts/world_view.gd")
 const ResponsiveDialog = preload("res://scripts/responsive_dialog.gd")
 const Operations = preload("res://scripts/operations.gd")
+const ArtScreen = preload("res://scripts/art_screen.gd")
 # DailyCorp 0.1: original mobile mining and logistics prototype.
 const W := 42
 const H := 42
@@ -28,6 +29,7 @@ var operations_saved: Dictionary = {}
 var passive_progress: Dictionary = {}
 var ore_amounts: Dictionary = {}
 var drop_serial := 0
+var art_screen = null
 var world_view = null
 var mine_dialog = null
 var world_mode := true
@@ -79,6 +81,11 @@ func _ready() -> void:
     mine_dialog.closed.connect(_mine_dialog_closed)
     mine_dialog.hide()
     world_mode = true
+    art_screen = ArtScreen.new()
+    art_screen.game = self
+    add_child(art_screen)
+    art_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    art_screen.present("world",0)
     set_process(true)
     queue_redraw()
 
@@ -619,6 +626,10 @@ func tapped(point: Vector2) -> void:
                         toast("Игра сохранена")
                 show_mine_dialog()
                 return
+    if point.y <= top_bar_height() and point.x >= size.x*0.69:
+        if art_screen != null:
+            art_screen.present("mine",active_mine)
+        return
     if point.y >= top_bar_height() and point.y < size.y-bottom_bar_height():
         command(to_cell(point))
 
@@ -983,6 +994,8 @@ func enter_mine(index: int) -> void:
     world_view.hide()
     mine_dialog.hide()
     toast("Добыча: шахта №%d" % (index+1))
+    if art_screen != null:
+        art_screen.present("mine",index)
     queue_redraw()
     save_game()
 
@@ -995,6 +1008,8 @@ func go_world() -> void:
     if world_view != null:
         world_view.show()
         world_view.queue_redraw()
+    if art_screen != null:
+        art_screen.present("world",0)
     save_game()
 
 func _notification(what: int) -> void:
