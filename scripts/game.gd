@@ -567,8 +567,8 @@ func _draw() -> void:
     # HUD is painted last to hide map tiles behind the header/footer.
     draw_rect(Rect2(0, 0, size.x, 153), PANEL)
     draw_rect(Rect2(0, size.y - 164, size.x, 164), PANEL)
-    write("DAILYCORP", Vector2(20, 42), 29, GOLDEN)
-    write("АЛЬФА 0.1", Vector2(size.x - 154, 38), 15, MUTED)
+    write("DAILYCORP / ШАХТА", Vector2(20, 42), 26, GOLDEN)
+    write("АЛЬФА 0.2", Vector2(size.x - 154, 38), 15, MUTED)
     write("₽ %d" % cash, Vector2(20, 92), 29, GOLDEN)
     var sum := 0
     for amount in stock.values():
