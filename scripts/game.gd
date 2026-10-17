@@ -104,9 +104,10 @@ func show_mine_dialog() -> void:
         "upgrade":
             title = "Улучшение шахты"
             lines = ["Шахтёров: %d  ·  вагонеток: %d" % [worker_count,cart_count],
-                "Шахтёр: %d ₽ (после 4 нужен механизм)" % (150+maxi(0,worker_count-2)*80),
+                "Шахтёр: %d ₽ · назначается на эту шахту" % (155+operations.personnel.size()*65 if operations != null else 285),
                 "Вагонетка: %d ₽ (после 2 нужны провода)" % (200+maxi(0,cart_count-1)*110),
                 "Скорость: %d ₽ и %d стали" % [240+speed_level*190,speed_level+1],
+                "Улучшение конкретных рабочих — в казарме.",
                 "Производи ресурсы на заводах в открытом мире."]
         "help":
             title = "Как играть"
@@ -128,7 +129,7 @@ func queued_ore(kind: int) -> int:
     var key: String = KEYS.get(kind, "")
     if key == "":
         return 0
-    var total: int = int(stock.get(key, 0))
+    var total: int = int(operations.buffers[active_mine].get(key,0)) if operations != null else int(stock.get(key,0))
     for drop in drops:
         if int(drop["kind"]) == kind:
             total += 1
@@ -564,18 +565,10 @@ func act(index: int) -> void:
         "upgrade":
             match index:
                 0:
-                    var cost := 150 + maxi(0, worker_count - 2) * 80
-                    if worker_count >= 10:
-                        message = "Максимум 10 шахтёров"
-                    elif cash < cost or (worker_count >= 4 and int(stock["parts"]) < 1):
-                        message = "Нужно %d ₽ и механизм (после 4 рабочих)" % cost
+                    if operations != null and operations.hire_worker():
+                        message = "Шахтёр принят. Переводы и улучшения — в казарме"
                     else:
-                        cash -= cost
-                        if worker_count >= 4:
-                            stock["parts"] -= 1
-                        worker_count += 1
-                        workers.append({"cell": BASE, "pos": Vector2(BASE), "path": [], "state": "idle", "target": Vector2i(-1, -1), "timer": 0.0, "id": worker_count})
-                        message = "Новый шахтёр нанят"
+                        message = "Недостаточно средств или штат заполнен"
                 1:
                     var cost := 200 + maxi(0, cart_count - 1) * 110
                     if cart_count >= 7:
@@ -657,6 +650,8 @@ func _draw() -> void:
             if kind != AIR:
                 draw_rect(Rect2(pos + Vector2(0, side * 0.85), Vector2(side, side * 0.15)), color.darkened(0.18))
                 if kind != ROCK:
+                    if zoom >= 0.76:
+                        write(str(vein_left(c)),pos+Vector2(5,19)*zoom,clampi(roundi(19*zoom),11,20),LIGHT)
                     for n in range(3):
                         var fx := float(posmod(x * 29 + y * 97 + n * 53, 83)) / 83.0
                         var fy := float(posmod(y * 41 + x * 71 + n * 37, 89)) / 89.0
