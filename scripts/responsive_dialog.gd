@@ -9,7 +9,7 @@ var viewport_scroll: ScrollContainer
 var content: VBoxContainer
 var action_callback: Callable
 var heading_text := ""
-var detail_lines: Array[String] = []
+var detail_lines: Array = []
 var commands: Array = []
 
 func _ready() -> void:
@@ -85,7 +85,7 @@ func _ready() -> void:
     get_viewport().size_changed.connect(reflow)
     reflow()
 
-func present(title: String, details: Array[String], actions: Array, callback: Callable) -> void:
+func present(title: String, details: Array, actions: Array, callback: Callable) -> void:
     action_callback = callback
     heading_text = title
     detail_lines = details
