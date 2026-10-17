@@ -129,6 +129,10 @@ func show_panel() -> void:
                 if factory_owned[selected_id]:
                     var lev: int = factory_levels[selected_id]
                     lines.append("Модернизация: %d ₽, %d стали и %d проводов" % [180*lev,lev,maxi(0,lev-2)])
+                    lines.append("Входящий запас завода:")
+                    for key in game.operations.ORES:
+                        lines.append("%s: %d из 40" % [PRODUCTS[key],game.operations.factory_inputs[selected_id].get(key,0)])
+                    lines.append("Готовая продукция: %d из %d" % [game.stock.get(factory_recipes[selected_id],0),capacity(factory_recipes[selected_id])])
         "recipes":
             title = "Выбор продукции"
             lines = ["Один завод выпускает один вид продукции.",
