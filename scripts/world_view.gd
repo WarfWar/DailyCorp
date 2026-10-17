@@ -1285,6 +1285,39 @@ func draw_purchase_effect(p: Vector2,rx: float,ry: float) -> void:
             clampi(roundi(11.0*world_zoom),9,14),
             Color(0.77,0.94,0.98,1.0-progress*0.7))
 
+func draw_target_reticle() -> void:
+    if panel == "":
+        return
+    var location := Vector2(-100,-100)
+    match panel:
+        "trade": location = Vector2(MARKET_POS)
+        "contracts": location = Vector2(CONTRACT_POS)
+        "barracks", "worker", "worker_transfer": location = Vector2(BARRACKS_POS)
+        "hangar", "truck", "truck_transfer": location = Vector2(HANGAR_POS)
+        "warehouse", "warehouse_slot", "warehouse_types": location = Vector2(WAREHOUSES[selected_id]["pos"])
+        "place", "recipes", "routing", "route_target":
+            if selected_kind == "mine":
+                location = Vector2(MINES[selected_id]["pos"])
+            elif selected_kind == "factory":
+                location = Vector2(FACTORIES[selected_id]["pos"])
+        "land": location = plot_anchor(selected_plot)
+    if location.x < 0:
+        return
+    var center := world_screen(location)
+    if center.x < -90 or center.x > size.x+90 or center.y < -90 or center.y > size.y+90:
+        return
+    var radius := clampf(41*world_zoom,22,58)
+    var phase := fposmod(time*0.19,1.0)*TAU
+    var reticle := Color("#8bddeb",0.88)
+    for part in range(4):
+        var start := phase+float(part)*TAU/4.0
+        draw_arc(center,radius,start,start+0.45,12,reticle,2.0,true)
+    draw_circle(center,3.0,Color("#ffe0a1"))
+    draw_line(center+Vector2(-radius-8,0),center+Vector2(-radius+3,0),reticle,1.2,true)
+    draw_line(center+Vector2(radius-3,0),center+Vector2(radius+8,0),reticle,1.2,true)
+    draw_line(center+Vector2(0,-radius-8),center+Vector2(0,-radius+3),reticle,1.2,true)
+    draw_line(center+Vector2(0,radius-3),center+Vector2(0,radius+8),reticle,1.2,true)
+
 func draw_world_hud() -> void:
     # Original industrial command console, inspired by EVE's information density
     # but with large Android touch targets, own icons and distinct trade branding.
@@ -1328,8 +1361,13 @@ func draw_world_hud() -> void:
         var last_w := maxf(72.0,available-(cell+gap)*3)
         console_metric(Rect2(14+(cell+gap)*3,y,last_w,top-y-8),"АКТИВЫ",
             "%d / %d" % [mine_owned.count(true)+factory_owned.count(true)+warehouse_owned.count(true),12],Color("#b5a2d8"))
+    var selected_tab := -1
+    match panel:
+        "trade": selected_tab = 0
+        "assets": selected_tab = 1
+        "help": selected_tab = 2
     for i in range(4):
-        draw_console_nav(bottom_button(i),["РЫНОК","ОБЪЕКТЫ","СПРАВКА","СОХР."][i],i,i==0)
+        draw_console_nav(bottom_button(i),["РЫНОК","ОБЪЕКТЫ","СПРАВКА","СОХР."][i],i,i==selected_tab)
 
 func _draw() -> void:
     if game == null:
@@ -1382,6 +1420,7 @@ func _draw() -> void:
         var point: Vector2 = world_screen(Vector2(item["pos"]))
         if point.x > -110 and point.x < size.x+110 and point.y > -110 and point.y < size.y+110:
             draw_building_label(point,bool(item["owned"]),str(item["label"]),str(item["desc"]))
+    draw_target_reticle()
     draw_world_hud()
 
 func draw_popup() -> void:
