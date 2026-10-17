@@ -104,6 +104,15 @@ jobs:
             exit 1
           fi
 
+      - name: Verify ore veins, transport routes, rosters, contracts and persistence
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/operations_smoke.gd 2>&1 | tee /tmp/operations-test.log
+          grep -q "OPERATIONS TEST PASSED" /tmp/operations-test.log
+          if grep -E "SCRIPT ERROR|Parse Error|OPERATIONS TEST FAILED" /tmp/operations-test.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
