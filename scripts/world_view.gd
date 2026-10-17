@@ -147,7 +147,7 @@ func show_panel() -> void:
             title = "Компания"
             lines = ["Шахты: %d / 4" % mine_owned.count(true),
                 "Заводы: %d / 4" % factory_owned.count(true),
-                "Складские комплексы: %d / 3" % warehouse_owned.count(true),
+                "Складские комплексы: %d / 4" % warehouse_owned.count(true),
                 "Баланс компании: %d ₽" % game.cash,
                 "Общая ёмкость: 20 ед. на каждый материал.",
                 "Покупка склада увеличивает её на 10 ед.",
@@ -501,6 +501,13 @@ func tapped(p: Vector2) -> void:
             panel = "warehouse"
             show_panel()
             return
+    for point in [{"pos":BARRACKS_POS,"panel":"barracks"},
+        {"pos":HANGAR_POS,"panel":"hangar"},
+        {"pos":CONTRACT_POS,"panel":"contracts"}]:
+        if world_screen(Vector2(point["pos"])).distance_to(p) < hit_radius*0.75:
+            panel = str(point["panel"])
+            show_panel()
+            return
     if world_screen(Vector2(MARKET_POS)).distance_to(p) < hit_radius:
         panel = "trade"
         show_panel()
@@ -590,6 +597,8 @@ func action(i: int) -> void:
                     if i == 0:
                         panel = ""
                         game.enter_mine(selected_id)
+                    elif i == 1:
+                        panel = "routing"
                     else:
                         panel = ""
                 elif i == 0:
@@ -705,6 +714,79 @@ func action(i: int) -> void:
                     game.save_game()
             else:
                 panel = "warehouse"
+        "routing":
+            if i < 4:
+                selected_route_material = game.operations.ORES[i]
+                panel = "route_target"
+            else:
+                panel = "place"
+        "route_target":
+            if i >= 0 and i < WAREHOUSES.size()+FACTORIES.size():
+                var kind := "warehouse" if i < WAREHOUSES.size() else "factory"
+                var target_index := i if kind == "warehouse" else i-WAREHOUSES.size()
+                if game.operations.set_route(selected_id,selected_route_material,kind,target_index):
+                    pop("Маршрут руды назначен")
+                    panel = "routing"
+                else:
+                    pop("Сначала нужно приобрести выбранный объект")
+            else:
+                panel = "routing"
+        "barracks":
+            if i == 0:
+                if game.operations.hire_worker():
+                    pop("Нанят шахтёр")
+                else:
+                    pop("Недостаточно денег или мест для рабочих")
+            elif i > 0 and i <= game.operations.personnel.size():
+                selected_worker = i-1
+                panel = "worker"
+        "worker":
+            if i == 0:
+                var worker_id := int(game.operations.personnel[selected_worker]["id"])
+                pop("Улучшено!" if game.operations.upgrade_worker(worker_id) else "Нужны деньги, сталь или достигнут максимум")
+            elif i == 1:
+                panel = "worker_transfer"
+            else:
+                panel = "barracks"
+        "worker_transfer":
+            if i < 4:
+                var worker_id := int(game.operations.personnel[selected_worker]["id"])
+                if game.operations.transfer_worker(worker_id,i):
+                    panel = "worker"
+                    pop("Шахтёр назначен в шахту №%d" % (i+1))
+                else:
+                    pop("Шахта недоступна или шахтёр уже там")
+            else:
+                panel = "worker"
+        "hangar":
+            if i == 0:
+                pop("Куплен грузовик" if game.operations.hire_truck() else "Нужно больше денег или мест")
+            elif i > 0 and i <= game.operations.vehicles.size():
+                selected_truck = i-1
+                panel = "truck"
+        "truck":
+            if i == 0:
+                var truck_id := int(game.operations.vehicles[selected_truck]["id"])
+                pop("Транспорт модернизирован" if game.operations.upgrade_truck(truck_id) else "Нужны деньги, провода или достигнут максимум")
+            elif i == 1:
+                panel = "truck_transfer"
+            else:
+                panel = "hangar"
+        "truck_transfer":
+            if i < 4:
+                var truck_id := int(game.operations.vehicles[selected_truck]["id"])
+                if game.operations.transfer_truck(truck_id,i):
+                    panel = "truck"
+                    pop("Грузовик переведён на шахту №%d" % (i+1))
+                else:
+                    pop("Нельзя перевести занятый транспорт или шахта закрыта")
+            else:
+                panel = "truck"
+        "contracts":
+            if i == 0:
+                pop("Заказ сдан, город доволен!" if game.operations.fulfill_contract() else "Нужно больше товара на главном складе")
+            else:
+                panel = ""
         "assets":
             panel = "" if i == 0 else "trade"
         "help":
@@ -814,6 +896,10 @@ func _draw() -> void:
     road.append(Vector2i(13,3))
     road.append(Vector2i(3,11))
     road.append(Vector2i(13,17))
+    road.append(Vector2i(7,7))
+    road.append(BARRACKS_POS)
+    road.append(HANGAR_POS)
+    road.append(CONTRACT_POS)
     for i in range(road.size()-1):
         var a := world_screen(Vector2(road[i]))
         var b := world_screen(Vector2(road[i+1]))
@@ -834,7 +920,24 @@ func _draw() -> void:
         var name: String = str(warehouse["name"])
         var status := "КУПЛЕН" if warehouse_owned[i] else "%d ₽" % warehouse["cost"]
         building(world_screen(Vector2(warehouse["pos"])),"warehouse",warehouse_owned[i],name,status)
+    building(world_screen(Vector2(BARRACKS_POS)),"barracks",true,"КАЗАРМА","РАБОЧИЕ")
+    building(world_screen(Vector2(HANGAR_POS)),"hangar",true,"АНГАР","МАШИНЫ")
+    building(world_screen(Vector2(CONTRACT_POS)),"contract",true,"ЗАКАЗЫ","ГОРОД")
     building(world_screen(Vector2(MARKET_POS)),"market",true,"РЫНОК","ПРОДАЖА")
+    if game.operations != null:
+        for truck in game.operations.vehicles:
+            if truck["state"] == "idle":
+                continue
+            var place: Vector2 = Vector2(MINES[int(truck["mine"])]["pos"])
+            var target: Dictionary = truck["destination"]
+            var destination := Vector2(WAREHOUSES[int(target["index"])]["pos"]) if target["type"] == "warehouse" else Vector2(FACTORIES[int(target["index"])]["pos"])
+            var duration := game.operations.road_seconds(int(truck["mine"]),target,int(truck["level"]))
+            var progress := clampf(1.0-float(truck["remaining"])/duration,0.0,1.0)
+            var position: Vector2 = place.lerp(destination,progress) if truck["state"] == "delivery" else destination.lerp(place,progress)
+            var point := world_screen(position)
+            draw_rect(Rect2(point-Vector2(14,8)*world_zoom,Vector2(29,17)*world_zoom),Color("#f0c873"))
+            draw_circle(point+Vector2(-8,11)*world_zoom,4*world_zoom,Color("#1c2a33"))
+            draw_circle(point+Vector2(8,11)*world_zoom,4*world_zoom,Color("#1c2a33"))
     var top_height := top_bar_height()
     var bottom_height := bottom_bar_height()
     draw_rect(Rect2(0,0,size.x,top_height),PANEL)
@@ -842,14 +945,14 @@ func _draw() -> void:
     var narrow := size.x < 560 or size.y < 700
     txt("DAILYCORP / МИР" if not narrow else "DAILYCORP",Vector2(15,30 if narrow else 38),20 if narrow else 27,YELLOW)
     if not narrow:
-        txt("АЛЬФА 0.3",Vector2(size.x-145,36),15,MUTED)
+        txt("АЛЬФА 0.4",Vector2(size.x-145,36),15,MUTED)
     txt("₽ %d" % game.cash,Vector2(15,65 if narrow else 90),22 if narrow else 29,YELLOW)
     var total := 0
     for amount in game.stock.values():
         total += int(amount)
     txt("Склад: %d" % total,Vector2(size.x*0.52,65 if narrow else 89),16 if narrow else 19,PAPER)
     if not narrow:
-        txt("Шахты: %d/4  ·  Заводы: %d/4  ·  Склады: %d/3" % [mine_owned.count(true),factory_owned.count(true),warehouse_owned.count(true)],Vector2(15,125),16,MUTED)
+        txt("Шахты: %d/4  ·  Заводы: %d/4  ·  Склады: %d/4" % [mine_owned.count(true),factory_owned.count(true),warehouse_owned.count(true)],Vector2(15,125),16,MUTED)
     if size.y >= 600:
         txt(info,Vector2(15,size.y-bottom_height-8),14 if narrow else 16,YELLOW)
     for i in range(4):
