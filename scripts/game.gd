@@ -1,4 +1,5 @@
 extends Control
+const WorldView = preload("res://scripts/world_view.gd")
 # DailyCorp 0.1: original mobile mining and logistics prototype.
 const W := 42
 const H := 42
@@ -10,7 +11,7 @@ const IRON := 4
 const GOLD := 5
 const BASE := Vector2i(21, 2)
 const SAVE_FILE := "user://dailycorp_save.json"
-const PRICES := {"coal": 12, "copper": 28, "iron": 42, "gold": 110, "steel": 126}
+const PRICES := {"coal": 12, "copper": 28, "iron": 42, "gold": 110, "steel": 160, "wire": 60, "parts": 495, "electronics": 470}
 const ORE_NAMES := {ROCK: "Камень", COAL: "Уголь", COPPER: "Медь", IRON: "Железо", GOLD: "Золото"}
 const KEYS := {COAL: "coal", COPPER: "copper", IRON: "iron", GOLD: "gold"}
 const BG := Color("#121c29")
@@ -20,6 +21,11 @@ const GOLDEN := Color("#e9bc73")
 const MUTED := Color("#9caebd")
 const TILE := 52.0
 
+var world_view = null
+var world_mode := true
+var active_mine := 0
+var mine_maps: Dictionary = {}
+var world_saved: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 var grid: Array = []
 var orders: Array[Vector2i] = []
@@ -51,6 +57,12 @@ var mouse_moved := false
 func _ready() -> void:
     if not load_game():
         fresh_game()
+    world_view = WorldView.new()
+    world_view.game = self
+    add_child(world_view)
+    world_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    world_view.restore_state(world_saved)
+    world_mode = true
     set_process(true)
     queue_redraw()
 
@@ -65,7 +77,7 @@ func fresh_game() -> void:
     speed_level = 0
     foundry = false
     delivered = 0
-    stock = {"coal": 0, "copper": 0, "iron": 0, "gold": 0, "steel": 0}
+    stock = {"coal": 0, "copper": 0, "iron": 0, "gold": 0, "steel": 0, "wire": 0, "parts": 0, "electronics": 0}
     for y in range(H):
         var row: Array = []
         for x in range(W):
@@ -283,8 +295,10 @@ func simulation(delta: float) -> void:
                 cart["state"] = "idle"
 
 func _process(delta: float) -> void:
-    if not grid.is_empty():
+    if not grid.is_empty() and not world_mode:
         simulation(minf(delta, 0.10))
+    if world_view != null:
+        world_view.process_industry(minf(delta, 0.10))
     save_time += delta
     if save_time >= 30.0:
         save_time = 0.0
@@ -311,6 +325,8 @@ func pan(amount: Vector2) -> void:
     camera.y = clampf(camera.y, 0.0, H - 2.0)
 
 func _gui_input(event: InputEvent) -> void:
+    if world_mode:
+        return
     if event is InputEventScreenTouch:
         var e: InputEventScreenTouch = event
         if e.pressed:
@@ -383,8 +399,8 @@ func modal_box() -> Rect2:
 
 func modal_buttons() -> Array[String]:
     match page:
-        "stock": return ["ПРОДАТЬ ВСЁ", "ПРОИЗВЕСТИ СТАЛЬ", "ЗАКРЫТЬ"]
-        "upgrade": return ["НАНЯТЬ ШАХТЁРА", "КУПИТЬ ВАГОНЕТКУ", "УСКОРИТЬ ДОБЫЧУ", "ПОСТРОИТЬ ПЛАВИЛЬНЮ", "ЗАКРЫТЬ"]
+        "stock": return ["ТОРГОВАТЬ В МИРЕ", "ЗАКРЫТЬ"]
+        "upgrade": return ["НАНЯТЬ ШАХТЁРА", "КУПИТЬ ВАГОНЕТКУ", "УСКОРИТЬ ДОБЫЧУ", "ЗАКРЫТЬ"]
         "help": return ["НОВАЯ ШАХТА", "ЗАКРЫТЬ"]
         "confirm": return ["СБРОСИТЬ ПРОГРЕСС", "ОТМЕНА"]
     return []
@@ -407,7 +423,9 @@ func tapped(point: Vector2) -> void:
                 match i:
                     0: page = "stock"
                     1: page = "upgrade"
-                    2: page = "help"
+                    2:
+                        page = ""
+                        go_world()
                     3:
                         save_game()
                         toast("Игра сохранена")
@@ -419,35 +437,24 @@ func act(index: int) -> void:
     var message := ""
     match page:
         "stock":
-            match index:
-                0:
-                    var income := 0
-                    for key in stock.keys():
-                        income += int(stock[key]) * int(PRICES[key])
-                        stock[key] = 0
-                    cash += income
-                    message = "Продано на %d ₽" % income
-                1:
-                    if not foundry:
-                        message = "Сначала нужна плавильня"
-                    elif int(stock["iron"]) < 2 or int(stock["coal"]) < 1:
-                        message = "Нужно 2 железа и 1 уголь"
-                    else:
-                        stock["iron"] -= 2
-                        stock["coal"] -= 1
-                        stock["steel"] += 1
-                        message = "Готово: 1 сталь"
-                2: page = ""
+            if index == 0:
+                page = ""
+                go_world()
+                world_view.panel = "trade"
+            else:
+                page = ""
         "upgrade":
             match index:
                 0:
                     var cost := 150 + maxi(0, worker_count - 2) * 80
                     if worker_count >= 10:
                         message = "Максимум 10 шахтёров"
-                    elif cash < cost:
-                        message = "Нужно %d ₽" % cost
+                    elif cash < cost or (worker_count >= 4 and int(stock["parts"]) < 1):
+                        message = "Нужно %d ₽ и механизм (после 4 рабочих)" % cost
                     else:
                         cash -= cost
+                        if worker_count >= 4:
+                            stock["parts"] -= 1
                         worker_count += 1
                         workers.append({"cell": BASE, "pos": Vector2(BASE), "path": [], "state": "idle", "target": Vector2i(-1, -1), "timer": 0.0, "id": worker_count})
                         message = "Новый шахтёр нанят"
@@ -455,10 +462,12 @@ func act(index: int) -> void:
                     var cost := 200 + maxi(0, cart_count - 1) * 110
                     if cart_count >= 7:
                         message = "Максимум 7 вагонеток"
-                    elif cash < cost:
-                        message = "Нужно %d ₽" % cost
+                    elif cash < cost or (cart_count >= 2 and int(stock["wire"]) < 1):
+                        message = "Нужно %d ₽ и провода (после 2 вагонеток)" % cost
                     else:
                         cash -= cost
+                        if cart_count >= 2:
+                            stock["wire"] -= 1
                         cart_count += 1
                         carts.append({"cell": BASE, "pos": Vector2(BASE), "path": [], "state": "idle", "bag": Vector2i(-1, -1), "cargo": -1})
                         message = "Куплена вагонетка"
@@ -466,22 +475,14 @@ func act(index: int) -> void:
                     var cost := 240 + speed_level * 190
                     if speed_level >= 5:
                         message = "Скорость максимальная"
-                    elif cash < cost:
-                        message = "Нужно %d ₽" % cost
+                    elif cash < cost or int(stock["steel"]) < speed_level + 1:
+                        message = "Нужно %d ₽ и %d стали" % [cost, speed_level + 1]
                     else:
                         cash -= cost
+                        stock["steel"] -= speed_level + 1
                         speed_level += 1
                         message = "Скорость: ур. %d" % speed_level
-                3:
-                    if foundry:
-                        message = "Плавильня уже работает"
-                    elif cash < 300:
-                        message = "Нужно 300 ₽"
-                    else:
-                        cash -= 300
-                        foundry = true
-                        message = "Плавильня построена"
-                4: page = ""
+                3: page = ""
         "help":
             page = "confirm" if index == 0 else ""
         "confirm":
@@ -512,6 +513,8 @@ func button(rect: Rect2, caption: String, bright: bool = false) -> void:
     write(caption, rect.position + Vector2(10, rect.size.y * 0.64), 16, BG if bright else LIGHT)
 
 func _draw() -> void:
+    if world_mode:
+        return
     draw_rect(Rect2(Vector2.ZERO, size), BG)
     if grid.is_empty():
         return
@@ -574,7 +577,7 @@ func _draw() -> void:
     write("Шахтёры: %d  ·  Вагонетки: %d  ·  Доставлено: %d" % [worker_count, cart_count, delivered], Vector2(20, 129), 16, MUTED)
     write(notice, Vector2(18, size.y - 129), 17, GOLDEN)
     for i in range(4):
-        button(footer_box(i), ["СКЛАД", "РАЗВИТИЕ", "ПОМОЩЬ", "СОХР."][i], i == 1)
+        button(footer_box(i), ["СКЛАД", "РАЗВИТИЕ", "МИР", "СОХР."][i], i == 1)
     if page != "":
         draw_modal()
 
@@ -590,14 +593,16 @@ func draw_modal() -> void:
             lines = ["Уголь %d  ·  Медь %d" % [stock["coal"], stock["copper"]],
                 "Железо %d  ·  Золото %d" % [stock["iron"], stock["gold"]],
                 "Сталь: %d" % stock["steel"],
-                "Цена: уголь 12, медь 28, железо 42",
-                "золото 110, сталь 126 ₽"]
+                "Провода: %d  ·  Механизмы: %d" % [stock["wire"], stock["parts"]],
+                "Электроника: %d" % stock["electronics"],
+                "Продажи доступны на рынке в мире."]
         "upgrade":
             title = "РАЗВИТИЕ"
             lines = ["Шахтёр: %d ₽" % (150 + maxi(0, worker_count - 2) * 80),
                 "Вагонетка: %d ₽" % (200 + maxi(0, cart_count - 1) * 110),
-                "Скорость: %d ₽" % (240 + speed_level * 190),
-                "Плавильня: 300 ₽" if not foundry else "Плавильня: работает"]
+                "Скорость: %d ₽ и %d стали" % [240 + speed_level * 190,speed_level+1],
+                "Продв. рабочим нужны механизмы.",
+                "Продв. вагонеткам нужны провода."]
         "help":
             title = "КАК ИГРАТЬ"
             lines = ["1. Тапни по руде рядом с тоннелем.",
@@ -625,9 +630,13 @@ func save_game() -> void:
     for drop in drops:
         var c: Vector2i = drop["cell"]
         drop_data.append([c.x, c.y, drop["kind"]])
-    var snapshot := {"version": 1, "grid": grid, "orders": order_data, "drops": drop_data, "cash": cash,
+    var snapshot := {"version": 2, "grid": grid, "orders": order_data, "drops": drop_data, "cash": cash,
         "stock": stock, "workers": worker_count, "carts": cart_count, "speed": speed_level,
         "foundry": foundry, "delivered": delivered}
+    mine_maps[str(active_mine)] = capture_mine()
+    snapshot["mine_maps"] = mine_maps
+    snapshot["active_mine"] = active_mine
+    snapshot["surface"] = world_view.pack_state() if world_view != null else world_saved
     var file := FileAccess.open(SAVE_FILE, FileAccess.WRITE)
     if file != null:
         file.store_string(JSON.stringify(snapshot))
@@ -641,7 +650,7 @@ func load_game() -> bool:
         return false
     var data = JSON.parse_string(file.get_as_text())
     file.close()
-    if not (data is Dictionary) or int(data.get("version", 0)) != 1:
+    if not (data is Dictionary) or int(data.get("version", 0)) not in [1, 2]:
         return false
     var saved_grid: Array = data.get("grid", [])
     if saved_grid.size() != H:
@@ -650,6 +659,9 @@ func load_game() -> bool:
         if not (row is Array) or row.size() != W:
             return false
     grid = saved_grid
+    world_saved = data.get("surface", {})
+    mine_maps = data.get("mine_maps", {})
+    active_mine = clampi(int(data.get("active_mine", 0)), 0, 3)
     cash = maxi(0, int(data.get("cash", 350)))
     worker_count = clampi(int(data.get("workers", 2)), 1, 10)
     cart_count = clampi(int(data.get("carts", 1)), 1, 7)
@@ -674,6 +686,105 @@ func load_game() -> bool:
                 drops.append({"cell": c, "kind": kind, "reserved": false})
     reset_units()
     return true
+
+func capture_mine() -> Dictionary:
+    var order_data: Array = []
+    for order in orders:
+        order_data.append([order.x,order.y])
+    var drop_data: Array = []
+    for drop in drops:
+        var c: Vector2i = drop["cell"]
+        drop_data.append([c.x,c.y,drop["kind"]])
+    return {"grid":grid.duplicate(true),"orders":order_data,"drops":drop_data,
+        "workers":worker_count,"carts":cart_count,"speed":speed_level}
+
+func restore_mine(data: Dictionary) -> void:
+    grid = data.get("grid", [])
+    if grid.size() != H:
+        create_mine()
+        return
+    worker_count = clampi(int(data.get("workers",2)),1,10)
+    cart_count = clampi(int(data.get("carts",1)),1,7)
+    speed_level = clampi(int(data.get("speed",0)),0,5)
+    orders.clear()
+    for pair in data.get("orders",[]):
+        if pair is Array and pair.size() == 2:
+            var pos := Vector2i(int(pair[0]),int(pair[1]))
+            if valid(pos) and tile(pos) != AIR:
+                orders.append(pos)
+    drops.clear()
+    for item in data.get("drops",[]):
+        if item is Array and item.size() == 3:
+            var pos := Vector2i(int(item[0]),int(item[1]))
+            if valid(pos) and tile(pos) == AIR:
+                drops.append({"cell":pos,"kind":int(item[2]),"reserved":false})
+    reset_units()
+
+func create_mine() -> void:
+    rng.randomize()
+    grid.clear()
+    orders.clear()
+    drops.clear()
+    worker_count = 2
+    cart_count = 1
+    speed_level = 0
+    for y in range(H):
+        var row: Array = []
+        for x in range(W):
+            var kind := ROCK
+            if y >= 3:
+                var rate := rng.randf()
+                if rate < 0.027:
+                    kind = GOLD
+                elif rate < 0.115:
+                    kind = IRON
+                elif rate < 0.20:
+                    kind = COPPER
+                elif rate < 0.35:
+                    kind = COAL
+            row.append(kind)
+        grid.append(row)
+    for x in range(14,29):
+        for y in range(3):
+            set_tile(Vector2i(x,y),AIR)
+    for y in range(3,12):
+        set_tile(Vector2i(21,y),AIR)
+    for x in range(15,29):
+        set_tile(Vector2i(x,11),AIR)
+    for x in range(18,25):
+        set_tile(Vector2i(x,8),AIR)
+    set_tile(Vector2i(20,9),GOLD)
+    set_tile(Vector2i(19,10),COAL)
+    set_tile(Vector2i(23,9),COPPER)
+    set_tile(Vector2i(25,10),IRON)
+    reset_units()
+
+func enter_mine(index: int) -> void:
+    if world_view == null or not bool(world_view.mine_owned[index]):
+        return
+    mine_maps[str(active_mine)] = capture_mine()
+    if index != active_mine:
+        active_mine = index
+        if mine_maps.has(str(index)):
+            restore_mine(mine_maps[str(index)])
+        else:
+            create_mine()
+    page = ""
+    camera = Vector2(21,8)
+    world_mode = false
+    world_view.hide()
+    toast("Добыча: шахта №%d" % (index+1))
+    queue_redraw()
+    save_game()
+
+func go_world() -> void:
+    mine_maps[str(active_mine)] = capture_mine()
+    world_mode = true
+    page = ""
+    if world_view != null:
+        world_view.show()
+        world_view.queue_redraw()
+    save_game()
 
 func _notification(what: int) -> void:
     if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_CLOSE_REQUEST:
