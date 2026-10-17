@@ -289,6 +289,12 @@ func process_industry(delta: float) -> void:
                 info = "Коснись шахты, завода или рынка"
         queue_redraw()
 
+func top_bar_height() -> float:
+    return clampf(size.y * 0.12, 82.0, 145.0)
+
+func bottom_bar_height() -> float:
+    return clampf(size.y * 0.105, 82.0, 122.0)
+
 func world_screen(p: Vector2) -> Vector2:
     return size * 0.5 + (p - world_camera) * CELL * world_zoom
 
@@ -324,7 +330,7 @@ func _gui_input(event: InputEvent) -> void:
         contacts[t.index] = t.position
         if t.position.distance_to(touch_origin.get(t.index,t.position)) > 12.0:
             touch_moved[t.index] = true
-        if panel == "" and contacts.size() == 1 and t.position.y > 140 and t.position.y < size.y - 120:
+        if panel == "" and contacts.size() == 1 and t.position.y > top_bar_height() and t.position.y < size.y - bottom_bar_height():
             pan(t.position - old)
         elif panel == "" and contacts.size() == 2:
             var keys := contacts.keys()
@@ -353,7 +359,7 @@ func _gui_input(event: InputEvent) -> void:
         var m: InputEventMouseMotion = event
         if m.position.distance_to(mouse_start) > 12.0:
             did_move = true
-        if did_move and panel == "" and m.position.y > 140 and m.position.y < size.y - 120:
+        if did_move and panel == "" and m.position.y > top_bar_height() and m.position.y < size.y - bottom_bar_height():
             pan(m.position - mouse_last)
         mouse_last = m.position
         accept_event()
@@ -362,7 +368,7 @@ func tapped(p: Vector2) -> void:
     if panel != "":
         # Modal controls handle all taps, including the fixed Close button.
         return
-    if p.y > size.y - 112.0:
+    if p.y > size.y - bottom_bar_height():
         for i in range(4):
             if bottom_button(i).has_point(p):
                 match i:
@@ -374,7 +380,7 @@ func tapped(p: Vector2) -> void:
                         pop("Компания сохранена")
                 show_panel()
                 return
-    if p.y < 142.0:
+    if p.y < top_bar_height():
         return
     var hit_radius := CELL * world_zoom * 0.8
     for i in range(MINES.size()):
@@ -417,7 +423,7 @@ func modal_button(i: int, count: int) -> Rect2:
 func bottom_button(i: int) -> Rect2:
     var gap := 8.0
     var w := (size.x - 26.0 - 3*gap) / 4.0
-    return Rect2(13.0 + i*(w+gap), size.y - 90.0, w, 60.0)
+    return Rect2(13.0 + i*(w+gap), size.y-bottom_bar_height()+18.0, w, minf(60.0,bottom_bar_height()-24.0))
 
 func buttons() -> Array:
     match panel:
@@ -609,7 +615,8 @@ func txt(value: String, p: Vector2, scale: int = 19, color: Color = PAPER) -> vo
 
 func panel_button(rect: Rect2, caption: String, accent: bool = false) -> void:
     draw_rect(rect, YELLOW if accent else Color("#355269"))
-    txt(caption, rect.position + Vector2(14,rect.size.y*0.64), 17, DARK if accent else PAPER)
+    var max_font := clampi(roundi((rect.size.x-12.0)/(maxf(1.0,float(caption.length()))*0.66)),10,17)
+    txt(caption, rect.position + Vector2(7,rect.size.y*0.66), max_font, DARK if accent else PAPER)
 
 func building(p: Vector2, kind: String, owned: bool, label: String, desc: String) -> void:
     var scale := world_zoom
@@ -706,17 +713,23 @@ func _draw() -> void:
         var status := "КУПЛЕН" if warehouse_owned[i] else "%d ₽" % warehouse["cost"]
         building(world_screen(Vector2(warehouse["pos"])),"warehouse",warehouse_owned[i],name,status)
     building(world_screen(Vector2(MARKET_POS)),"market",true,"РЫНОК","ПРОДАЖА")
-    draw_rect(Rect2(0,0,size.x,145),PANEL)
-    draw_rect(Rect2(0,size.y-122,size.x,122),PANEL)
-    txt("DAILYCORP  /  МИР",Vector2(19,38),27,YELLOW)
-    txt("АЛЬФА 0.2",Vector2(size.x-145,36),15,MUTED)
-    txt("₽ %d" % game.cash,Vector2(19,90),29,YELLOW)
+    var top_height := top_bar_height()
+    var bottom_height := bottom_bar_height()
+    draw_rect(Rect2(0,0,size.x,top_height),PANEL)
+    draw_rect(Rect2(0,size.y-bottom_height,size.x,bottom_height),PANEL)
+    var narrow := size.x < 560 or size.y < 700
+    txt("DAILYCORP / МИР" if not narrow else "DAILYCORP",Vector2(15,30 if narrow else 38),20 if narrow else 27,YELLOW)
+    if not narrow:
+        txt("АЛЬФА 0.3",Vector2(size.x-145,36),15,MUTED)
+    txt("₽ %d" % game.cash,Vector2(15,65 if narrow else 90),22 if narrow else 29,YELLOW)
     var total := 0
     for amount in game.stock.values():
         total += int(amount)
-    txt("Склад: %d ед." % total,Vector2(size.x*0.54,89),19,PAPER)
-    txt("Шахты: %d/4    ·    Заводы: %d/4" % [mine_owned.count(true),factory_owned.count(true)],Vector2(19,127),18,MUTED)
-    txt(info,Vector2(15,size.y-102),16,YELLOW)
+    txt("Склад: %d" % total,Vector2(size.x*0.52,65 if narrow else 89),16 if narrow else 19,PAPER)
+    if not narrow:
+        txt("Шахты: %d/4  ·  Заводы: %d/4  ·  Склады: %d/3" % [mine_owned.count(true),factory_owned.count(true),warehouse_owned.count(true)],Vector2(15,125),16,MUTED)
+    if size.y >= 600:
+        txt(info,Vector2(15,size.y-bottom_height-8),14 if narrow else 16,YELLOW)
     for i in range(4):
         panel_button(bottom_button(i),["РЫНОК","ОБЪЕКТЫ","ПОМОЩЬ","СОХР."][i],i==0)
     # World dialogs are real controls; no off-screen draw commands are used.
