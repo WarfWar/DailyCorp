@@ -1,5 +1,6 @@
 extends Control
 const ResponsiveDialog = preload("res://scripts/responsive_dialog.gd")
+const BRIGHT_ATLAS = preload("res://assets/casual11/buildings.webp")
 const RoadNetwork = preload("res://scripts/road_network.gd")
 # Real independent transparent world sprites. Each corresponds to one gameplay entity.
 const WORLD_ART := {
@@ -931,10 +932,77 @@ func tile_source(row: int, column: int) -> Rect2:
     return Rect2(float(column)*210.0, 0.0, 210.0, 195.0)
 
 func tile_draw(p: Vector2, row: int, column: int) -> void:
-    var w := ISO_W * world_zoom * 1.08
-    var h := ISO_H * world_zoom * 2.05
-    var region := tile_source(row, column)
-    draw_texture_rect_region(ISO_TERRAIN[row], Rect2(p.x-w*0.5,p.y-h*0.50,w,h), region)
+    # Map diamonds are genuine deterministic game tiles, not a painted background.
+    var rx := ISO_W*world_zoom*0.50
+    var ry := ISO_H*world_zoom*0.50
+    var color := Color("#75d546")
+    if row == 0:
+        color = [Color("#76d84b"),Color("#70d246"),Color("#7bde50"),
+            Color("#72d749"),Color("#6fd047"),Color("#7bd750")][posmod(column,6)]
+    elif row == 1:
+        color = Color("#a4b979") if column%3 == 0 else Color("#a3c584")
+    elif row == 2:
+        color = Color("#149cdf") if column%2 == 0 else Color("#168ddd")
+    var points := PackedVector2Array([
+        p+Vector2(0,-ry),p+Vector2(rx,0),p+Vector2(0,ry),p+Vector2(-rx,0)
+    ])
+    draw_colored_polygon(points,color)
+    if row == 2:
+        draw_line(p+Vector2(-rx*0.38,-ry*0.04),p+Vector2(rx*0.08,ry*0.19),Color("#9deafa",0.28),2.0*world_zoom,true)
+    elif row == 1 and column == 3:
+        draw_line(p+Vector2(-rx*0.12,0),p+Vector2(rx*0.10,-ry*0.30),Color("#85987a",0.40),2.0*world_zoom,true)
+
+func draw_casual_tree(p: Vector2,variant: int) -> void:
+    var z := clampf(world_zoom,0.48,1.50)
+    var h := (30.0+float(posmod(variant,3))*6.0)*z
+    var b := 14.0*z
+    draw_ellipse_shadow(p+Vector2(3,1)*z,12.0*z,4.0*z)
+    draw_rect(Rect2(p.x-2*z,p.y-h*0.36,4*z,h*0.40),Color("#7b643c"))
+    for i in range(3):
+        var y := p.y-h*0.24-float(i)*h*0.21
+        var spread := b*(1.0-float(i)*0.12)
+        draw_colored_polygon(PackedVector2Array([
+            Vector2(p.x,y-h*0.46),Vector2(p.x-spread,y+spread*0.50),
+            Vector2(p.x+spread,y+spread*0.50)]),
+            [Color("#168c3c"),Color("#20a94a"),Color("#32b94a")][i])
+
+func draw_ellipse_shadow(p: Vector2,rx: float,ry: float) -> void:
+    draw_colored_polygon(PackedVector2Array([
+        p+Vector2(-rx,0),p+Vector2(-rx*0.5,-ry),p+Vector2(rx*0.5,-ry),
+        p+Vector2(rx,0),p+Vector2(rx*0.5,ry),p+Vector2(-rx*0.5,ry)
+    ]),Color("#154e22",0.13))
+
+func draw_casual_rock(p: Vector2,kind: int) -> void:
+    var z := world_zoom
+    var w := (12+posmod(kind,6))*z
+    draw_colored_polygon(PackedVector2Array([p+Vector2(-w*0.7,w*0.2),
+        p+Vector2(-w*0.35,-w*0.55),p+Vector2(w*0.34,-w*0.46),p+Vector2(w*0.70,w*0.18)]),Color("#aab5af"))
+    draw_colored_polygon(PackedVector2Array([p+Vector2(-w*0.35,-w*0.55),p+Vector2(w*0.34,-w*0.46),
+        p+Vector2(0,w*0.15)]),Color("#d8dfd9"))
+
+func draw_casual_decor() -> void:
+    if world_roads.is_empty():
+        make_road_network()
+    var centers: Array = scene_entities()
+    for x in range(MAP_W):
+        for y in range(MAP_H):
+            var pos := world_screen(Vector2(x,y))
+            if pos.x < -70 or pos.x > size.x+70 or pos.y < -75 or pos.y > size.y+75:
+                continue
+            if world_roads.has(road_key(x,y)) or field_kind(x,y).x == 2:
+                continue
+            var busy := false
+            for entry in centers:
+                if Vector2(x,y).distance_to(Vector2(entry["pos"])) < 2.05:
+                    busy = true
+                    break
+            if busy:
+                continue
+            var seed := posmod(x*71+y*47+x*y*3,37)
+            if seed <= 4:
+                draw_casual_tree(pos+Vector2(0,-9)*world_zoom,seed)
+            elif seed == 9:
+                draw_casual_rock(pos+Vector2(0,-6)*world_zoom,x+y)
 
 func field_kind(x: int, y: int) -> Vector2i:
     # Deterministic geography, never re-randomized by a redraw or save.
@@ -1008,17 +1076,14 @@ func road_travel_steps(mine: int, destination: Dictionary) -> int:
     return maxi(0,route.size()-1)
 
 func draw_road_link(a: Vector2,b: Vector2) -> void:
-    # Draw roads as continuous vector geometry on the same grid as truck routing.
-    # Never mix unmatched curve / straight atlas cells.
-    var width := maxf(5.0,18.0*world_zoom)
-    draw_line(a,b,Color("#1f3030"),width+6.0*world_zoom,true)
-    draw_line(a,b,Color("#92917e"),width+2.0*world_zoom,true)
-    draw_line(a,b,Color("#485653"),width-3.0*world_zoom,true)
-    var span := b-a
-    for i in range(2):
-        draw_line(a+span*((float(i)+0.20)*0.5),
-            a+span*((float(i)+0.47)*0.5),Color("#dfceaa"),
-            maxf(1.0,1.7*world_zoom),true)
+    var lane := maxf(7.0,23.0*world_zoom)
+    draw_line(a,b,Color("#edf0e9"),lane+7.0*world_zoom,true)
+    draw_line(a,b,Color("#555965"),lane,true)
+    draw_line(a,b,Color("#626773"),lane-5.0*world_zoom,true)
+    var delta := b-a
+    for segment in range(2):
+        var t := (float(segment)+0.25)/2.0
+        draw_line(a+delta*t,a+delta*(t+0.20),Color("#eff1e9"),maxf(1,2.2*world_zoom),true)
 
 func draw_road_system() -> void:
     if world_roads.is_empty():
@@ -1114,42 +1179,39 @@ func building_span(p: Vector2, entities: Array) -> float:
     return clampf(minf(normal_size,nearest*1.15),55.0*world_zoom,normal_size)
 
 func draw_building_body(p: Vector2,kind: String,owned: bool,index: int,span: float = -1.0) -> void:
-    var coord: Vector2i = atlas_building(kind,owned,index)
-    var atlas: Texture2D = ISO_BUILDINGS[coord.y]
-    var width := ISO_W*world_zoom*1.0 if span <= 0 else span
-    if kind == "contract" or kind == "market":
-        width *= 0.92
-    var height := width
-    var foot_w := minf(width*0.32,ISO_W*world_zoom*0.40)
-    var foot_h := minf(width*0.20,ISO_H*world_zoom*0.40)
-    var pad := PackedVector2Array([p+Vector2(0,-foot_h),p+Vector2(foot_w,0),
-        p+Vector2(0,foot_h),p+Vector2(-foot_w,0)])
-    draw_colored_polygon(pad,Color("#344146",0.26))
-    var shadow := Rect2(p.x-width*0.30,p.y-height*0.09,width*0.60,height*0.16)
-    draw_rect(shadow,Color("#101a21",0.18))
-    var place := Rect2(p.x-width*0.5,p.y-height*0.87,width,height)
-    # Source atlas pixels are cleaned in the asset build. Do not paint a dark stripe!
-    var tint := Color.WHITE if owned else Color(0.68,0.77,0.83,0.80)
-    draw_texture_rect_region(atlas,place,Rect2(coord.x*244.0,0.0,244.0,244.0),tint)
+    var art_id := 0
+    match kind:
+        "mine": art_id = 0
+        "factory": art_id = 1
+        "warehouse": art_id = 2
+        "market", "contract": art_id = 3
+        "hangar": art_id = 4
+        "barracks": art_id = 5
+    var width := (ISO_W*world_zoom*1.42) if span <= 0 else span*1.48
+    if kind == "market" or kind == "contract":
+        width *= 0.88
+    var box := Rect2(p.x-width*0.50,p.y-width*0.78,width,width)
+    var src := Rect2(float(art_id%4)*320.0,float(art_id/4)*320.0,320.0,320.0)
+    var tint := Color.WHITE if owned else Color(0.80,0.89,0.93,0.88)
+    draw_texture_rect_region(BRIGHT_ATLAS,box,src,tint)
     if owned and kind == "factory":
-        for i in range(2):
-            var phase := fposmod(time*0.30+float(i)*0.43,1.0)
-            var smoke := p+Vector2(width*0.08+sin(time*1.4+float(i))*5,-height*0.62-phase*21*world_zoom)
-            draw_circle(smoke,maxf(2.0,(3.0+phase*5.0)*world_zoom),Color(0.83,0.91,0.93,(1.0-phase)*0.23))
-    if owned and kind == "mine":
-        draw_circle(p+Vector2(0,-height*0.32),maxf(2.0,4.0*world_zoom),
-            Color("#efbc68",0.15+0.13*sin(time*2.1)*sin(time*2.1)))
+        for j in range(2):
+            var progress := fposmod(time*0.36+j*0.46,1.0)
+            var puff := p+Vector2(width*0.11,-width*0.69-progress*23*world_zoom)
+            draw_circle(puff,(4.0+progress*8.0)*world_zoom,Color(0.95,0.99,1.0,(1.0-progress)*0.32))
 
 func draw_building_label(p: Vector2,owned: bool,label: String,desc: String) -> void:
-    # Text is composed last, on its own layer, so sprites never clip the HUD.
-    var width := clampf(139.0*world_zoom,97.0,171.0)
-    var height := clampf(44.0*world_zoom,35.0,55.0)
-    var rect := Rect2(p.x-width*0.5,p.y+11.0*world_zoom,width,height)
-    sci_plate(rect,owned)
-    var name_font := clampi(roundi(world_zoom*13.0),10,15)
-    txt(label,rect.position+Vector2(9,17),name_font,PAPER)
-    txt(desc,rect.position+Vector2(9,height-7),maxi(10,name_font-1),
-        Color("#76c7d6") if owned else MUTED)
+    var w := clampf(136.0*world_zoom,100,166)
+    var h := clampf(41.0*world_zoom,31,51)
+    var center := p+Vector2(0,-83.0*world_zoom)
+    var first := Rect2(center.x-w*0.5,center.y-h*0.5,w,h*0.58)
+    rounded_plate(first,Color("#092d44",0.96),Color("#23617b"),14)
+    var size_label := clampi(roundi(w/maxf(8.0,float(label.length())*0.73)),10,17)
+    txt(label,first.position+Vector2(10,first.size.y*0.74),size_label,Color.WHITE)
+    var second := Rect2(center.x-w*0.28,first.end.y,w*0.56,h*0.42)
+    rounded_plate(second,Color("#f5f8fb",0.98),Color("#d8e4e7"),11)
+    var text_value := desc if owned else "₽ "+desc.replace(" ₽","")
+    txt(text_value,second.position+Vector2(5,second.size.y*0.73),clampi(roundi(world_zoom*12),10,13),Color("#17364d"))
 
 func sci_plate(rect: Rect2,selected: bool = false) -> void:
     draw_rect(rect,Color("#081723",0.90))
@@ -1372,7 +1434,7 @@ func draw_world_hud() -> void:
 func _draw() -> void:
     if game == null:
         return
-    draw_rect(Rect2(Vector2.ZERO,size),Color("#173e47"))
+    draw_rect(Rect2(Vector2.ZERO,size),Color("#39a1d9"))
     if world_roads.is_empty():
         world_roads = make_road_network()
     # Back-to-front depth order keeps isometric cliff edges and trees coherent.
@@ -1387,6 +1449,7 @@ func _draw() -> void:
                 continue
             tile_draw(position,ground.x,ground.y)
     draw_road_system()
+    draw_casual_decor()
     for index in range(EXPANSION_PLOTS.size()):
         var location: Vector2i = EXPANSION_PLOTS[index]
         var center := world_screen(plot_anchor(index))
