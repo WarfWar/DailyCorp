@@ -3,6 +3,7 @@ extends SceneTree
 const Generator = preload("res://scripts/v3/continent_generator.gd")
 const Technology = preload("res://scripts/v3/technology_system.gd")
 const Campaign = preload("res://scripts/v3/campaign_state.gd")
+const Catalog = preload("res://scripts/v3/content_registry.gd")
 
 func _initialize() -> void:
     call_deferred("_check")
@@ -77,22 +78,61 @@ func _check() -> void:
     if restored.current_epoch() != 2 or restored.science_points != science.science_points:
         fail("Research save lost")
         return
+    var registry = Catalog.new()
+    if not registry.load_catalog() or registry.ores.size() != 300 or registry.recipes.size() != 380 or registry.municipal_projects.size() != 24:
+        fail("Full ore, recipe and city project catalog unavailable")
+        return
     var state = Campaign.new()
     state.initialize({"world_seed":20261018,"city_target":48})
     var deed: Dictionary = state.register_mine_purchase(1,0)
     if deed.is_empty() or int(deed["depth"]) < 12:
         fail("No deterministic mine deed")
         return
+    var found := false
+    var ore_x := -1
+    var ore_y := -1
+    var ore_floor := 1
+    for f in range(1,mini(int(deed["depth"]),4)+1):
+        if found:
+            break
+        for y in range(48):
+            if found:
+                break
+            for x in range(48):
+                var item: Dictionary = state.generator.mineral_cell(deed,f,x,y)
+                if item.get("type","") == "ore":
+                    if not registry.ores.has(str(item.get("item_id",""))):
+                        fail("Generated mineral is not a catalog item")
+                        return
+                    found = true
+                    ore_x = x
+                    ore_y = y
+                    ore_floor = f
+                    break
+    if not found:
+        fail("No mineable catalog ore in the top four floors")
+        return
+    var before: int = state.ore_remaining(1,0,ore_floor,ore_x,ore_y)
+    var extraction: Dictionary = state.extract_ore_unit(1,0,ore_floor,ore_x,ore_y)
+    if not extraction.get("ok",false) or int(extraction.get("amount",0)) != 1:
+        fail("One-unit extraction failed")
+        return
+    if state.ore_remaining(1,0,ore_floor,ore_x,ore_y) != before-1:
+        fail("Ore reservoir was not depleted exactly once")
+        return
     state.add_discovery(10,11)
     state.complete_city_project("city_001","city_project.road_repair")
     state.technology.grant_science(90)
     var loaded = Campaign.new()
     loaded.initialize(state.save_snapshot())
-    if loaded.registered_mine(1,0) != deed or not loaded.is_discovered(10,11):
+    if loaded.ore_remaining(1,0,ore_floor,ore_x,ore_y) != before-1:
+        fail("Mined cell re-generated after save/load")
+        return
+    if not loaded.is_discovered(10,11) or loaded.registered_mine(1,0).is_empty():
         fail("Campaign seed, geology or discoveries lost in roundtrip")
         return
     if loaded.municipal_projects.get("city_001",{}).get("city_project.road_repair","") != "completed":
         fail("Persistent municipal contract progress lost")
         return
-    print("V3 FOUNDATION PASSED: continent, 48 cities, geology, mine depth, technology and save roundtrip")
+    print("V3 FOUNDATION PASSED: continent, 48 cities, 300 ore IDs, geology, finite mining, 380 recipes, epochs and persistence")
     quit(0)
