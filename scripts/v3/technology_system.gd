@@ -115,3 +115,23 @@ func available_research() -> Array:
             options.append(nodes[id])
     options.sort_custom(func(a,b): return int(a.get("epoch",1)) < int(b.get("epoch",1)))
     return options
+
+func research_opportunities(limit: int = 8) -> Array:
+    # Show visible choices even before enough science points are earned.
+    var options: Array = []
+    for id in nodes:
+        if unlocked.has(id):
+            continue
+        var entry: Dictionary = nodes[id]
+        var ready := true
+        for requirement in entry.get("requirements",[]):
+            if not unlocked.has(str(requirement)):
+                ready = false
+                break
+        if ready:
+            options.append(entry)
+    options.sort_custom(func(a,b):
+        if int(a.get("science_cost",0)) == int(b.get("science_cost",0)):
+            return str(a["id"]) < str(b["id"])
+        return int(a.get("science_cost",0)) < int(b.get("science_cost",0)))
+    return options.slice(0,mini(options.size(),maxi(0,limit)))
