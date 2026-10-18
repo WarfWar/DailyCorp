@@ -61,3 +61,32 @@ func complete_city_project(city_id: String,project_id: String) -> void:
     var projects: Dictionary = municipal_projects.get(city_id,{})
     projects[project_id] = "completed"
     municipal_projects[city_id] = projects
+
+func ore_remaining(city_id: int,slot_id: int,floor: int,x: int,y: int) -> int:
+    var deed := registered_mine(city_id,slot_id)
+    if deed.is_empty():
+        return 0
+    var ore: Dictionary = generator.mineral_cell(deed,floor,x,y)
+    if ore.get("type","") != "ore":
+        return 0
+    var key := "%d:%d:%d" % [floor,x,y]
+    return maxi(0,int(deed.get("mined_cells",{}).get(key,ore["units"])))
+
+func extract_ore_unit(city_id: int,slot_id: int,floor: int,x: int,y: int) -> Dictionary:
+    # One successful mining cycle removes exactly one finite resource unit.
+    var mine_key := "%d/%d" % [city_id,slot_id]
+    if not mine_deeds.has(mine_key):
+        return {"ok":false,"reason":"not_owned"}
+    var deed: Dictionary = mine_deeds[mine_key]
+    var ore: Dictionary = generator.mineral_cell(deed,floor,x,y)
+    if ore.get("type","") != "ore":
+        return {"ok":false,"reason":"rock_or_invalid_floor"}
+    var key := "%d:%d:%d" % [floor,x,y]
+    var mined: Dictionary = deed.get("mined_cells",{})
+    var remaining := maxi(0,int(mined.get(key,ore["units"])))
+    if remaining < 1:
+        return {"ok":false,"reason":"exhausted"}
+    mined[key] = remaining-1
+    deed["mined_cells"] = mined
+    mine_deeds[mine_key] = deed
+    return {"ok":true,"item_id":str(ore["item_id"]),"amount":1,"remaining":remaining-1}
