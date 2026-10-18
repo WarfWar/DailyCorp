@@ -13,6 +13,8 @@ func _run() -> void:
     root.add_child(game)
     await process_frame
     var world = game.world_view
+    # Local gameplay regression: new startup screen is the full continent.
+    world.view_mode = "city"
     if world == null or not world.visible or not game.world_mode:
         fail("The editable world map is not visible on launch")
         return
