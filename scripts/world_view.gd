@@ -981,12 +981,45 @@ func draw_casual_rock(p: Vector2,kind: int) -> void:
     draw_colored_polygon(PackedVector2Array([p+Vector2(-w*0.35,-w*0.55),p+Vector2(w*0.34,-w*0.46),
         p+Vector2(0,w*0.15)]),Color("#d8dfd9"))
 
+func visible_world_limits(extra: float = 3.0) -> Rect2i:
+    # Inverse-project the screen corners. Only visible tiles are submitted each
+    # frame, especially important on low-end Android devices when panning.
+    var corners: Array = [
+        world_from_screen(Vector2(-120,-120)),
+        world_from_screen(Vector2(size.x+120,-120)),
+        world_from_screen(Vector2(-120,size.y+120)),
+        world_from_screen(Vector2(size.x+120,size.y+120))
+    ]
+    var xmin := float(MAP_W)
+    var ymin := float(MAP_H)
+    var xmax := 0.0
+    var ymax := 0.0
+    for corner in corners:
+        xmin = minf(xmin,corner.x)
+        ymin = minf(ymin,corner.y)
+        xmax = maxf(xmax,corner.x)
+        ymax = maxf(ymax,corner.y)
+    var left := clampi(floori(xmin-extra),0,MAP_W-1)
+    var top := clampi(floori(ymin-extra),0,MAP_H-1)
+    var right := clampi(ceili(xmax+extra),0,MAP_W-1)
+    var bottom := clampi(ceili(ymax+extra),0,MAP_H-1)
+    return Rect2i(left,top,maxi(1,right-left+1),maxi(1,bottom-top+1))
+
+func sort_visual_entities(a: Dictionary,b: Dictionary) -> bool:
+    var a_ground: Vector2 = building_visual_anchor(a["pos"])
+    var b_ground: Vector2 = building_visual_anchor(b["pos"])
+    return a_ground.x+a_ground.y < b_ground.x+b_ground.y
+
 func draw_casual_decor() -> void:
     if world_roads.is_empty():
         make_road_network()
+    # A crowded view hides some decoration at far zoom to keep mobile FPS.
+    if world_zoom < 0.58:
+        return
     var centers: Array = scene_entities()
-    for x in range(MAP_W):
-        for y in range(MAP_H):
+    var box := visible_world_limits(2.5)
+    for x in range(box.position.x,box.end.x):
+        for y in range(box.position.y,box.end.y):
             var pos := world_screen(Vector2(x,y))
             if pos.x < -70 or pos.x > size.x+70 or pos.y < -75 or pos.y > size.y+75:
                 continue
@@ -994,7 +1027,8 @@ func draw_casual_decor() -> void:
                 continue
             var busy := false
             for entry in centers:
-                if Vector2(x,y).distance_to(Vector2(entry["pos"])) < 2.05:
+                var world_cell := Vector2(x,y)
+                if world_cell.distance_to(Vector2(entry["pos"])) < 1.75 or world_cell.distance_to(building_visual_anchor(entry["pos"])) < 1.75:
                     busy = true
                     break
             if busy:
@@ -1515,10 +1549,15 @@ func _draw() -> void:
     if world_roads.is_empty():
         world_roads = make_road_network()
     # Back-to-front depth order keeps isometric cliff edges and trees coherent.
-    for depth in range(MAP_W+MAP_H-1):
-        for x in range(MAP_W):
+    var visible_box := visible_world_limits(3.0)
+    var left := visible_box.position.x
+    var top := visible_box.position.y
+    var right := visible_box.end.x
+    var bottom := visible_box.end.y
+    for depth in range(left+top,right+bottom-1):
+        for x in range(left,right):
             var y := depth-x
-            if y < 0 or y >= MAP_H:
+            if y < top or y >= bottom:
                 continue
             var position := world_screen(Vector2(x,y))
             var ground := field_kind(x,y)
@@ -1528,6 +1567,9 @@ func _draw() -> void:
     draw_road_system()
     draw_casual_decor()
     var entities: Array = scene_entities()
+    if not layout_ready:
+        rebuild_site_layout()
+    entities.sort_custom(Callable(self,"sort_visual_entities"))
     draw_service_drives(entities)
     for index in range(EXPANSION_PLOTS.size()):
         var location: Vector2i = EXPANSION_PLOTS[index]
