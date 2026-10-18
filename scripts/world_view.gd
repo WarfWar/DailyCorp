@@ -993,7 +993,7 @@ func buttons() -> Array:
     match panel:
         "place":
             if selected_kind == "mine":
-                return ["ОТКРЫТЬ ШАХТУ","МАРШРУТЫ РУДЫ","ЗАКРЫТЬ"] if mine_owned[selected_id] else ["КУПИТЬ ШАХТУ","ЗАКРЫТЬ"]
+                return ["ОТКРЫТЬ ШАХТУ","НАЗНАЧИТЬ ГРУЗОВИК","ЗАКРЫТЬ"] if mine_owned[selected_id] else ["КУПИТЬ ШАХТУ","ЗАКРЫТЬ"]
             return ["ВЫБРАТЬ ПРОДУКЦИЮ","УЛУЧШИТЬ ЗАВОД","ЗАКРЫТЬ"] if factory_owned[selected_id] else ["КУПИТЬ ЗАВОД","ЗАКРЫТЬ"]
         "recipes": return ["СТАЛЬ  •  Fe + уголь","ПРОВОДА  •  медь","МЕХАНИЗМЫ  •  сталь + провода","ЭЛЕКТРОНИКА  •  золото + провода","НАЗАД"]
         "trade":
@@ -1042,10 +1042,52 @@ func buttons() -> Array:
             for truck in game.operations.vehicles:
                 result.append("ГРУЗОВИК #%d · УРОВЕНЬ %d" % [truck["id"],truck["level"]])
             return result
-        "truck": return ["УЛУЧШИТЬ ГРУЗОВИК","ПЕРЕНАЗНАЧИТЬ ШАХТУ","НАЗАД"]
-        "truck_transfer": return ["ШАХТА №1","ШАХТА №2","ШАХТА №3","ШАХТА №4","НАЗАД"]
+        "truck": return ["УЛУЧШИТЬ","НАЗНАЧИТЬ МАРШРУТ","СНЯТЬ С МАРШРУТА","НАЗАД"]
+        "truck_source":
+            var sources: Array = []
+            if not contract_route_mode:
+                for j in range(4):
+                    sources.append("ШАХТА: "+str(MINES[j]["name"]))
+            for j in range(4):
+                sources.append("СКЛАД: "+str(WAREHOUSES[j]["name"]))
+            sources.append("НАЗАД")
+            return sources
+        "truck_target":
+            var choices: Array = []
+            if truck_source.get("type","") == "mine":
+                for j in range(4):
+                    choices.append("СКЛАД: "+str(WAREHOUSES[j]["name"]))
+                for j in range(4):
+                    choices.append("ЗАВОД: "+str(FACTORIES[j]["name"]))
+            else:
+                for j in range(4):
+                    choices.append("ЗАВОД: "+str(FACTORIES[j]["name"]))
+                for j in range(game.operations.CONTRACTS.size()):
+                    choices.append("КОНТРАКТ: "+str(game.operations.CONTRACTS[j]["title"]))
+            choices.append("НАЗАД")
+            return choices
+        "truck_material":
+            var items: Array = []
+            for key in (game.operations.ORES if truck_source.get("type","") == "mine" else MATERIALS):
+                items.append(str(PRODUCTS[key]))
+            items.append("НАЗАД")
+            return items
+        "contract_detail":
+            return ["КОНТРАКТ ЗАВЕРШЁН","НАЗАД"] if game.operations.completed_contracts.has(selected_contract) else ["НАЗНАЧИТЬ МАШИНУ","НАЗАД"]
+        "contract_fleet":
+            var fleet: Array = []
+            for truck in game.operations.vehicles:
+                fleet.append("ГРУЗОВИК #%d · %s" % [truck["id"],str(truck["state"])])
+            fleet.append("НАЗАД")
+            return fleet
         "land": return ["ЗАКРЫТЬ"] if expansion_owned[selected_plot] else ["КУПИТЬ УЧАСТОК","ЗАКРЫТЬ"]
-        "contracts": return ["СДАТЬ ЗАКАЗ","ГОРОДА КОНТИНЕНТА","НАЗАД"]
+        "contracts":
+            var commands: Array = []
+            for j in range(game.operations.CONTRACTS.size()):
+                commands.append("%02d  ·  %s" % [j+1,game.operations.CONTRACTS[j]["title"]])
+            commands.append("ГОРОДА КОНТИНЕНТА")
+            commands.append("НАЗАД")
+            return commands
         "continent_city": return ["ОТКРЫТЬ ГОРОД","КОНТРАКТЫ ГОРОДА","ШАХТЫ ГОРОДА","НАЗАД К КОНТИНЕНТУ"]
         "cities":
             if game.campaign_v3 == null:
