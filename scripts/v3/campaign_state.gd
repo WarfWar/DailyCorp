@@ -2,15 +2,18 @@ extends RefCounted
 ## V3 foundation is namespaced inside legacy save format v4: no destructive migration.
 const Generator = preload("res://scripts/v3/continent_generator.gd")
 const Technology = preload("res://scripts/v3/technology_system.gd")
+const Municipal = preload("res://scripts/v3/municipal_system.gd")
 const CityEconomy = preload("res://scripts/v3/city_economy.gd")
 var generator = Generator.new()
 var technology = Technology.new()
+var municipal = Municipal.new()
 var city_economy = CityEconomy.new()
 var seed: int = 1182403
 var cities: Array = []
 var mine_deeds: Dictionary = {}
 var region_discoveries: Dictionary = {}
 var municipal_projects: Dictionary = {}
+var city_development: Dictionary = {}
 var catalog_stock: Dictionary = {}
 
 func initialize(saved: Dictionary = {}) -> void:
@@ -24,6 +27,7 @@ func initialize(saved: Dictionary = {}) -> void:
             mine_deeds[str(key)] = saved_mines[key].duplicate(true)
     region_discoveries = saved.get("region_discoveries",{}).duplicate(true)
     municipal_projects = saved.get("municipal_projects",{}).duplicate(true)
+    city_development = saved.get("city_development",{}).duplicate(true)
     catalog_stock = saved.get("catalog_stock",{}).duplicate(true)
     city_economy.initialize(seed,saved.get("city_economy",{}))
     technology.load_definitions()
@@ -33,6 +37,7 @@ func save_snapshot() -> Dictionary:
     return {"schema":1,"world_seed":seed,"city_target":cities.size(),
         "mine_deeds":mine_deeds.duplicate(true),"region_discoveries":region_discoveries.duplicate(true),
         "municipal_projects":municipal_projects.duplicate(true),
+        "city_development":city_development.duplicate(true),
         "catalog_stock":catalog_stock.duplicate(true),
         "city_economy":city_economy.export_state(),
         "technology":technology.export_state()}
@@ -63,6 +68,64 @@ func add_discovery(chunk_x: int,chunk_y: int) -> void:
 
 func is_discovered(chunk_x: int,chunk_y: int) -> bool:
     return bool(region_discoveries.get("%d:%d" % [chunk_x,chunk_y],false))
+
+func city_record(city_id: String) -> Dictionary:
+    for original in cities:
+        if str(original.get("id","")) == city_id:
+            return city_development.get(city_id,original).duplicate(true)
+    return {}
+
+func city_project_offers(city_id: String) -> Array:
+    var city := city_record(city_id)
+    if city.is_empty():
+        return []
+    var existing: Dictionary = municipal_projects.get(city_id,{})
+    return municipal.valid_templates(city,technology.current_epoch(),existing)
+
+func accept_municipal_project(city_id: String,project_id: String) -> Dictionary:
+    var city := city_record(city_id)
+    if city.is_empty():
+        return {"ok":false,"reason":"unknown_city"}
+    var current: Dictionary = municipal_projects.get(city_id,{}).duplicate(true)
+    var result := municipal.begin(city,project_id,technology.current_epoch(),current)
+    if result.get("ok",false):
+        current[project_id] = result["project"]
+        municipal_projects[city_id] = current
+    return result
+
+func supply_municipal_project(city_id: String,project_id: String,
+        item_id: String,quantity: int,inventory: Dictionary) -> Dictionary:
+    var active: Dictionary = municipal_projects.get(city_id,{})
+    if not active.has(project_id) or not active[project_id] is Dictionary:
+        return {"ok":false,"reason":"not_accepted"}
+    var template := municipal.catalog.city_project(project_id)
+    if template.is_empty():
+        return {"ok":false,"reason":"unknown_project"}
+    var result := municipal.deliver(active[project_id],template,item_id,quantity,inventory)
+    if result.get("ok",false):
+        var changed: Dictionary = active.duplicate(true)
+        changed[project_id] = result["project"]
+        municipal_projects[city_id] = changed
+    return result
+
+func finish_municipal_project(city_id: String,project_id: String) -> Dictionary:
+    var city := city_record(city_id)
+    var active: Dictionary = municipal_projects.get(city_id,{})
+    if city.is_empty() or not active.has(project_id) or not active[project_id] is Dictionary:
+        return {"ok":false,"reason":"not_accepted"}
+    var template := municipal.catalog.city_project(project_id)
+    if template.is_empty():
+        return {"ok":false,"reason":"unknown_project"}
+    var result := municipal.complete(city,template,active[project_id])
+    if not result.get("ok",false):
+        return result
+    var changed: Dictionary = active.duplicate(true)
+    changed[project_id] = result["project"]
+    municipal_projects[city_id] = changed
+    city_development[city_id] = result["city"]
+    technology.grant_science(int(result["reward_science"]))
+    technology.record_event("city_project_completed")
+    return result
 
 func complete_city_project(city_id: String,project_id: String) -> void:
     var projects: Dictionary = municipal_projects.get(city_id,{})
