@@ -214,8 +214,8 @@ func show_panel() -> void:
                     "Очки науки: %d" % tech.science_points,
                     "Первые исследования оплачиваются наукой от городских контрактов.",
                     "Развитие технологий не зависит от уровня отдельного завода.",
-                    "Доступные исследования:"]
-                var available: Array = tech.available_research()
+                    "Ближайшие исследования:"]
+                var available: Array = tech.research_opportunities(8)
                 for index in range(mini(8,available.size())):
                     var item: Dictionary = available[index]
                     lines.append("%s — %d науки" % [str(item["name_ru"]),int(item["science_cost"])])
@@ -695,7 +695,7 @@ func buttons() -> Array:
             var entries: Array = []
             if game.campaign_v3 != null:
                 var tech = game.campaign_v3.technology
-                var available: Array = tech.available_research()
+                var available: Array = tech.research_opportunities(8)
                 for j in range(mini(8,available.size())):
                     var node: Dictionary = available[j]
                     entries.append("ИССЛЕДОВАТЬ: %s · %d" % [node["name_ru"],int(node["science_cost"])])
@@ -930,7 +930,7 @@ func action(i: int) -> void:
                 panel = "assets"
             else:
                 var tech = game.campaign_v3.technology
-                var available: Array = tech.available_research()
+                var available: Array = tech.research_opportunities(8)
                 if i >= 0 and i < mini(8,available.size()):
                     var id := str(available[i]["id"])
                     if tech.unlock_research(id):
