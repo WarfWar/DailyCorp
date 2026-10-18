@@ -182,6 +182,15 @@ jobs:
             exit 1
           fi
 
+      - name: Test interactive DailyCorp 3.0 city console
+        run: |
+          set -o pipefail
+          timeout 90s godot --headless --path . --script res://tests/v3_city_ui_smoke.gd 2>&1 | tee /tmp/v3-city-ui.log
+          grep -q "V3 CITY UI PASSED" /tmp/v3-city-ui.log
+          if grep -E "SCRIPT ERROR|Parse Error|V3 CITY UI FAILED" /tmp/v3-city-ui.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
