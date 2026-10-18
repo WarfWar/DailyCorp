@@ -2031,8 +2031,132 @@ func draw_world_hud() -> void:
     for i in range(4):
         draw_console_nav(bottom_button(i),["РЫНОК","ОБЪЕКТЫ","СПРАВКА","СОХР."][i],i,i==0 and panel=="trade")
 
+func draw_continent() -> void:
+    draw_rect(Rect2(Vector2.ZERO,size),Color("#062738"))
+    if game.campaign_v3 == null:
+        txt("Генерация континента...",Vector2(35,size.y*0.5),20,Color.WHITE)
+        return
+    continent_map.prepare(game.campaign_v3)
+    var frame := continent_frame()
+    draw_rect(Rect2(frame.position-Vector2(4,4),frame.size+Vector2(8,8)),Color("#0f4157"))
+    if continent_map.texture != null:
+        var pixels := float(continent_map.MAP_RESOLUTION)
+        var source_width := pixels/continent_zoom
+        var source := Rect2((continent_center/1024.0)*pixels-Vector2.ONE*source_width*0.5,
+            Vector2.ONE*source_width)
+        draw_texture_rect_region(continent_map.texture,frame,source)
+    # Regional connections are overview hints, not simulated freight roads.
+    for link in continent_map.links:
+        var cities: Array = game.campaign_v3.cities
+        var a: Array = cities[int(link["a"])]["position"]
+        var b: Array = cities[int(link["b"])]["position"]
+        var from := continent_screen(Vector2(float(a[0]),float(a[1])))
+        var to := continent_screen(Vector2(float(b[0]),float(b[1])))
+        if frame.has_point(from) and frame.has_point(to):
+            draw_line(from,to,Color("#e8ebd9",0.50),maxf(1,1.5*continent_zoom),true)
+    for index in range(game.campaign_v3.cities.size()):
+        var city: Dictionary = game.campaign_v3.cities[index]
+        var coords: Array = city["position"]
+        var point := continent_screen(Vector2(float(coords[0]),float(coords[1])))
+        if not frame.has_point(point):
+            continue
+        var chosen := str(city["id"]) == selected_continent_city
+        var first := index == 0
+        var radius := clampf(4.5*continent_zoom,4.5,11.0)
+        if first:
+            radius += 2
+        if chosen:
+            draw_circle(point,radius+7,Color("#f9ce67",0.34))
+            draw_arc(point,radius+6,0,TAU,32,Color("#ffe2a1"),2.5,true)
+        draw_circle(point,radius+2,Color("#102c39"))
+        draw_circle(point,radius,Color("#ffbf54") if first else Color("#e8f2df"))
+        if chosen or first or (continent_zoom > 1.5 and index%3 == 0):
+            var name := str(city["name"])
+            var width := clampf(float(name.length())*8.0+20.0,78,123)
+            var label_rect := Rect2(point.x+radius+4,point.y-12,width,24)
+            if frame.encloses(label_rect):
+                draw_rect(label_rect,Color("#0b3045",0.90))
+                txt(name,label_rect.position+Vector2(7,17),12,Color("#ffffff"))
+    draw_rect(Rect2(0,0,size.x,top_bar_height()),Color("#071d2e",0.96))
+    txt("DAILYCORP  /  КОНТИНЕНТ",Vector2(18,29),clampi(roundi(size.x*0.020),16,24),Color("#f0e5ce"))
+    var status: Dictionary = continent_map.status(game.campaign_v3)
+    txt("ГОРОДОВ: %d  ·  ШАХТ: %d  ·  ИССЛЕДОВАНО СЕКТОРОВ: %d" %
+        [status["cities"],status["mines"],status["regions"]],
+        Vector2(18,top_bar_height()-13),clampi(roundi(size.x*0.012),10,16),Color("#a7cfdd"))
+    txt("КОНТИНЕНТ 1024 × 1024  ·  МАСШТАБ %.1f×" % continent_zoom,
+        Vector2(frame.position.x,frame.position.y-16),clampi(roundi(size.x*0.013),11,16),Color("#d6edf5"))
+    var chosen_city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
+    if not chosen_city.is_empty():
+        var control := continent_city_button()
+        rounded_plate(control,Color("#205b78"),Color("#76b9d1"),11)
+        txt("ОТКРЫТЬ ГОРОД",control.position+Vector2(8,control.size.y*0.65),
+            clampi(roundi(control.size.x*0.093),11,16),Color.WHITE)
+        var pop := game.campaign_v3.city_economy.city_record(chosen_city)
+        txt("%s · %s · жителей %d" % [chosen_city["name"],chosen_city["specialization"],pop["population"]],
+            Vector2(frame.position.x+10,frame.end.y+22),
+            clampi(roundi(size.x*0.014),11,16),Color("#e5f1ea"))
+    txt("Нажми на город · раздвинь пальцы для масштаба · перемещай карту",Vector2(22,size.y-bottom_bar_height()-10),
+        clampi(roundi(size.x*0.011),10,14),Color("#b6d9df"))
+    draw_mode_navigation(["ПРОМРАЙОН","ГОРОДА","КОНТРАКТЫ","СОХР."])
+
+func draw_regional_map() -> void:
+    draw_rect(Rect2(Vector2.ZERO,size),Color("#66b67a"))
+    if game.campaign_v3 == null:
+        return
+    var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
+    if city.is_empty():
+        return
+    var top := top_bar_height()
+    var bottom := bottom_bar_height()
+    # Distinct city land lots follow its fixed seed and available site counts.
+    var sites := region_hotspots()
+    for site in sites:
+        var p: Vector2 = site["screen"]
+        var radius := float(site["radius"])
+        draw_colored_polygon(PackedVector2Array([
+            p+Vector2(0,-radius*0.65),p+Vector2(radius,0),
+            p+Vector2(0,radius*0.65),p+Vector2(-radius,0)
+        ]),Color("#d5d2ad"))
+        var kind := str(site["type"])
+        var art_id := 0
+        match kind:
+            "factory": art_id = 1
+            "warehouse": art_id = 2
+            "commercial","municipal": art_id = 3
+            "energy": art_id = 1
+            _: art_id = 0
+        var pic := radius*1.95
+        var source := Rect2(float(art_id%4)*320.0,float(int(art_id/4))*320.0,320,320)
+        draw_texture_rect_region(BRIGHT_ATLAS,Rect2(p.x-pic*0.50,p.y-pic*0.88,pic,pic),source,
+            Color(1,1,1,0.84))
+    draw_rect(Rect2(0,0,size.x,top),Color("#082b3e",0.96))
+    txt("DAILYCORP  /  %s" % city["name"],Vector2(20,32),
+        clampi(roundi(size.x*0.020),16,25),Color.WHITE)
+    var info: Dictionary = game.campaign_v3.city_economy.city_record(city)
+    txt("%s   ·   НАСЕЛЕНИЕ %d   ·   БЮДЖЕТ %d ₽" %
+        [city["specialization"],info["population"],info["budget"]],
+        Vector2(20,top-15),clampi(roundi(size.x*0.014),11,18),Color("#d2e5d4"))
+    rounded_plate(continent_city_button(),Color("#184968"),Color("#72b9d0"),10)
+    txt("← КОНТИНЕНТ",continent_city_button().position+Vector2(10,25),14,Color.WHITE)
+    draw_rect(Rect2(0,size.y-bottom,size.x,bottom),Color("#08283e",0.97))
+    txt("Свободные площадки города: коснись шахты или зоны муниципальных проектов.",
+        Vector2(16,size.y-bottom-12),clampi(roundi(size.x*0.012),10,14),Color("#f4f2e5"))
+    draw_mode_navigation(["КОНТИНЕНТ","ШАХТЫ","КОНТРАКТЫ","СОХР."])
+
+func draw_mode_navigation(names: Array) -> void:
+    var b := bottom_bar_height()
+    draw_rect(Rect2(0,size.y-b,size.x,b),Color("#061e2b",0.95))
+    for i in range(4):
+        draw_console_nav(bottom_button(i),str(names[i]),i,i==0)
+
 func _draw() -> void:
     if game == null:
+        return
+    if view_mode == "continent":
+        draw_continent()
+        return
+    if view_mode == "regional":
+        draw_regional_map()
         return
     draw_rect(Rect2(Vector2.ZERO,size),Color("#39a1d9"))
     if world_roads.is_empty():
@@ -2094,6 +2218,9 @@ func _draw() -> void:
             draw_building_label(point,bool(item["owned"]),str(item["label"]),str(item["desc"]))
     draw_target_reticle()
     draw_world_hud()
+    var return_button := continent_city_button()
+    rounded_plate(return_button,Color("#174660",0.96),Color("#559bb2"),11)
+    txt("← КОНТИНЕНТ",return_button.position+Vector2(10,return_button.size.y*0.67),14,Color.WHITE)
 
 func draw_popup() -> void:
     draw_rect(Rect2(Vector2.ZERO,size),Color(0.02,0.05,0.08,0.86))
