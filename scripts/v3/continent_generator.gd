@@ -105,7 +105,7 @@ func generate_cities(count: int = 48) -> Array:
     var rng := random_for([909,target])
     var result: Array = []
     for stage in range(3):
-        var distance_required := [73.0,55.0,37.0][stage]
+        var distance_required: float = [73.0,55.0,37.0][stage]
         for attempt in range(8000):
             if result.size() >= target:
                 return result
