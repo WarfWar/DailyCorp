@@ -1282,7 +1282,7 @@ func building_span(p: Vector2, entities: Array) -> float:
     var normal_size := ISO_W*world_zoom*1.05
     var nearest := INF
     for item in entities:
-        var other := world_screen(Vector2(item["pos"]))
+        var other := world_screen(building_visual_anchor(item["pos"]))
         var distance := p.distance_to(other)
         if distance > 0.5:
             nearest = minf(nearest,distance)
