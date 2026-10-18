@@ -79,7 +79,10 @@ func city_project_offers(city_id: String) -> Array:
     var city := city_record(city_id)
     if city.is_empty():
         return []
-    var existing: Dictionary = municipal_projects.get(city_id,{})
+    var existing: Dictionary = municipal_projects.get(city_id,{}).duplicate(true)
+    var completed: Dictionary = city_economy.city_record(find_city(city_id)).get("completed",{})
+    for id in completed:
+        existing[str(id)] = "completed"
     return municipal.valid_templates(city,technology.current_epoch(),existing)
 
 func accept_municipal_project(city_id: String,project_id: String) -> Dictionary:
@@ -87,6 +90,9 @@ func accept_municipal_project(city_id: String,project_id: String) -> Dictionary:
     if city.is_empty():
         return {"ok":false,"reason":"unknown_city"}
     var current: Dictionary = municipal_projects.get(city_id,{}).duplicate(true)
+    var built: Dictionary = city_economy.city_record(find_city(city_id)).get("completed",{})
+    if built.has(project_id):
+        return {"ok":false,"reason":"already_completed"}
     var result := municipal.begin(city,project_id,technology.current_epoch(),current)
     if result.get("ok",false):
         current[project_id] = result["project"]
@@ -116,6 +122,11 @@ func finish_municipal_project(city_id: String,project_id: String) -> Dictionary:
     var template: Dictionary = municipal.catalog.city_project(project_id)
     if template.is_empty():
         return {"ok":false,"reason":"unknown_project"}
+    var economy_city: Dictionary = city_economy.city_record(find_city(city_id))
+    if economy_city.get("completed",{}).has(project_id):
+        return {"ok":false,"reason":"already_completed"}
+    if int(economy_city.get("budget",0)) < int(template.get("reward_money_base",0)):
+        return {"ok":false,"reason":"city_budget"}
     var result := municipal.complete(city,template,active[project_id])
     if not result.get("ok",false):
         return result
@@ -123,6 +134,23 @@ func finish_municipal_project(city_id: String,project_id: String) -> Dictionary:
     changed[project_id] = result["project"]
     municipal_projects[city_id] = changed
     city_development[city_id] = result["city"]
+    # Both municipal APIs use one city ledger: no duplicate payout on a second path.
+    var old_record: Dictionary = city_economy.city_record(find_city(city_id))
+    var city_completed: Dictionary = old_record.get("completed",{}).duplicate(true)
+    city_completed[project_id] = true
+    old_record["completed"] = city_completed
+    var constructions: Array = old_record.get("buildings",[]).duplicate(true)
+    constructions.append({"project_id":project_id,"category":str(template.get("category","municipal")),
+        "construction":"completed"})
+    old_record["buildings"] = constructions
+    old_record["budget"] = maxi(0,int(old_record.get("budget",0))-int(result["reward_money"]))
+    old_record["reputation"] = maxi(0,int(old_record.get("reputation",0))+int(result["reward_reputation"]))
+    old_record["satisfaction"] = mini(100,int(old_record.get("satisfaction",55))+1)
+    var city_stats: Dictionary = old_record.get("stats",{}).duplicate(true)
+    for stat_key in template.get("city_stat_delta",{}):
+        city_stats[str(stat_key)] = int(city_stats.get(str(stat_key),0))+int(template["city_stat_delta"][stat_key])
+    old_record["stats"] = city_stats
+    city_economy.progress[city_id] = old_record
     technology.grant_science(int(result["reward_science"]))
     technology.record_event("city_project_completed")
     return result
@@ -153,6 +181,9 @@ func try_company_municipal_contract(city_id: String,project_id: String) -> Dicti
     return result
 
 func complete_municipal_contract(city_id: String,project_id: String,stock: Dictionary) -> Dictionary:
+    # Prevent the instant and staged interfaces from awarding the same contract twice.
+    if municipal_projects.get(city_id,{}).has(project_id):
+        return {"ok":false,"reason":"already_accepted_or_completed"}
     # Strict atomic contract entry: no reward is applied until every input exists.
     var city: Dictionary = find_city(city_id)
     if city.is_empty():
