@@ -2107,8 +2107,8 @@ func draw_continent() -> void:
         rounded_plate(control,Color("#205b78"),Color("#76b9d1"),11)
         txt("ОТКРЫТЬ ГОРОД",control.position+Vector2(8,control.size.y*0.65),
             clampi(roundi(control.size.x*0.093),11,16),Color.WHITE)
-        var pop := game.campaign_v3.city_economy.city_record(chosen_city)
-        txt("%s · %s · жителей %d" % [chosen_city["name"],chosen_city["specialization"],pop["population"]],
+        var city_stats: Dictionary = game.campaign_v3.city_economy.city_record(chosen_city)
+        txt("%s · %s · жителей %d" % [chosen_city["name"],chosen_city["specialization"],city_stats["population"]],
             Vector2(frame.position.x+10,frame.end.y+22),
             clampi(roundi(size.x*0.014),11,16),Color("#e5f1ea"))
     txt("Нажми на город · раздвинь пальцы для масштаба · перемещай карту",Vector2(22,size.y-bottom_bar_height()-10),
