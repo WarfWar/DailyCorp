@@ -67,7 +67,7 @@ func _test() -> void:
         return
     var found: Dictionary = view.region_hotspots()[0]
     view.tapped_regional(found["screen"])
-    if view.panel != "city_mines" and view.panel != "city_projects":
+    if view.panel != "city_mine_detail" and view.panel != "city_projects":
         fail("Regional resources and contracts are not clickable")
         return
     view.close_panel()
