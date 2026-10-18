@@ -146,6 +146,15 @@ jobs:
             exit 1
           fi
 
+      - name: Test approved bright visual integration
+        run: |
+          set -o pipefail
+          timeout 75s godot --headless --path . --script res://tests/casual_art_smoke.gd 2>&1 | tee /tmp/casual-art.log
+          grep -q "CASUAL ART PASSED" /tmp/casual-art.log
+          if grep -E "SCRIPT ERROR|Parse Error|CASUAL ART FAILED" /tmp/casual-art.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
