@@ -100,6 +100,10 @@ var warehouse_owned := [false, false, false, true]
 var warehouse_slots: Array = [[],[],[],[]]
 var selected_worker := 0
 var selected_truck := 0
+var truck_source: Dictionary = {"type":"none","index":-1}
+var truck_destination: Dictionary = {"type":"none","index":-1}
+var selected_contract := 0
+var contract_route_mode := false
 var selected_route_material := "iron"
 var selected_route_target := 0
 var selected_slot := 0
@@ -327,27 +331,53 @@ func show_panel() -> void:
                 "При переводе текущая работа отменяется.",
                 "Выработка и улучшения сохраняются."]
         "hangar":
-            title = "Ангар · транспорт"
-            lines = ["Грузовиков компании: %d" % game.operations.vehicles.size(),
-                "Новый грузовик: %d ₽" % (250+game.operations.vehicles.size()*125),
-                "Грузоподъёмность растёт с уровнем.",
-                "Чем выше уровень, тем быстрее перевозка."]
+            title = "Ангар · диспетчер транспорта"
+            lines = ["Каждая машина получает собственный маршрут.",
+                "Шахта → завод/склад · склад → завод/контракт.",
+                "Без ручного назначения машина стоит в ангаре."]
             for truck in game.operations.vehicles:
-                lines.append("Грузовик #%d · шахта %d · ур.%d · %s" % [truck["id"],int(truck["mine"])+1,truck["level"],str(truck["state"])])
+                var job: Dictionary = truck.get("assignment",{})
+                var route_label := "не назначен" if job.is_empty() else str(job.get("material",""))
+                lines.append("#%d · ур.%d · %s · %s" % [truck["id"],truck["level"],truck["state"],route_label])
         "truck":
             var truck: Dictionary = game.operations.vehicles[selected_truck]
-            var lvl := int(truck["level"])
+            var job: Dictionary = truck.get("assignment",{})
             title = "Грузовик #%d" % truck["id"]
-            lines = ["Назначен: шахта %d" % (int(truck["mine"])+1),
-                "Груз: %d единиц за рейс" % game.operations.truck_capacity(truck),
-                "Уровень %d / 5 · %s" % [lvl,str(truck["state"])],
-                "Улучшение: %d ₽" % (145*lvl),
-                "После 2 уровня дополнительно нужны провода.",
-                "Переброска возможна только после завершения рейса."]
-        "truck_transfer":
-            title = "Переназначение грузовика"
-            lines = ["Между шахтами перемещается пустой транспорт.",
-                "У каждой шахты могут быть свои машины."]
+            lines = ["Уровень: %d/5 · %s" % [truck["level"],truck["state"]],
+                "Грузоподъёмность: %d ед." % game.operations.truck_capacity(truck),
+                "Перевозка только по действующим дорогам."]
+            if job.is_empty():
+                lines.append("Нет задания — ожидает в ангаре.")
+            else:
+                lines.append("%s №%d → %s №%d · %s" % [
+                    str(job["source"]["type"]),int(job["source"]["index"])+1,
+                    str(job["destination"]["type"]),int(job["destination"]["index"])+1,
+                    str(job["material"])])
+        "truck_source":
+            title = "Где загрузить груз?"
+            lines = ["Выбери купленную шахту или склад.",
+                "Транспорт не прикрепляется к шахте автоматически."]
+        "truck_target":
+            title = "Куда доставить?"
+            lines = ["Шахта → склад / завод.",
+                "Склад → завод / городской контракт.",
+                "Грузовик должен быть свободен."]
+        "truck_material":
+            title = "Выбери материал"
+            lines = ["Назначение создаётся только после подтверждения груза.",
+                "Завод получает товар на производственный входной склад."]
+        "contract_detail":
+            var task: Dictionary = game.operations.CONTRACTS[selected_contract]
+            title = str(task["title"])
+            lines = ["Поставить: %s × %d" % [PRODUCTS[str(task["key"])],task["quantity"]],
+                "Доставлено: %d / %d ед." % [int(game.operations.contract_progress.get(str(selected_contract),0)),task["quantity"]],
+                "Награда: %d ₽" % task["reward"],
+                "Выплата только после приезда грузовика.",
+                "Выбери свободный транспорт для доставки со склада."]
+        "contract_fleet":
+            title = "Назначить доставку"
+            lines = ["Выбери грузовик для городского заказа.",
+                "Затем укажи склад, с которого забрать материал."]
         "land":
             title = "Земельный участок №%d" % (selected_plot+1)
             if expansion_owned[selected_plot]:
@@ -503,14 +533,14 @@ func show_panel() -> void:
                     if not status.get("ok",false):
                         lines.append("Ожидание: "+str(status.get("reason","материалы")))
         "contracts":
-            var task: Dictionary = game.operations.contract()
-            title = "Городские контракты"
-            lines = ["Заказ: " + str(task["title"]),
-                "Нужно: %d ед. · %s" % [task["quantity"],PRODUCTS[str(task["key"])]],
-                "Есть на общем складе: %d ед." % game.stock.get(task["key"],0),
-                "Выплата: %d ₽" % task["reward"],
-                "Выполнено контрактов: %d" % game.operations.reputation,
-                "Следующий контракт откроется после сдачи."]
+            title = "Контракты · диспетчер поставок"
+            lines = ["Список заказов города. Платёж после фактической доставки.",
+                "Для каждого заказа требуется отдельный товар."]
+            for j in range(game.operations.CONTRACTS.size()):
+                var entry: Dictionary = game.operations.CONTRACTS[j]
+                var count: int = int(game.operations.contract_progress.get(str(j),0))
+                var label := "ВЫПОЛНЕНО" if game.operations.completed_contracts.has(j) else "%d/%d" % [count,entry["quantity"]]
+                lines.append("%d. %s · %s" % [j+1,entry["title"],label])
     if info_seconds > 0.0:
         lines.push_front(info)
     var commands_to_show: Array = buttons()
