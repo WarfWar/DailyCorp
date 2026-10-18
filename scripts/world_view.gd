@@ -1108,7 +1108,7 @@ func draw_road_system() -> void:
             if p.x < -100 or p.x > size.x+100 or p.y < -100 or p.y > size.y+100:
                 continue
             if road_planner.neighbors(Vector2i(x,y)).size() >= 2:
-                draw_circle(p,maxf(3.0,8.5*world_zoom),Color("#485653"))
+                draw_circle(p,maxf(3.0,8.5*world_zoom),Color("#626773"))
 
 func atlas_building(kind: String, owned: bool, index: int) -> Vector2i:
     match kind:
@@ -1191,7 +1191,7 @@ func draw_building_body(p: Vector2,kind: String,owned: bool,index: int,span: flo
     if kind == "market" or kind == "contract":
         width *= 0.88
     var box := Rect2(p.x-width*0.50,p.y-width*0.78,width,width)
-    var src := Rect2(float(art_id%4)*320.0,float(art_id/4)*320.0,320.0,320.0)
+    var src := Rect2(float(art_id%4)*320.0,float(int(art_id / 4))*320.0,320.0,320.0)
     var tint := Color.WHITE if owned else Color(0.80,0.89,0.93,0.88)
     draw_texture_rect_region(BRIGHT_ATLAS,box,src,tint)
     if owned and kind == "factory":
@@ -1259,29 +1259,27 @@ func draw_console_icon(kind: int,center: Vector2,accent: Color) -> void:
             draw_circle(Vector2(x,y+rr*0.25),rr*0.25,accent)
 
 func draw_console_nav(rect: Rect2,caption: String,index: int,active: bool = false) -> void:
-    var base := Color("#d3ad69") if active else Color("#101d2a",0.96)
-    draw_rect(rect,base)
-    var edge := Color("#ffe0a5") if active else Color("#416276",0.82)
-    draw_rect(Rect2(rect.position.x,rect.position.y,rect.size.x,1.3),edge)
-    draw_rect(Rect2(rect.position.x,rect.end.y-1.3,rect.size.x,1.3),edge)
-    draw_rect(Rect2(rect.position.x,rect.position.y,1.3,rect.size.y),edge)
-    draw_rect(Rect2(rect.end.x-1.3,rect.position.y,1.3,rect.size.y),edge)
+    # Buttons have independent, vivid backgrounds, like the approved mockup.
+    var shades := [Color("#ff990f"),Color("#2388f0"),Color("#9250e8"),Color("#2dcd26")]
+    var darks := [Color("#e97900"),Color("#1458c9"),Color("#5c31c5"),Color("#0b9514")]
+    rounded_plate(rect,shades[index],darks[index],15)
+    draw_rect(Rect2(rect.position+Vector2(6,5),Vector2(rect.size.x-12,2)),Color(1,1,1,0.25))
+    var icon_x := rect.position.x+clampf(rect.size.x*0.20,18,40)
+    var mid := rect.position.y+rect.size.y*0.47
+    draw_console_icon(index,Vector2(icon_x,mid),Color.WHITE)
+    var cap_size := clampi(roundi(rect.size.x/maxf(7.0,float(caption.length())*0.80)),12,18)
+    txt(caption,Vector2(icon_x+clampf(rect.size.x*0.22,21,37),mid+cap_size*0.32),
+        cap_size,Color.WHITE)
     if active:
-        draw_rect(Rect2(rect.position.x,rect.position.y,rect.size.x,3.5),Color("#f0d39b"))
-    var icon_x := rect.position.x + clampf(rect.size.x*0.22,18.0,32.0)
-    var middle := rect.position.y + rect.size.y*0.49
-    draw_console_icon(index,Vector2(icon_x,middle),Color("#263542") if active else Color("#84c4d2"))
-    var font_size := clampi(roundi(rect.size.x/(float(caption.length())+4.0)),10,17)
-    txt(caption,Vector2(icon_x+23.0, middle+font_size*0.32),font_size,
-        Color("#1b303d") if active else Color("#e1e8e8"))
+        draw_circle(Vector2(rect.position.x+rect.size.x-11,rect.position.y+11),4,Color.WHITE)
 
 func console_metric(rect: Rect2,tag: String,value: String,highlight: Color) -> void:
-    draw_rect(rect,Color("#102333",0.96))
-    draw_rect(Rect2(rect.position.x,rect.position.y,2.0,rect.size.y),highlight)
-    draw_rect(Rect2(rect.position.x,rect.position.y,rect.size.x,1),Color("#466474",0.75))
-    var small := clampi(roundi(rect.size.x*0.047),10,14)
-    txt(tag,rect.position+Vector2(10,15),small,Color("#819dad"))
-    txt(value,rect.position+Vector2(10,rect.size.y-8),clampi(roundi(rect.size.y*0.39),15,27),Color("#f4e6cf"))
+    rounded_plate(rect,Color("#092c41",0.96),Color("#27647b"),15)
+    draw_circle(rect.position+Vector2(17,rect.size.y*0.48),7,highlight)
+    var tx := rect.position.x+30
+    txt(tag,Vector2(tx,rect.position.y+15),clampi(roundi(rect.size.y*0.21),10,14),Color("#9bd4ed"))
+    txt(value,Vector2(tx,rect.position.y+rect.size.y-10),
+        clampi(roundi(rect.size.y*0.33),14,23),Color.WHITE)
 
 func plot_anchor(index: int) -> Vector2:
     # Purchase markers occupy undeveloped land adjacent to roads, not their corners.
@@ -1309,22 +1307,20 @@ func plot_anchor(index: int) -> Vector2:
 
 func draw_empty_plot(p: Vector2, index: int) -> void:
     var owned := bool(expansion_owned[index])
-    var rx := ISO_W*world_zoom*0.34
-    var ry := ISO_H*world_zoom*0.34
-    var color := Color("#79c5d2") if owned else Color("#758b97")
-    var points := PackedVector2Array([
-        p+Vector2(0,-ry),p+Vector2(rx,0),p+Vector2(0,ry),p+Vector2(-rx,0)
-    ])
-    draw_colored_polygon(points,Color("#12333f",0.39) if owned else Color("#18242a",0.21))
-    for i in range(4):
-        draw_line(points[i],points[(i+1)%4],color,maxf(1.0,1.8*world_zoom),true)
-    var width := clampf(112.0*world_zoom,85.0,138.0)
-    var box := Rect2(p.x-width*0.5,p.y+ry+5,width,clampf(25.0*world_zoom,24.0,37.0))
-    sci_plate(box,owned)
-    txt("СЕКТОР %02d" % (index+1),box.position+Vector2(8,box.size.y*0.66),
-        clampi(roundi(12.0*world_zoom),10,14),PAPER)
+    var width := ISO_W*world_zoom*1.25
+    draw_texture_rect_region(BRIGHT_ATLAS,Rect2(p.x-width*0.50,p.y-width*0.51,width,width),
+        Rect2(3*320.0,320.0,320.0,320.0))
+    var bubble := p+Vector2(0,-width*0.24)
+    draw_circle(bubble,15*world_zoom,Color("#21ca21") if not owned else Color("#2b83df"))
+    draw_arc(bubble,15*world_zoom,0,TAU,20,Color.WHITE,2.0,true)
+    txt("✓" if owned else "+",bubble+Vector2(-7,7)*world_zoom,22,Color.WHITE)
+    var width_label := clampf(132*world_zoom,91,148)
+    var plate := Rect2(p.x-width_label*0.5,p.y+width*0.26,width_label,26*world_zoom)
+    rounded_plate(plate,Color("#123746",0.88),Color("#3b7686"),13)
+    txt("УЧАСТОК %02d" % (index+1),plate.position+Vector2(10,plate.size.y*0.69),
+        clampi(roundi(12*world_zoom),10,14),Color.WHITE)
     if purchase_effect_plot == index and purchase_effect_time > 0.0:
-        draw_purchase_effect(p,rx,ry)
+        draw_purchase_effect(p,width*0.32,width*0.18)
 
 func draw_purchase_effect(p: Vector2,rx: float,ry: float) -> void:
     # Animated perimeter scan + expanding hologram. Does not cover adjacent roads.
@@ -1381,55 +1377,49 @@ func draw_target_reticle() -> void:
     draw_line(center+Vector2(0,radius-3),center+Vector2(0,radius+8),reticle,1.2,true)
 
 func draw_world_hud() -> void:
-    # Original industrial command console, inspired by EVE's information density
-    # but with large Android touch targets, own icons and distinct trade branding.
-    var top := top_bar_height()
-    var bottom := bottom_bar_height()
     var w := size.x
     var h := size.y
-    var compact := w < 560 or h < 700
-    draw_rect(Rect2(0,0,w,top),Color("#07121e",0.975))
-    draw_rect(Rect2(0,top-1.4,w,1.4),Color("#6794a2",0.83))
-    draw_rect(Rect2(0,h-bottom,w,bottom),Color("#081421",0.97))
-    draw_rect(Rect2(0,h-bottom,w,1.5),Color("#5a7b89",0.90))
+    var top := top_bar_height()
+    var bottom := bottom_bar_height()
+    var compact := w < 700.0
+    # Floating game panels, with greenery still visible underneath.
+    draw_rect(Rect2(0,0,w,top),Color("#78d0eb",0.16))
+    var logo_w := minf(315,w*0.30) if not compact else minf(260,w*0.45)
+    var logo_h := maxf(42.0,minf(59.0,top*0.45))
+    rounded_plate(Rect2(12,8,logo_w,logo_h),Color("#092b42",0.98),Color("#3c7a8d"),20)
     for i in range(3):
-        var left := 13.0+float(i)*8.0
-        draw_rect(Rect2(left,24-float(i)*4.0,5.0,8.0+float(i)*4.0),Color("#d3a968"))
-    txt("DAILYCORP",Vector2(47,29 if compact else 32),20 if compact else 25,Color("#f4e4cb"))
-    if not compact:
-        txt("ПРОМЫШЛЕННЫЙ КОМПЛЕКС // УПРАВЛЕНИЕ",Vector2(49,51),12,Color("#749baa"))
-        txt("ALPHA 0.10",Vector2(w-121,24),13,Color("#7898a5"))
-    var stock_total := 0
-    for val in game.stock.values():
-        stock_total += int(val)
-    var truck_total := 0
+        draw_rect(Rect2(25+i*7,30-i*6,5,12+i*6),Color("#49b8ed"))
+    txt("DAILYCORP",Vector2(56,8+logo_h*0.67),clampi(roundi(logo_w*0.088),16,29),Color("#eefaff"))
+
+    var total_stock := 0
+    for n in game.stock.values():
+        total_stock += int(n)
+    var worker_count := 0
     if game.operations != null:
-        for truck in game.operations.vehicles:
-            if str(truck.get("state","idle")) != "idle":
-                truck_total += 1
+        worker_count = game.operations.personnel.size()
+    var owned := mine_owned.count(true)+factory_owned.count(true)+warehouse_owned.count(true)
+    var y := 10.0 if not compact else logo_h+14.0
+    var metric_x := 13.0+logo_w+12.0 if not compact else 12.0
+    var space := w-metric_x-11.0
+    var gap := 8.0
+    var cell := (space-3*gap)/4.0 if not compact else (space-2*gap)/3.0
     if compact:
-        var metric_top := 42.0
-        var metric_width := maxf(92.0,(w-38.0)*0.50)
-        console_metric(Rect2(12,metric_top,metric_width,top-metric_top-5),"КАПИТАЛ","%d ₽" % game.cash,Color("#e0b776"))
-        console_metric(Rect2(26+metric_width,metric_top,metric_width,top-metric_top-5),"ЗАПАСЫ",str(stock_total),Color("#79bac8"))
+        space = w-24.0
+        cell = (space-2*gap)/3.0
+    var height := logo_h if not compact else maxf(38.0,top-y-5.0)
+    if not compact:
+        console_metric(Rect2(metric_x,y,cell,height),"КАПИТАЛ","%d ₽" % game.cash,Color("#6ed956"))
+        console_metric(Rect2(metric_x+(cell+gap),y,cell,height),"СКЛАД","%d" % total_stock,Color("#ffbf3f"))
+        console_metric(Rect2(metric_x+2*(cell+gap),y,cell,height),"РАБОЧИЕ","%d" % worker_count,Color("#f9d954"))
+        console_metric(Rect2(metric_x+3*(cell+gap),y,cell,height),"ОБЪЕКТЫ","%d" % owned,Color("#55a9ff"))
     else:
-        var y := clampf(top*0.48,58.0,73.0)
-        var available := w-36.0
-        var gap := 8.0
-        var cell := minf(250.0,(available-3*gap)/4.0)
-        console_metric(Rect2(14,y,cell,top-y-8),"КАПИТАЛ","%d ₽" % game.cash,Color("#dda963"))
-        console_metric(Rect2(14+(cell+gap),y,cell,top-y-8),"СКЛАД",str(stock_total)+" ед.",Color("#68b5c7"))
-        console_metric(Rect2(14+(cell+gap)*2,y,cell,top-y-8),"ТРАНСПОРТ",str(truck_total)+" рейс.",Color("#81c5c5"))
-        var last_w := maxf(72.0,available-(cell+gap)*3)
-        console_metric(Rect2(14+(cell+gap)*3,y,last_w,top-y-8),"АКТИВЫ",
-            "%d / %d" % [mine_owned.count(true)+factory_owned.count(true)+warehouse_owned.count(true),12],Color("#b5a2d8"))
-    var selected_tab := -1
-    match panel:
-        "trade": selected_tab = 0
-        "assets": selected_tab = 1
-        "help": selected_tab = 2
+        console_metric(Rect2(metric_x,y,cell,height),"ДЕНЬГИ","%d ₽" % game.cash,Color("#6ed956"))
+        console_metric(Rect2(metric_x+(cell+gap),y,cell,height),"СКЛАД",str(total_stock),Color("#ffc643"))
+        console_metric(Rect2(metric_x+2*(cell+gap),y,cell,height),"АКТИВЫ",str(owned),Color("#5bacfa"))
+    var nav_bg := Rect2(0,h-bottom,w,bottom)
+    draw_rect(nav_bg,Color("#07273c",0.96))
     for i in range(4):
-        draw_console_nav(bottom_button(i),["РЫНОК","ОБЪЕКТЫ","СПРАВКА","СОХР."][i],i,i==selected_tab)
+        draw_console_nav(bottom_button(i),["РЫНОК","ОБЪЕКТЫ","СПРАВКА","СОХР."][i],i,i==0 and panel=="trade")
 
 func _draw() -> void:
     if game == null:
