@@ -358,6 +358,22 @@ func show_panel() -> void:
                     "Стоимость земли: %d ₽" % price,
                     "Пока покупка даёт только право владения.",
                     "Новые типы построек добавим в дальнейшем."]
+        "continent_city":
+            title = "Континент · город"
+            var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
+            if city.is_empty():
+                lines = ["Город не найден."]
+            else:
+                var info: Dictionary = game.campaign_v3.city_economy.city_record(city)
+                var lots: Dictionary = city["lots"]
+                title = str(city["name"])
+                lines = ["Регион: %s" % city["specialization"],
+                    "Население: %d · развитие %d" % [info["population"],info["rank"]],
+                    "Шахтных участков: %d" % lots.get("mine",0),
+                    "Мест для заводов: %d" % lots.get("factory",0),
+                    "Складских участков: %d" % lots.get("warehouse",0),
+                    "Муниципальных площадок: %d" % lots.get("municipal",0),
+                    "Выбери действие. Город имеет собственные контракты и геологию."]
         "cities":
             title = "Континент · города"
             if game.campaign_v3 == null:
@@ -812,15 +828,39 @@ func tapped(p: Vector2) -> void:
     if p.y > size.y - bottom_bar_height():
         for i in range(4):
             if bottom_button(i).has_point(p):
-                match i:
-                    0: panel = "trade"
-                    1: panel = "assets"
-                    2: panel = "help"
-                    3:
-                        game.save_game()
-                        pop("Компания сохранена")
-                show_panel()
+                if view_mode == "continent":
+                    match i:
+                        0: selected_continent_city = "city_001"; enter_selected_city()
+                        1: panel = "cities"
+                        2: panel = "contracts"
+                        3: game.save_game(); pop("Компания сохранена")
+                elif view_mode == "regional":
+                    match i:
+                        0: enter_continent()
+                        1: panel = "city_mines"
+                        2: panel = "city_projects"
+                        3: game.save_game(); pop("Компания сохранена")
+                else:
+                    match i:
+                        0: panel = "trade"
+                        1: panel = "assets"
+                        2: panel = "help"
+                        3: game.save_game(); pop("Компания сохранена")
+                if panel != "":
+                    show_panel()
                 return
+    if view_mode == "continent":
+        tapped_continent(p)
+        return
+    if view_mode == "regional":
+        if continent_city_button().has_point(p):
+            enter_continent()
+        else:
+            tapped_regional(p)
+        return
+    if continent_city_button().has_point(p):
+        enter_continent()
+        return
     if p.y < top_bar_height():
         if p.x > size.x*0.67:
             panel = "assets"
@@ -940,6 +980,7 @@ func buttons() -> Array:
         "truck_transfer": return ["ШАХТА №1","ШАХТА №2","ШАХТА №3","ШАХТА №4","НАЗАД"]
         "land": return ["ЗАКРЫТЬ"] if expansion_owned[selected_plot] else ["КУПИТЬ УЧАСТОК","ЗАКРЫТЬ"]
         "contracts": return ["СДАТЬ ЗАКАЗ","ГОРОДА КОНТИНЕНТА","НАЗАД"]
+        "continent_city": return ["ОТКРЫТЬ ГОРОД","КОНТРАКТЫ ГОРОДА","ШАХТЫ ГОРОДА","НАЗАД К КОНТИНЕНТУ"]
         "cities":
             if game.campaign_v3 == null:
                 return ["НАЗАД"]
@@ -1207,6 +1248,12 @@ func action(i: int) -> void:
                 panel = "cities"
             else:
                 panel = ""
+        "continent_city":
+            match i:
+                0: enter_selected_city()
+                1: panel = "city_projects"
+                2: panel = "city_mines"
+                _: enter_continent()
         "cities":
             if game.campaign_v3 == null:
                 panel = "contracts"
