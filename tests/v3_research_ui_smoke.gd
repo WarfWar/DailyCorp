@@ -41,7 +41,7 @@ func _check() -> void:
     game.stock[item] = int(task["quantity"])
     var science_before: int = science.science_points
     # Contracts now require delivery from a warehouse using an assigned truck.
-    var assignment := game.operations.configure_truck(1,"warehouse",3,"contract",0,item)
+    var assignment: Dictionary = game.operations.configure_truck(1,"warehouse",3,"contract",0,item)
     if not assignment.get("ok",false):
         fail("No warehouse-to-contract shipment available")
         return
