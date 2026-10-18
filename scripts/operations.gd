@@ -272,6 +272,16 @@ func target_capacity(destination: Dictionary,material: String) -> int:
         return maxi(0,40-int(factory_inputs[index].get(material,0)))
     return 0
 
+func cargo_in_transit(target: Dictionary,material: String) -> int:
+    # Prevent multiple assigned vehicles overbooking a contract or factory.
+    var pending := 0
+    for truck in vehicles:
+        if truck["state"] == "delivery" and str(truck.get("material","")) == material:
+            var dest: Dictionary = truck.get("destination",{})
+            if str(dest.get("type","")) == str(target.get("type","")) and int(dest.get("index",-1)) == int(target.get("index",-1)):
+                pending += maxi(0,int(truck.get("amount",0)))
+    return pending
+
 func configure_truck(id: int,from_type: String,from_index: int,to_type: String,to_index: int,material: String) -> Dictionary:
     if not ["mine","warehouse"].has(from_type) or not ["factory","warehouse","contract"].has(to_type):
         return {"ok":false,"reason":"route_type"}
@@ -342,7 +352,7 @@ func process_transport(delta: float) -> void:
             var target: Dictionary = job.get("destination",{})
             var material := str(job.get("material",""))
             var count := source_available(source,material)
-            var space := target_capacity(target,material)
+            var space := maxi(0,target_capacity(target,material)-cargo_in_transit(target,material))
             var duration := truck_seconds(truck)
             if count <= 0 or space <= 0 or duration <= 0.0:
                 continue
