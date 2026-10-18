@@ -164,6 +164,15 @@ jobs:
             exit 1
           fi
 
+      - name: Verify DailyCorp 3.0 foundation and stable geology
+        run: |
+          set -o pipefail
+          timeout 90s godot --headless --path . --script res://tests/v3_foundation_smoke.gd 2>&1 | tee /tmp/v3-foundation.log
+          grep -q "V3 FOUNDATION PASSED" /tmp/v3-foundation.log
+          if grep -E "SCRIPT ERROR|Parse Error|V3 FOUNDATION FAILED" /tmp/v3-foundation.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
