@@ -70,6 +70,19 @@ func _verify() -> void:
         fail("Large inventory lost when restoring campaign")
         return
 
+    # Pre-0.14 procedural saves may have a purchased mine without a
+    # discovered-floor list. Migration must grant floor one without ore resets.
+    var old_format: Dictionary = state.save_snapshot()
+    old_format["mine_deeds"]["1/0"]["explored_floors"] = []
+    var migrated = Campaign.new()
+    migrated.initialize(old_format)
+    if migrated.registered_mine(1,0).get("explored_floors",[]) != [1]:
+        fail("Old procedural deed cannot open its first floor")
+        return
+    if migrated.ore_remaining(1,0,1,int(cell["x"]),int(cell["y"])) != previous-1:
+        fail("Legacy migration unexpectedly restores mined ore")
+        return
+
     # Integration: actual Android menu actions, not just a test-only domain model.
     var game = load("res://scenes/main.tscn").instantiate()
     root.add_child(game)
