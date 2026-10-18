@@ -294,5 +294,9 @@ func fulfill_contract() -> bool:
     game.cash += int(task["reward"])
     reputation += 1
     contract_index += 1
+    # The first V3 science source is tangible completion of municipal contracts.
+    if game.campaign_v3 != null:
+        game.campaign_v3.technology.grant_science(40)
+        game.campaign_v3.technology.record_event("city_contract",1)
     game.save_game()
     return true
