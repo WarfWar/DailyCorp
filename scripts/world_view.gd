@@ -2454,15 +2454,16 @@ func _draw() -> void:
         draw_building_body(point,str(item["kind"]),bool(item["owned"]),int(item["index"]),building_span(point,entities))
     if game.operations != null:
         for truck in game.operations.vehicles:
-            var origin: Vector2 = Vector2(MINES[int(truck["mine"])]["pos"])
-            if truck["state"] == "idle":
-                draw_truck(world_screen(origin),false)
+            var route: Array = game.operations.truck_path(truck)
+            if str(truck.get("state","idle")) == "idle":
+                var parking := Vector2(HANGAR_POS)
+                if not truck.get("assignment",{}).is_empty() and not route.is_empty():
+                    parking = Vector2(route[0])
+                draw_truck(world_screen(parking),false)
                 continue
-            var target: Dictionary = truck["destination"]
-            var route: Array = haul_route(int(truck["mine"]),target)
-            if route.is_empty():
+            if route.size() < 2:
                 continue
-            var duration: float = game.operations.road_seconds(int(truck["mine"]),target,int(truck["level"]))
+            var duration: float = game.operations.truck_seconds(truck)
             var progress := clampf(1.0-float(truck["remaining"])/maxf(0.01,duration),0.0,1.0)
             if truck["state"] == "return":
                 progress = 1.0-progress
