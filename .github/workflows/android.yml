@@ -173,6 +173,15 @@ jobs:
             exit 1
           fi
 
+      - name: Test DailyCorp 3.0 municipal project progression
+        run: |
+          set -o pipefail
+          timeout 90s godot --headless --path . --script res://tests/v3_city_contract_smoke.gd 2>&1 | tee /tmp/v3-cities.log
+          grep -q "V3 CITY CONTRACT PASSED" /tmp/v3-cities.log
+          if grep -E "SCRIPT ERROR|Parse Error|V3 CITY CONTRACT FAILED" /tmp/v3-cities.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
