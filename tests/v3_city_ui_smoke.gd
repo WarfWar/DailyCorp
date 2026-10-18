@@ -27,16 +27,19 @@ func _check() -> void:
     if view.panel != "city_projects" or view.selected_continent_city != "city_001":
         bad("Cannot select first city")
         return
-    if view.buttons().size() != 1:
-        bad("Low-tech projects must remain locked in era one")
+    if not game.campaign_v3.city_contracts("city_001").is_empty():
+        bad("Low-tech civic contracts must remain locked in era one")
+        return
+    if view.buttons().size() != 3 or view.buttons()[0] != "ШАХТЫ РЕГИОНА":
+        bad("New regional mine and warehouse screens are not accessible")
         return
     var tech = game.campaign_v3.technology
     tech.grant_science(1000)
     tech.unlock_research("research.prospect_mines")
     tech.unlock_research("epoch.mechanization")
     view.show_panel()
-    if view.buttons().size() != 3:
-        bad("Technology epoch did not expose city offers")
+    if view.buttons().size() != 5 or game.campaign_v3.city_contracts("city_001").size() != 2:
+        bad("Technology epoch did not expose two municipal contracts")
         return
     view.action(0)
     if view.panel != "city_project_details":
