@@ -788,19 +788,32 @@ func _gui_input(event: InputEvent) -> void:
         if t.position.distance_to(touch_origin.get(t.index,t.position)) > 12.0:
             touch_moved[t.index] = true
         if panel == "" and contacts.size() == 1 and t.position.y > top_bar_height() and t.position.y < size.y - bottom_bar_height():
-            pan(t.position - old)
+            if view_mode == "continent":
+                continent_camera_pan(t.position-old)
+            elif view_mode == "city":
+                pan(t.position-old)
         elif panel == "" and contacts.size() == 2:
             var keys := contacts.keys()
             var other_id: int = int(keys[0]) if int(keys[0]) != t.index else int(keys[1])
             var other: Vector2 = contacts[other_id]
-            world_zoom = clampf(world_zoom * t.position.distance_to(other) / maxf(1, old.distance_to(other)), 0.5, 1.45)
+            var ratio := t.position.distance_to(other)/maxf(1.0,old.distance_to(other))
+            if view_mode == "continent":
+                set_continent_zoom(continent_zoom*ratio)
+            elif view_mode == "city":
+                world_zoom = clampf(world_zoom*ratio,0.5,1.45)
         accept_event()
     elif event is InputEventMouseButton:
         var m: InputEventMouseButton = event
         if m.button_index == MOUSE_BUTTON_WHEEL_UP and m.pressed:
-            world_zoom = clampf(world_zoom * 1.12, 0.5, 1.45)
+            if view_mode == "continent":
+                set_continent_zoom(continent_zoom*1.12)
+            else:
+                world_zoom = clampf(world_zoom*1.12,0.5,1.45)
         elif m.button_index == MOUSE_BUTTON_WHEEL_DOWN and m.pressed:
-            world_zoom = clampf(world_zoom * 0.9, 0.5, 1.45)
+            if view_mode == "continent":
+                set_continent_zoom(continent_zoom*0.9)
+            else:
+                world_zoom = clampf(world_zoom*0.9,0.5,1.45)
         elif m.button_index == MOUSE_BUTTON_LEFT:
             if m.pressed:
                 dragging_mouse = true
@@ -817,7 +830,10 @@ func _gui_input(event: InputEvent) -> void:
         if m.position.distance_to(mouse_start) > 12.0:
             did_move = true
         if did_move and panel == "" and m.position.y > top_bar_height() and m.position.y < size.y - bottom_bar_height():
-            pan(m.position - mouse_last)
+            if view_mode == "continent":
+                continent_camera_pan(m.position-mouse_last)
+            elif view_mode == "city":
+                pan(m.position-mouse_last)
         mouse_last = m.position
         accept_event()
 
