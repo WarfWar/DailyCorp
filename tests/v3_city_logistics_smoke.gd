@@ -42,6 +42,8 @@ func _verify() -> void:
     var ops = game.operations
     game.cash = 50000
     world.factory_owned[0] = true
+    ops.completed_contracts = []
+    ops.contract_progress = {}
     # Isolate the truck from previous CI smoke-test saves.
     ops.vehicles = [{"id":1,"mine":0,"level":1,"state":"idle","material":"","amount":0,"remaining":0.0,
         "source":{"type":"none","index":-1},"destination":{"type":"none","index":-1},"assignment":{}}]
