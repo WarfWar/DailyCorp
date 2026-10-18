@@ -204,6 +204,23 @@ func show_panel() -> void:
                 "Покупка склада увеличивает её на 10 ед.",
                 "Специализированная секция: +50 ед. за уровень.",
                 "Перевезено: %d ед." % game.operations.shipping_total]
+        "research":
+            title = "Исследования корпорации"
+            if game.campaign_v3 == null:
+                lines = ["Научный центр ещё не подключён."]
+            else:
+                var tech = game.campaign_v3.technology
+                lines = ["Текущая технологическая эпоха: %d / 10" % tech.current_epoch(),
+                    "Очки науки: %d" % tech.science_points,
+                    "Первые исследования оплачиваются наукой от городских контрактов.",
+                    "Развитие технологий не зависит от уровня отдельного завода.",
+                    "Доступные исследования:"]
+                var available: Array = tech.available_research()
+                for index in range(mini(8,available.size())):
+                    var item: Dictionary = available[index]
+                    lines.append("%s — %d науки" % [str(item["name_ru"]),int(item["science_cost"])])
+                if available.is_empty():
+                    lines.append("Новые исследования станут доступны после предыдущих открытий.")
         "help":
             title = "Управление"
             lines = ["Касайся шахт, заводов, складов и рынка.",
@@ -673,7 +690,17 @@ func buttons() -> Array:
         "truck_transfer": return ["ШАХТА №1","ШАХТА №2","ШАХТА №3","ШАХТА №4","НАЗАД"]
         "land": return ["ЗАКРЫТЬ"] if expansion_owned[selected_plot] else ["КУПИТЬ УЧАСТОК","ЗАКРЫТЬ"]
         "contracts": return ["СДАТЬ ЗАКАЗ","НАЗАД"]
-        "assets": return ["К КАРТЕ","ТОРГОВЛЯ","КАЗАРМА","АНГАР","КОНТРАКТЫ"]
+        "assets": return ["К КАРТЕ","ТОРГОВЛЯ","КАЗАРМА","АНГАР","КОНТРАКТЫ","ИССЛЕДОВАНИЯ"]
+        "research":
+            var entries: Array = []
+            if game.campaign_v3 != null:
+                var tech = game.campaign_v3.technology
+                var available: Array = tech.available_research()
+                for j in range(mini(8,available.size())):
+                    var node: Dictionary = available[j]
+                    entries.append("ИССЛЕДОВАТЬ: %s · %d" % [node["name_ru"],int(node["science_cost"])])
+            entries.append("НАЗАД")
+            return entries
         "help": return ["ЗАКРЫТЬ"]
     return []
 
@@ -897,6 +924,22 @@ func action(i: int) -> void:
                 2: panel = "barracks"
                 3: panel = "hangar"
                 4: panel = "contracts"
+                5: panel = "research"
+        "research":
+            if game.campaign_v3 == null:
+                panel = "assets"
+            else:
+                var tech = game.campaign_v3.technology
+                var available: Array = tech.available_research()
+                if i >= 0 and i < mini(8,available.size()):
+                    var id := str(available[i]["id"])
+                    if tech.unlock_research(id):
+                        pop("Исследование выполнено: "+str(available[i]["name_ru"]))
+                        game.save_game()
+                    else:
+                        pop("Недостаточно науки или не выполнены зависимости")
+                else:
+                    panel = "assets"
         "help":
             panel = ""
     if dialog != null:
