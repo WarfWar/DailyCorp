@@ -155,6 +155,15 @@ jobs:
             exit 1
           fi
 
+      - name: Verify world layout and tile visibility
+        run: |
+          set -o pipefail
+          timeout 75s godot --headless --path . --script res://tests/world_layout_smoke.gd 2>&1 | tee /tmp/world-layout.log
+          grep -q "WORLD LAYOUT PASSED" /tmp/world-layout.log
+          if grep -E "SCRIPT ERROR|Parse Error|WORLD LAYOUT FAILED" /tmp/world-layout.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
