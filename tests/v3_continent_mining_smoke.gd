@@ -91,7 +91,7 @@ func _verify() -> void:
     game.cash = 1000
     var world = game.world_view
     world.panel = "contracts"
-    world.action(1) # open cities
+    world.action(game.operations.CONTRACTS.size()) # open cities
     if world.panel != "cities":
         fail("Cities unavailable from municipal contract board")
         return
