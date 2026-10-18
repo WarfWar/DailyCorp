@@ -227,7 +227,7 @@ func truck_seconds(truck: Dictionary) -> float:
     return maxf(1.5,float(path.size()-1)*1.6/(1+0.2*float(int(truck["level"])-1)))
 
 func road_seconds(mine: int,target: Dictionary,level: int) -> float:
-    var path := world.road_path(endpoint({"type":"mine","index":mine}),endpoint(target))
+    var path: Array = world.road_path(endpoint({"type":"mine","index":mine}),endpoint(target))
     if path.size() <= 1:
         return 0.0
     return maxf(1.5,float(path.size()-1)*1.6/(1+0.2*float(level-1)))
