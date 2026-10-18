@@ -200,6 +200,15 @@ jobs:
             exit 1
           fi
 
+      - name: Verify playable procedural mining and continent inventory
+        run: |
+          set -o pipefail
+          timeout 120s godot --headless --path . --script res://tests/v3_continent_mining_smoke.gd 2>&1 | tee /tmp/v3-mining.log
+          grep -q "CONTINENT MINING PASSED" /tmp/v3-mining.log
+          if grep -E "SCRIPT ERROR|Parse Error|CONTINENT MINING FAILED" /tmp/v3-mining.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
