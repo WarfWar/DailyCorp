@@ -24,7 +24,10 @@ func initialize(saved: Dictionary = {}) -> void:
     var saved_mines: Dictionary = saved.get("mine_deeds",{})
     for key in saved_mines:
         if saved_mines[key] is Dictionary:
-            mine_deeds[str(key)] = saved_mines[key].duplicate(true)
+            var old_mine: Dictionary = saved_mines[key].duplicate(true)
+            if old_mine.get("explored_floors",[]).is_empty():
+                old_mine["explored_floors"] = [1]
+            mine_deeds[str(key)] = old_mine
     region_discoveries = saved.get("region_discoveries",{}).duplicate(true)
     municipal_projects = saved.get("municipal_projects",{}).duplicate(true)
     city_development = saved.get("city_development",{}).duplicate(true)
@@ -56,6 +59,7 @@ func register_mine_purchase(city_id: int,slot_id: int) -> Dictionary:
     if slot_id < 0 or slot_id >= int(city["lots"].get("mine",0)):
         return {}
     var purchased := generator.mine_blueprint(city_id,slot_id)
+    purchased["explored_floors"] = [1]
     mine_deeds[key] = purchased.duplicate(true)
     return purchased
 
