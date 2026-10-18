@@ -3,6 +3,7 @@ const ResponsiveDialog = preload("res://scripts/responsive_dialog.gd")
 const BRIGHT_ATLAS = preload("res://assets/casual11/buildings-clean.png")
 const RoadNetwork = preload("res://scripts/road_network.gd")
 const ContinentMap = preload("res://scripts/v3/continent_map.gd")
+const CityLayout = preload("res://scripts/v3/city_layout.gd")
 # Real independent transparent world sprites. Each corresponds to one gameplay entity.
 const WORLD_ART := {
     "mine": preload("res://assets/world/mine.webp"),
@@ -107,6 +108,9 @@ var selected_continent_city := "city_001"
 # Whole-continent overview at startup. The original four-mine map is city_001.
 var view_mode := "continent"
 var continent_map = ContinentMap.new()
+var city_layout = CityLayout.new()
+var region_center := Vector2(19,17)
+var region_zoom := 0.93
 var continent_center := Vector2(512.0,512.0)
 var continent_zoom := 1.0
 var selected_municipal_project := ""
@@ -730,37 +734,43 @@ func tapped_continent(p: Vector2) -> void:
         panel = "continent_city"
         show_panel()
 
+func regional_screen(pos: Vector2) -> Vector2:
+    var rel := pos-region_center
+    return Vector2(size.x*0.50,(top_bar_height()+size.y-bottom_bar_height())*0.5)+Vector2(
+        (rel.x-rel.y)*86.0*region_zoom*0.50,(rel.x+rel.y)*48.0*region_zoom*0.50)
+
+func regional_pan(delta: Vector2) -> void:
+    var scale_x := maxf(1.0,43.0*region_zoom)
+    var scale_y := maxf(1.0,24.0*region_zoom)
+    var a := delta.x/scale_x
+    var b := delta.y/scale_y
+    region_center -= Vector2((a+b)*0.5,(b-a)*0.5)
+    region_center.x = clampf(region_center.x,1,CityLayout.GRID_W-2)
+    region_center.y = clampf(region_center.y,1,CityLayout.GRID_H-2)
+
 func region_hotspots() -> Array:
     if game.campaign_v3 == null:
         return []
     var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
-    if city.is_empty():
+    var city_map: Dictionary = city_layout.build(city)
+    if city_map.is_empty():
         return []
     var sites: Array = []
-    var quantities: Dictionary = city.get("lots",{})
-    var types := ["mine","factory","warehouse","commercial","municipal","energy"]
-    var ids: Array = []
-    for kind in types:
-        for j in range(int(quantities.get(kind,0))):
-            ids.append(kind)
-    var count := mini(ids.size(),24)
-    var columns := 6
-    var width := size.x*0.82
-    var height := size.y-top_bar_height()-bottom_bar_height()-75.0
-    for i in range(count):
-        var row := int(i / columns)
-        var column := i % columns
-        var x := size.x*0.09+(float(column)+0.5)*width/columns
-        var y := top_bar_height()+58.0+(float(row)+0.5)*height/4.0
-        sites.append({"type":ids[i],"screen":Vector2(x,y),
-            "radius":minf(width/columns,height/4.0)*0.38})
+    for lot in city_map["lots"]:
+        var spot := regional_screen(Vector2(lot["pos"]))
+        sites.append({"type":lot["type"],"slot":lot["slot"],"screen":spot,
+            "radius":maxf(28.0,32*region_zoom),"pos":lot["pos"]})
     return sites
 
 func tapped_regional(p: Vector2) -> void:
     for region in region_hotspots():
         var position: Vector2 = region["screen"]
         if position.distance_to(p) < maxf(29.0,float(region["radius"])):
-            panel = "city_mines" if region["type"] == "mine" else "city_projects"
+            if region["type"] == "mine":
+                selected_continent_mine_slot = int(region["slot"])
+                panel = "city_mine_detail"
+            else:
+                panel = "city_projects"
             show_panel()
             return
 
@@ -790,6 +800,8 @@ func _gui_input(event: InputEvent) -> void:
         if panel == "" and contacts.size() == 1 and t.position.y > top_bar_height() and t.position.y < size.y - bottom_bar_height():
             if view_mode == "continent":
                 continent_camera_pan(t.position-old)
+            elif view_mode == "regional":
+                regional_pan(t.position-old)
             elif view_mode == "city":
                 pan(t.position-old)
         elif panel == "" and contacts.size() == 2:
@@ -799,6 +811,8 @@ func _gui_input(event: InputEvent) -> void:
             var ratio := t.position.distance_to(other)/maxf(1.0,old.distance_to(other))
             if view_mode == "continent":
                 set_continent_zoom(continent_zoom*ratio)
+            elif view_mode == "regional":
+                region_zoom = clampf(region_zoom*ratio,0.53,2.0)
             elif view_mode == "city":
                 world_zoom = clampf(world_zoom*ratio,0.5,1.45)
         accept_event()
@@ -807,11 +821,15 @@ func _gui_input(event: InputEvent) -> void:
         if m.button_index == MOUSE_BUTTON_WHEEL_UP and m.pressed:
             if view_mode == "continent":
                 set_continent_zoom(continent_zoom*1.12)
+            elif view_mode == "regional":
+                region_zoom = clampf(region_zoom*1.12,0.53,2.0)
             else:
                 world_zoom = clampf(world_zoom*1.12,0.5,1.45)
         elif m.button_index == MOUSE_BUTTON_WHEEL_DOWN and m.pressed:
             if view_mode == "continent":
                 set_continent_zoom(continent_zoom*0.9)
+            elif view_mode == "regional":
+                region_zoom = clampf(region_zoom*0.9,0.53,2.0)
             else:
                 world_zoom = clampf(world_zoom*0.9,0.5,1.45)
         elif m.button_index == MOUSE_BUTTON_LEFT:
@@ -832,6 +850,8 @@ func _gui_input(event: InputEvent) -> void:
         if did_move and panel == "" and m.position.y > top_bar_height() and m.position.y < size.y - bottom_bar_height():
             if view_mode == "continent":
                 continent_camera_pan(m.position-mouse_last)
+            elif view_mode == "regional":
+                regional_pan(m.position-mouse_last)
             elif view_mode == "city":
                 pan(m.position-mouse_last)
         mouse_last = m.position
@@ -2116,47 +2136,124 @@ func draw_continent() -> void:
     draw_mode_navigation(["ПРОМРАЙОН","ГОРОДА","КОНТРАКТЫ","СОХР."])
 
 func draw_regional_map() -> void:
-    draw_rect(Rect2(Vector2.ZERO,size),Color("#66b67a"))
+    draw_rect(Rect2(Vector2.ZERO,size),Color("#8cc3d7"))
     if game.campaign_v3 == null:
         return
     var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
     if city.is_empty():
         return
-    var top := top_bar_height()
-    var bottom := bottom_bar_height()
-    # Distinct city land lots follow its fixed seed and available site counts.
+    var layout: Dictionary = city_layout.build(city)
+    var t: float = top_bar_height()
+    var b: float = bottom_bar_height()
+    var rx := 43.0*region_zoom
+    var ry := 24.0*region_zoom
+    var ground: Array = layout["terrain"]
+    # Draw individual interactive city terrain diamonds, not the same backdrop per city.
+    var view_top := t
+    var view_bottom := size.y-b
+    for depth in range(CityLayout.GRID_W+CityLayout.GRID_H-1):
+        for x in range(CityLayout.GRID_W):
+            var y := depth-x
+            if y < 0 or y >= CityLayout.GRID_H:
+                continue
+            var p := regional_screen(Vector2(x,y))
+            if p.x < -rx*2 or p.x > size.x+rx*2 or p.y < view_top-ry*3 or p.y > view_bottom+ry*3:
+                continue
+            var cell := str(ground[y][x])
+            var color := Color("#8fcb79") if (x+y)%4 < 2 else Color("#95d180")
+            match cell:
+                "trees": color = Color("#71b979")
+                "flower": color = Color("#aad88b")
+                "stone": color = Color("#a8a693")
+                "water": color = Color("#41b1d6")
+                "field": color = Color("#c7d078")
+                "rock": color = Color("#a3c3a0")
+            draw_colored_polygon(PackedVector2Array([
+                p+Vector2(0,-ry),p+Vector2(rx,0),p+Vector2(0,ry),p+Vector2(-rx,0)]),color)
+            if cell == "trees" and region_zoom > 0.55:
+                draw_circle(p+Vector2(0,-ry*0.45),4.0*region_zoom,Color("#2d8259"))
+            elif cell == "water" and (x+y)%5 == 0:
+                draw_line(p-Vector2(rx*0.33,0),p+Vector2(rx*0.14,ry*0.1),Color("#d5f4ef",0.57),1.4,true)
+    var roads: Dictionary = layout["roads"]
+    var segments: Array = []
+    var nodes: Array = []
+    for id in roads:
+        var parts: PackedStringArray = str(id).split(":")
+        var cell := Vector2i(int(parts[0]),int(parts[1]))
+        var screen := regional_screen(Vector2(cell))
+        if screen.x < -110 or screen.x > size.x+110 or screen.y < view_top-110 or screen.y > view_bottom+110:
+            continue
+        nodes.append(screen)
+        for delta in [Vector2i.RIGHT,Vector2i.DOWN]:
+            if roads.has(city_layout.key(cell.x+delta.x,cell.y+delta.y)):
+                segments.append([screen,regional_screen(Vector2(cell+delta))])
+    # Continuous curb/asphalt passes avoid seams through intersections.
+    for layer in range(2):
+        var width := (18.0 if layer == 0 else 13.0)*region_zoom
+        var color := Color("#d3d9cd") if layer == 0 else Color("#536371")
+        for edge in segments:
+            draw_line(edge[0],edge[1],color,width,true)
+        for center in nodes:
+            draw_circle(center,width*0.5,color)
+    for edge in segments:
+        draw_line(Vector2(edge[0]).lerp(Vector2(edge[1]),0.30),
+            Vector2(edge[0]).lerp(Vector2(edge[1]),0.70),Color("#f4f1df"),maxf(1,1.4*region_zoom),true)
+    # Downtown grows visibly: distinct center plus city-dependent lots, not repeated factories.
+    var civic := regional_screen(Vector2(layout["center"]))
+    if civic.x > -140 and civic.x < size.x+140 and civic.y > view_top-140 and civic.y < view_bottom+140:
+        draw_circle(civic,16*region_zoom,Color("#e8d5a1"))
+        draw_circle(civic,7*region_zoom,Color("#d09b5c"))
+        txt("ЦЕНТР",civic+Vector2(-25,29)*region_zoom,maxi(10,roundi(12*region_zoom)),Color("#183d4b"))
     var sites := region_hotspots()
-    for site in sites:
-        var p: Vector2 = site["screen"]
-        var radius := float(site["radius"])
-        draw_colored_polygon(PackedVector2Array([
-            p+Vector2(0,-radius*0.65),p+Vector2(radius,0),
-            p+Vector2(0,radius*0.65),p+Vector2(-radius,0)
-        ]),Color("#d5d2ad"))
-        var kind := str(site["type"])
-        var art_id := 0
+    sites.sort_custom(func(a,b): return float(a["screen"].y) < float(b["screen"].y))
+    for spot in sites:
+        var p: Vector2 = spot["screen"]
+        if p.x < -100 or p.x > size.x+100 or p.y < view_top-105 or p.y > view_bottom+105:
+            continue
+        var kind := str(spot["type"])
+        var lot := str(spot["slot"]+1)
+        var mine_owned_here := false
+        if kind == "mine":
+            var cid := int(selected_continent_city.trim_prefix("city_").to_int())
+            mine_owned_here = not game.campaign_v3.registered_mine(cid,int(spot["slot"])).is_empty()
+        var radius := clampf(22*region_zoom,13,31)
+        var fill := Color("#7baeb6",0.72)
         match kind:
-            "factory": art_id = 1
-            "warehouse": art_id = 2
-            "commercial","municipal": art_id = 3
-            "energy": art_id = 1
-            _: art_id = 0
-        var pic := radius*1.95
-        var source := Rect2(float(art_id%4)*320.0,float(int(art_id/4))*320.0,320,320)
-        draw_texture_rect_region(BRIGHT_ATLAS,Rect2(p.x-pic*0.50,p.y-pic*0.88,pic,pic),source,
-            Color(1,1,1,0.84))
-    draw_rect(Rect2(0,0,size.x,top),Color("#082b3e",0.96))
-    txt("DAILYCORP  /  %s" % city["name"],Vector2(20,32),
-        clampi(roundi(size.x*0.020),16,25),Color.WHITE)
+            "mine": fill = Color("#9a9582",0.82)
+            "factory": fill = Color("#cf9c71",0.80)
+            "warehouse": fill = Color("#5b9ec4",0.84)
+            "commercial": fill = Color("#e2bd79",0.78)
+            "municipal": fill = Color("#9ec7a5",0.78)
+            "energy": fill = Color("#b5b2d2",0.78)
+        draw_colored_polygon(PackedVector2Array([p+Vector2(0,-radius*0.53),
+            p+Vector2(radius,0),p+Vector2(0,radius*0.53),p+Vector2(-radius,0)]),fill)
+        var owned := mine_owned_here
+        if owned or kind == "municipal" or kind == "commercial":
+            var sprite: Texture2D = WORLD_ART.get("mine" if kind=="mine" else ("market" if kind=="municipal" or kind=="commercial" else "warehouse"),null)
+            if sprite != null:
+                var width := clampf(78*region_zoom,42,110)
+                draw_texture_rect(sprite,Rect2(p.x-width*0.5,p.y-width*0.84,width,width),false,
+                    Color(1,1,1,0.93))
+        else:
+            draw_circle(p,4.2*region_zoom,Color("#f6ffff"))
+        if region_zoom > 0.60:
+            var title := {"mine":"ШАХТА","factory":"ЗАВОД","warehouse":"СКЛАД",
+                "commercial":"ТОРГОВЛЯ","municipal":"ГОРОД","energy":"ЭНЕРГИЯ"}.get(kind,"УЧАСТОК")
+            var bounds := Rect2(p.x-43*region_zoom,p.y+radius*0.51,86*region_zoom,21*region_zoom)
+            draw_rect(bounds,Color("#103449",0.90))
+            txt("%s %s" % [title,lot],bounds.position+Vector2(5,14)*region_zoom,
+                maxi(9,roundi(11*region_zoom)),Color.WHITE)
+    draw_rect(Rect2(0,0,size.x,t),Color("#082b3e",0.96))
+    txt("DAILYCORP / "+str(city["name"]),Vector2(20,32),clampi(roundi(size.x*0.020),16,25),Color.WHITE)
     var info: Dictionary = game.campaign_v3.city_economy.city_record(city)
-    txt("%s   ·   НАСЕЛЕНИЕ %d   ·   БЮДЖЕТ %d ₽" %
-        [city["specialization"],info["population"],info["budget"]],
-        Vector2(20,top-15),clampi(roundi(size.x*0.014),11,18),Color("#d2e5d4"))
+    txt("%s · ЖИТЕЛИ %d · БЮДЖЕТ %d ₽ · УЧАСТКОВ %d" %
+        [city["specialization"],info["population"],info["budget"],layout["lots"].size()],
+        Vector2(20,t-15),clampi(roundi(size.x*0.013),11,17),Color("#d2e5d4"))
     rounded_plate(continent_city_button(),Color("#184968"),Color("#72b9d0"),10)
     txt("← КОНТИНЕНТ",continent_city_button().position+Vector2(10,25),14,Color.WHITE)
-    draw_rect(Rect2(0,size.y-bottom,size.x,bottom),Color("#08283e",0.97))
-    txt("Свободные площадки города: коснись шахты или зоны муниципальных проектов.",
-        Vector2(16,size.y-bottom-12),clampi(roundi(size.x*0.012),10,14),Color("#f4f2e5"))
+    draw_rect(Rect2(0,size.y-b,size.x,b),Color("#08283e",0.97))
+    txt("Уникальная карта города · двигай и масштабируй · выбери участок",
+        Vector2(16,size.y-b-12),clampi(roundi(size.x*0.012),10,14),Color("#f4f2e5"))
     draw_mode_navigation(["КОНТИНЕНТ","ШАХТЫ","КОНТРАКТЫ","СОХР."])
 
 func draw_mode_navigation(names: Array) -> void:
