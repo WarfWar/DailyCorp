@@ -123,6 +123,7 @@ func build(city: Dictionary) -> Dictionary:
         residential.append({"pos":pos,"style":rng.randi_range(0,3),
             "floors":rng.randi_range(2,6) if special == "metropolis" else rng.randi_range(1,3)})
 
+    var neighborhood: Array = []
     for y in range(GRID_H):
         var line: Array = []
         for x in range(GRID_W):
