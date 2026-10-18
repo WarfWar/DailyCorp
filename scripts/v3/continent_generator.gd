@@ -1,4 +1,6 @@
 extends RefCounted
+const ContentRegistry = preload("res://scripts/v3/content_registry.gd")
+var content_registry = ContentRegistry.new()
 ## DailyCorp 3.0 — persistent procedural world data, independent from any scene.
 ## No 1024x1024 terrain array is kept in memory; chunks and mine floors are lazy.
 const WIDTH := 1024
@@ -159,7 +161,12 @@ func mineral_cell(mine: Dictionary,floor_index: int,x: int,y: int) -> Dictionary
     var grade_index := 0 if rng.randf() < 0.30 else (2 if rng.randf() > 0.82 else 1)
     var amount := rng.randi_range(7,175)
     var depth_bonus := 1.0+float(floor_index)/maxf(1.0,float(mine["depth"]))*1.3
+    var actual: Dictionary = content_registry.mineral_for_depth(base,floor_index,
+        grades[grade_index],rng.randi_range(0,999999))
+    if actual.is_empty():
+        return {"type":"rock","units":0}
     return {"type":"ore","family":base,"grade":grades[grade_index],
+        "item_id":actual["id"],"mineral_id":actual["mineral_id"],
         "units":maxi(1,roundi(float(amount)*depth_bonus*float(mine["richness"])))}
 
 func generate_mine_floor(mine: Dictionary,floor_index: int) -> Dictionary:
