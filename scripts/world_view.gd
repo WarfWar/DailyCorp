@@ -2278,6 +2278,26 @@ func draw_continent() -> void:
         clampi(roundi(size.x*0.011),10,14),Color("#b6d9df"))
     draw_mode_navigation(["ПРОМРАЙОН","ГОРОДА","КОНТРАКТЫ","СОХР."])
 
+func draw_regional_house(p: Vector2,style: int,floors: int) -> void:
+    var scale := region_zoom
+    var w := 11.0*scale
+    var h := 5.5*scale
+    var height := (5.0+float(floors)*5.0)*scale
+    var pale := [Color("#ffeed1"),Color("#dcebf2"),Color("#f2d9c6"),
+        Color("#d6e8d5")][posmod(style,4)]
+    var roof := [Color("#b85845"),Color("#456e9a"),Color("#bf7d45"),
+        Color("#5d7d72")][posmod(style,4)]
+    draw_colored_polygon(PackedVector2Array([
+        p+Vector2(-w,0),p+Vector2(0,h),p+Vector2(0,h-height),p+Vector2(-w,-height)]),
+        pale.darkened(0.18))
+    draw_colored_polygon(PackedVector2Array([
+        p+Vector2(0,h),p+Vector2(w,0),p+Vector2(w,-height),p+Vector2(0,h-height)]),pale)
+    draw_colored_polygon(PackedVector2Array([
+        p+Vector2(0,-h-height),p+Vector2(w,-height),
+        p+Vector2(0,h-height),p+Vector2(-w,-height)]),roof)
+    draw_line(p+Vector2(-w*0.45,-height*0.44),p+Vector2(-w*0.45,-height*0.16),
+        Color("#7398a8"),2.4*scale,true)
+
 func draw_regional_map() -> void:
     draw_rect(Rect2(Vector2.ZERO,size),Color("#8cc3d7"))
     if game.campaign_v3 == null:
@@ -2347,6 +2367,11 @@ func draw_regional_map() -> void:
         draw_circle(civic,16*region_zoom,Color("#e8d5a1"))
         draw_circle(civic,7*region_zoom,Color("#d09b5c"))
         txt("ЦЕНТР",civic+Vector2(-25,29)*region_zoom,maxi(10,roundi(12*region_zoom)),Color("#183d4b"))
+    for home in layout.get("residential",[]):
+        var house_position: Vector2 = regional_screen(Vector2(home["pos"]))
+        if house_position.x < -70 or house_position.x > size.x+70 or house_position.y < view_top-70 or house_position.y > view_bottom+70:
+            continue
+        draw_regional_house(house_position,int(home["style"]),int(home["floors"]))
     var sites := region_hotspots()
     sites.sort_custom(func(a,b): return float(a["screen"].y) < float(b["screen"].y))
     for spot in sites:
