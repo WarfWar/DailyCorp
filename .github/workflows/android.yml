@@ -209,6 +209,15 @@ jobs:
             exit 1
           fi
 
+      - name: Verify whole-continent startup map and regional navigation
+        run: |
+          set -o pipefail
+          timeout 90s godot --headless --path . --script res://tests/v3_continent_map_smoke.gd 2>&1 | tee /tmp/v3-continent-map.log
+          grep -q "CONTINENT MAP PASSED" /tmp/v3-continent-map.log
+          if grep -E "SCRIPT ERROR|Parse Error|CONTINENT MAP FAILED" /tmp/v3-continent-map.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
