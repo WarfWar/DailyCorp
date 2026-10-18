@@ -104,6 +104,9 @@ var selected_slot := 0
 var selected_plot := 0
 var selected_continent_city := "city_001"
 var selected_municipal_project := ""
+var selected_continent_mine_slot := 0
+var selected_continent_floor := 1
+var selected_continent_ore_cursor := 0
 var city_list_offset := 0
 var purchase_effect_plot := -1
 var purchase_effect_time := 0.0
@@ -381,6 +384,76 @@ func show_panel() -> void:
                         lines.append("Пока нет открытых проектов. Развивай технологии.")
                     for project in offers:
                         lines.append("%s — %d ₽" % [project["name_ru"],project["reward_money_base"]])
+        "city_mines":
+            var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
+            title = "Геология · "+str(city.get("name","город"))
+            if city.is_empty():
+                lines = ["Город не найден."]
+            else:
+                var city_id := int(selected_continent_city.trim_prefix("city_").to_int())
+                var max_sites := int(city.get("lots",{}).get("mine",0))
+                lines = ["Доступные месторождения: %d" % max_sites,
+                    "Глубина и перечень минералов закрепляются после покупки.",
+                    "Каждый этаж содержит конечные случайные запасы руды.",
+                    "Геология сохраняется при загрузке игры."]
+                for j in range(max_sites):
+                    var deed: Dictionary = game.campaign_v3.registered_mine(city_id,j)
+                    var caption := "КУПЛЕНА · глубина %d" % deed["depth"] if not deed.is_empty() else "%d ₽" % game.campaign_v3.mine_purchase_cost(city_id,j)
+                    lines.append("Участок %02d: %s" % [j+1,caption])
+        "city_mine_detail":
+            var city_id := int(selected_continent_city.trim_prefix("city_").to_int())
+            var deed: Dictionary = game.campaign_v3.registered_mine(city_id,selected_continent_mine_slot)
+            title = "Шахта · участок %02d" % (selected_continent_mine_slot+1)
+            if deed.is_empty():
+                lines = ["Предварительная разведка: перспективное месторождение.",
+                    "Стоимость: %d ₽" % game.campaign_v3.mine_purchase_cost(city_id,selected_continent_mine_slot),
+                    "Точная глубина и минералы откроются после покупки.",
+                    "Все параметры шахты будут постоянными."]
+            else:
+                lines = ["Глубина: %d этажей" % deed["depth"],
+                    "Геологическая насыщенность: %.2f" % float(deed["richness"]),
+                    "Водоносность: %.2f" % float(deed["water_index"]),
+                    "Обнаружено семейств: %d" % deed["families"].size(),
+                    "Исследовано этажей: %d" % deed.get("explored_floors",[]).size(),
+                    "Добыча на каждом участке истощает конкретную жилу."]
+        "city_mine_floor":
+            var city_id := int(selected_continent_city.trim_prefix("city_").to_int())
+            var deed: Dictionary = game.campaign_v3.registered_mine(city_id,selected_continent_mine_slot)
+            title = "Шахта · этаж %d" % selected_continent_floor
+            if deed.is_empty():
+                lines = ["Шахта не приобретена."]
+            else:
+                var targets: Array = game.campaign_v3.mine_floor_targets(city_id,
+                    selected_continent_mine_slot,selected_continent_floor,6)
+                lines = ["Этаж %d из %d" % [selected_continent_floor,deed["depth"]],
+                    "Всего видов минералов в игре: %d" % game.campaign_v3.generator.content_registry.ores.size(),
+                    "Склад континента: %d позиций" % game.campaign_v3.catalog_stock.size()]
+                if targets.is_empty():
+                    lines.append("Доступные жилы истощены или не обнаружены.")
+                else:
+                    selected_continent_ore_cursor = posmod(selected_continent_ore_cursor,targets.size())
+                    var target: Dictionary = targets[selected_continent_ore_cursor]
+                    var ore: Dictionary = game.campaign_v3.generator.content_registry.ores.get(str(target["item_id"]),{})
+                    lines.append("Жила %d / %d · (%d,%d)" % [selected_continent_ore_cursor+1,targets.size(),target["x"],target["y"]])
+                    lines.append("Руда: "+str(ore.get("name_ru",target["item_id"])))
+                    lines.append("Качество: "+str(target["grade"]))
+                    lines.append("Запас клетки: %d / %d" % [target["remaining"],target["total"]])
+                lines.append("Бурение следующего этажа: %d ₽" % game.campaign_v3.next_floor_cost(selected_continent_floor))
+        "city_materials":
+            title = "Континентальный склад сырья"
+            var inventory: Dictionary = game.campaign_v3.catalog_stock
+            lines = ["Это отдельный склад для сотен новых типов руд.",
+                "Добытые минералы сохраняются вместе с кампанией.",
+                "Видов материалов: %d" % inventory.size()]
+            var total := 0
+            var ids: Array = inventory.keys()
+            ids.sort()
+            for item_id in ids:
+                total += int(inventory[item_id])
+                if lines.size() < 23:
+                    var ore: Dictionary = game.campaign_v3.generator.content_registry.ores.get(str(item_id),{})
+                    lines.append("%s: %d" % [ore.get("name_ru",str(item_id)),int(inventory[item_id])])
+            lines.insert(3,"Всего единиц: %d" % total)
         "city_project_details":
             title = "Муниципальный заказ"
             if game.campaign_v3 == null:
@@ -766,8 +839,23 @@ func buttons() -> Array:
             var projects: Array = []
             for item in game.campaign_v3.city_contracts(selected_continent_city):
                 projects.append(str(item["name_ru"]))
+            projects.append("ШАХТЫ РЕГИОНА")
+            projects.append("СКЛАД КОНТИНЕНТА")
             projects.append("НАЗАД")
             return projects
+        "city_mines":
+            var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
+            var entries: Array = []
+            for j in range(int(city.get("lots",{}).get("mine",0))):
+                entries.append("МЕСТОРОЖДЕНИЕ %02d" % (j+1))
+            entries.append("НАЗАД")
+            return entries
+        "city_mine_detail":
+            var city_id := int(selected_continent_city.trim_prefix("city_").to_int())
+            var deed: Dictionary = game.campaign_v3.registered_mine(city_id,selected_continent_mine_slot)
+            return ["КУПИТЬ МЕСТОРОЖДЕНИЕ","НАЗАД"] if deed.is_empty() else ["СПУСТИТЬСЯ В ШАХТУ","НАЗАД"]
+        "city_mine_floor": return ["ДОБЫТЬ 1 ЕД.","СЛЕДУЮЩАЯ ЖИЛА","ЭТАЖ ВВЕРХ","ВНИЗ / ПРОБУРИТЬ","НАЗАД"]
+        "city_materials": return ["НАЗАД"]
         "city_project_details": return ["СДАТЬ МАТЕРИАЛЫ И ЗАВЕРШИТЬ","НАЗАД"]
         "assets": return ["К КАРТЕ","ТОРГОВЛЯ","КАЗАРМА","АНГАР","КОНТРАКТЫ","ИССЛЕДОВАНИЯ"]
         "research":
@@ -1025,8 +1113,76 @@ func action(i: int) -> void:
                 if i < offered.size():
                     selected_municipal_project = str(offered[i]["id"])
                     panel = "city_project_details"
+                elif i == offered.size():
+                    panel = "city_mines"
+                elif i == offered.size()+1:
+                    panel = "city_materials"
                 else:
                     panel = "cities"
+        "city_mines":
+            var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
+            var max_sites := int(city.get("lots",{}).get("mine",0))
+            if i >= 0 and i < max_sites:
+                selected_continent_mine_slot = i
+                panel = "city_mine_detail"
+            else:
+                panel = "city_projects"
+        "city_mine_detail":
+            var city_id := int(selected_continent_city.trim_prefix("city_").to_int())
+            var deed: Dictionary = game.campaign_v3.registered_mine(city_id,selected_continent_mine_slot)
+            if i == 1:
+                panel = "city_mines"
+            elif deed.is_empty():
+                var result: Dictionary = game.campaign_v3.purchase_mine(city_id,
+                    selected_continent_mine_slot,game.cash)
+                if result.get("ok",false):
+                    game.cash = int(result["cash"])
+                    pop("Новая шахта! Глубина: %d этажей" % result["mine"]["depth"])
+                    game.save_game()
+                else:
+                    pop("Покупка недоступна: "+str(result.get("reason","нет денег")))
+            else:
+                selected_continent_floor = 1
+                selected_continent_ore_cursor = 0
+                panel = "city_mine_floor"
+        "city_mine_floor":
+            var city_id := int(selected_continent_city.trim_prefix("city_").to_int())
+            var targets: Array = game.campaign_v3.mine_floor_targets(city_id,
+                selected_continent_mine_slot,selected_continent_floor,6)
+            if i == 0:
+                if targets.is_empty():
+                    pop("На этом этаже нет доступной руды.")
+                else:
+                    var target: Dictionary = targets[posmod(selected_continent_ore_cursor,targets.size())]
+                    var result: Dictionary = game.campaign_v3.extract_to_company_stock(city_id,
+                        selected_continent_mine_slot,selected_continent_floor,
+                        int(target["x"]),int(target["y"]))
+                    if result.get("ok",false):
+                        pop("Добыто 1 ед. · остаток %d" % result["remaining"])
+                        game.save_game()
+                    else:
+                        pop("Добыча недоступна: "+str(result.get("reason","исчерпано")))
+            elif i == 1:
+                selected_continent_ore_cursor += 1
+            elif i == 2:
+                selected_continent_floor = maxi(1,selected_continent_floor-1)
+                selected_continent_ore_cursor = 0
+            elif i == 3:
+                var drill: Dictionary = game.campaign_v3.unlock_next_floor(city_id,
+                    selected_continent_mine_slot,selected_continent_floor,game.cash)
+                if drill.get("ok",false):
+                    game.cash = int(drill["cash"])
+                    selected_continent_floor = int(drill["floor"])
+                    selected_continent_ore_cursor = 0
+                    if int(drill.get("cost",0)) > 0:
+                        pop("Новый этаж разведан!")
+                        game.save_game()
+                else:
+                    pop("Не удалось бурение: "+str(drill.get("reason","лимит")))
+            else:
+                panel = "city_mine_detail"
+        "city_materials":
+            panel = "city_projects"
         "city_project_details":
             if i == 0 and game.campaign_v3 != null:
                 var completion: Dictionary = game.campaign_v3.try_company_municipal_contract(
