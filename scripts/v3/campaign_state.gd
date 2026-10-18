@@ -11,6 +11,7 @@ var cities: Array = []
 var mine_deeds: Dictionary = {}
 var region_discoveries: Dictionary = {}
 var municipal_projects: Dictionary = {}
+var catalog_stock: Dictionary = {}
 
 func initialize(saved: Dictionary = {}) -> void:
     seed = maxi(1,int(saved.get("world_seed",1182403)))
@@ -23,6 +24,7 @@ func initialize(saved: Dictionary = {}) -> void:
             mine_deeds[str(key)] = saved_mines[key].duplicate(true)
     region_discoveries = saved.get("region_discoveries",{}).duplicate(true)
     municipal_projects = saved.get("municipal_projects",{}).duplicate(true)
+    catalog_stock = saved.get("catalog_stock",{}).duplicate(true)
     city_economy.initialize(seed,saved.get("city_economy",{}))
     technology.load_definitions()
     technology.import_state(saved.get("technology",{}))
@@ -31,6 +33,7 @@ func save_snapshot() -> Dictionary:
     return {"schema":1,"world_seed":seed,"city_target":cities.size(),
         "mine_deeds":mine_deeds.duplicate(true),"region_discoveries":region_discoveries.duplicate(true),
         "municipal_projects":municipal_projects.duplicate(true),
+        "catalog_stock":catalog_stock.duplicate(true),
         "city_economy":city_economy.export_state(),
         "technology":technology.export_state()}
 
@@ -77,6 +80,14 @@ func city_contracts(city_id: String,limit: int = 6) -> Array:
     if city.is_empty():
         return []
     return city_economy.offers(city,technology.current_epoch(),limit)
+
+func try_company_municipal_contract(city_id: String,project_id: String) -> Dictionary:
+    # The upcoming continent has its own wide catalog stock; the existing
+    # eight material demo economy must not be replaced by 300+ incompatible IDs.
+    var result: Dictionary = complete_municipal_contract(city_id,project_id,catalog_stock)
+    if bool(result.get("ok",false)):
+        catalog_stock = (result["stock"] as Dictionary).duplicate(true)
+    return result
 
 func complete_municipal_contract(city_id: String,project_id: String,stock: Dictionary) -> Dictionary:
     # Strict atomic contract entry: no reward is applied until every input exists.
