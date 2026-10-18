@@ -40,8 +40,15 @@ func _check() -> void:
     var item: String = str(task["key"])
     game.stock[item] = int(task["quantity"])
     var science_before: int = science.science_points
-    if not game.operations.fulfill_contract():
-        fail("Municipal contract could not be completed")
+    # Contracts now require delivery from a warehouse using an assigned truck.
+    var assignment := game.operations.configure_truck(1,"warehouse",3,"contract",0,item)
+    if not assignment.get("ok",false):
+        fail("No warehouse-to-contract shipment available")
+        return
+    for step in range(24):
+        game.operations.process_transport(100.0)
+    if not game.operations.completed_contracts.has(0):
+        fail("Contract cargo never reached delivery point")
         return
     if science.science_points != science_before+40:
         fail("Real city contract did not award science")
