@@ -770,7 +770,7 @@ func _draw() -> void:
     var narrow := size.x < 560 or size.y < 700
     write("DAILYCORP" if narrow else "DAILYCORP / ШАХТА",Vector2(16,30 if narrow else 42),20 if narrow else 26,GOLDEN)
     if not narrow:
-        write("АЛЬФА 0.13",Vector2(size.x-150,38),15,MUTED)
+        write("АЛЬФА 0.15",Vector2(size.x-150,38),15,MUTED)
     write("₽ %d" % cash,Vector2(16,65 if narrow else 92),22 if narrow else 29,GOLDEN)
     var sum := 0
     for amount in stock.values():
