@@ -1,0 +1,699 @@
+{
+  "schema_version": 3,
+  "game": "DailyCorp",
+  "spec_status": "design-proposal",
+  "world": {
+    "mode": "persistent_seeded_continent",
+    "size": [
+      1024,
+      1024
+    ],
+    "chunk_size": 32,
+    "city_count": [
+      36,
+      72
+    ],
+    "mine_floor_size": [
+      48,
+      48
+    ],
+    "mine_depth_floor_range": [
+      12,
+      80
+    ],
+    "mine_depth_fixed_at_purchase": true,
+    "lazy_chunks": true
+  },
+  "technology": {
+    "epoch_count": 10,
+    "building_level_count": 10,
+    "epochs": [
+      {
+        "level": 1,
+        "id": "frontier",
+        "name_ru": "Первопроходцы",
+        "new_mechanics_ru": "Ручная добыча, небольшие склады и торговля",
+        "milestone": "deliver_ore"
+      },
+      {
+        "level": 2,
+        "id": "mechanization",
+        "name_ru": "Механизация",
+        "new_mechanics_ru": "Буровые установки, карьерная техника и геологоразведка",
+        "milestone": "prospect_mines"
+      },
+      {
+        "level": 3,
+        "id": "electrification",
+        "name_ru": "Электрификация",
+        "new_mechanics_ru": "Генераторы, сетевые подключения и электродвигатели",
+        "milestone": "grid_connection"
+      },
+      {
+        "level": 4,
+        "id": "metallurgy",
+        "name_ru": "Металлургическая эра",
+        "new_mechanics_ru": "Плавка сплавов, литейные цеха и непрерывное производство",
+        "milestone": "alloy_furnace"
+      },
+      {
+        "level": 5,
+        "id": "chemistry",
+        "name_ru": "Химическая индустрия",
+        "new_mechanics_ru": "Нефтепереработка, химия и удобрения",
+        "milestone": "chemical_processing"
+      },
+      {
+        "level": 6,
+        "id": "engineering",
+        "name_ru": "Машиностроение",
+        "new_mechanics_ru": "Двигатели, сборка грузовиков, железные дороги и порты",
+        "milestone": "vehicle_manufacturing"
+      },
+      {
+        "level": 7,
+        "id": "automation",
+        "name_ru": "Автоматизация",
+        "new_mechanics_ru": "Роботы, управляемые конвейеры, умные склады",
+        "milestone": "robotics"
+      },
+      {
+        "level": 8,
+        "id": "digital",
+        "name_ru": "Цифровая индустрия",
+        "new_mechanics_ru": "Микросхемы, датчики, центры обработки данных",
+        "milestone": "semiconductors"
+      },
+      {
+        "level": 9,
+        "id": "advanced",
+        "name_ru": "Высокие технологии",
+        "new_mechanics_ru": "Редкоземельные сплавы, новые типы энергии",
+        "milestone": "advanced_materials"
+      },
+      {
+        "level": 10,
+        "id": "future",
+        "name_ru": "Корпорация будущего",
+        "new_mechanics_ru": "Мегазаводы, автономная логистика, континентальные проекты",
+        "milestone": "corporate_megaproject"
+      }
+    ],
+    "research_nodes": [
+      {
+        "id": "epoch.frontier",
+        "name_ru": "Первопроходцы",
+        "epoch": 1,
+        "science_cost": 0,
+        "requirements": [],
+        "visible": true,
+        "desc_ru": "Ручная добыча, небольшие склады и торговля"
+      },
+      {
+        "id": "epoch.mechanization",
+        "name_ru": "Механизация",
+        "epoch": 2,
+        "science_cost": 200,
+        "requirements": [
+          "epoch.frontier",
+          "research.prospect_mines"
+        ],
+        "visible": true,
+        "desc_ru": "Буровые установки, карьерная техника и геологоразведка"
+      },
+      {
+        "id": "research.prospect_mines",
+        "name_ru": "Программа: Механизация",
+        "epoch": 1,
+        "science_cost": 58,
+        "requirements": [
+          "epoch.frontier"
+        ],
+        "visible": true
+      },
+      {
+        "id": "epoch.electrification",
+        "name_ru": "Электрификация",
+        "epoch": 3,
+        "science_cost": 550,
+        "requirements": [
+          "epoch.mechanization",
+          "research.grid_connection"
+        ],
+        "visible": true,
+        "desc_ru": "Генераторы, сетевые подключения и электродвигатели"
+      },
+      {
+        "id": "research.grid_connection",
+        "name_ru": "Программа: Электрификация",
+        "epoch": 2,
+        "science_cost": 160,
+        "requirements": [
+          "epoch.mechanization"
+        ],
+        "visible": true
+      },
+      {
+        "id": "epoch.metallurgy",
+        "name_ru": "Металлургическая эра",
+        "epoch": 4,
+        "science_cost": 950,
+        "requirements": [
+          "epoch.electrification",
+          "research.alloy_furnace"
+        ],
+        "visible": true,
+        "desc_ru": "Плавка сплавов, литейные цеха и непрерывное производство"
+      },
+      {
+        "id": "research.alloy_furnace",
+        "name_ru": "Программа: Металлургическая эра",
+        "epoch": 3,
+        "science_cost": 276,
+        "requirements": [
+          "epoch.electrification"
+        ],
+        "visible": true
+      },
+      {
+        "id": "epoch.chemistry",
+        "name_ru": "Химическая индустрия",
+        "epoch": 5,
+        "science_cost": 1600,
+        "requirements": [
+          "epoch.metallurgy",
+          "research.chemical_processing"
+        ],
+        "visible": true,
+        "desc_ru": "Нефтепереработка, химия и удобрения"
+      },
+      {
+        "id": "research.chemical_processing",
+        "name_ru": "Программа: Химическая индустрия",
+        "epoch": 4,
+        "science_cost": 464,
+        "requirements": [
+          "epoch.metallurgy"
+        ],
+        "visible": true
+      },
+      {
+        "id": "epoch.engineering",
+        "name_ru": "Машиностроение",
+        "epoch": 6,
+        "science_cost": 2600,
+        "requirements": [
+          "epoch.chemistry",
+          "research.vehicle_manufacturing"
+        ],
+        "visible": true,
+        "desc_ru": "Двигатели, сборка грузовиков, железные дороги и порты"
+      },
+      {
+        "id": "research.vehicle_manufacturing",
+        "name_ru": "Программа: Машиностроение",
+        "epoch": 5,
+        "science_cost": 754,
+        "requirements": [
+          "epoch.chemistry"
+        ],
+        "visible": true
+      },
+      {
+        "id": "epoch.automation",
+        "name_ru": "Автоматизация",
+        "epoch": 7,
+        "science_cost": 4000,
+        "requirements": [
+          "epoch.engineering",
+          "research.robotics"
+        ],
+        "visible": true,
+        "desc_ru": "Роботы, управляемые конвейеры, умные склады"
+      },
+      {
+        "id": "research.robotics",
+        "name_ru": "Программа: Автоматизация",
+        "epoch": 6,
+        "science_cost": 1160,
+        "requirements": [
+          "epoch.engineering"
+        ],
+        "visible": true
+      },
+      {
+        "id": "epoch.digital",
+        "name_ru": "Цифровая индустрия",
+        "epoch": 8,
+        "science_cost": 6500,
+        "requirements": [
+          "epoch.automation",
+          "research.semiconductors"
+        ],
+        "visible": true,
+        "desc_ru": "Микросхемы, датчики, центры обработки данных"
+      },
+      {
+        "id": "research.semiconductors",
+        "name_ru": "Программа: Цифровая индустрия",
+        "epoch": 7,
+        "science_cost": 1885,
+        "requirements": [
+          "epoch.automation"
+        ],
+        "visible": true
+      },
+      {
+        "id": "epoch.advanced",
+        "name_ru": "Высокие технологии",
+        "epoch": 9,
+        "science_cost": 9500,
+        "requirements": [
+          "epoch.digital",
+          "research.advanced_materials"
+        ],
+        "visible": true,
+        "desc_ru": "Редкоземельные сплавы, новые типы энергии"
+      },
+      {
+        "id": "research.advanced_materials",
+        "name_ru": "Программа: Высокие технологии",
+        "epoch": 8,
+        "science_cost": 2755,
+        "requirements": [
+          "epoch.digital"
+        ],
+        "visible": true
+      },
+      {
+        "id": "epoch.future",
+        "name_ru": "Корпорация будущего",
+        "epoch": 10,
+        "science_cost": 14500,
+        "requirements": [
+          "epoch.advanced",
+          "research.corporate_megaproject"
+        ],
+        "visible": true,
+        "desc_ru": "Мегазаводы, автономная логистика, континентальные проекты"
+      },
+      {
+        "id": "research.corporate_megaproject",
+        "name_ru": "Программа: Корпорация будущего",
+        "epoch": 9,
+        "science_cost": 4205,
+        "requirements": [
+          "epoch.advanced"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.geology.surveyor_drones",
+        "branch": "geology",
+        "epoch": 1,
+        "science_cost": 70,
+        "name_ru": "surveyor drones",
+        "requirements": [
+          "epoch.frontier"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.geology.deep_drilling",
+        "branch": "geology",
+        "epoch": 3,
+        "science_cost": 280,
+        "name_ru": "deep drilling",
+        "requirements": [
+          "research.geology.surveyor_drones"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.geology.seismic_model",
+        "branch": "geology",
+        "epoch": 5,
+        "science_cost": 630,
+        "name_ru": "seismic model",
+        "requirements": [
+          "research.geology.deep_drilling"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.geology.rare_ores",
+        "branch": "geology",
+        "epoch": 7,
+        "science_cost": 1120,
+        "name_ru": "rare ores",
+        "requirements": [
+          "research.geology.seismic_model"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.mining.mine_ventilation",
+        "branch": "mining",
+        "epoch": 1,
+        "science_cost": 70,
+        "name_ru": "mine ventilation",
+        "requirements": [
+          "epoch.frontier"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.mining.heavy_drills",
+        "branch": "mining",
+        "epoch": 3,
+        "science_cost": 280,
+        "name_ru": "heavy drills",
+        "requirements": [
+          "research.mining.mine_ventilation"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.mining.safe_explosives",
+        "branch": "mining",
+        "epoch": 5,
+        "science_cost": 630,
+        "name_ru": "safe explosives",
+        "requirements": [
+          "research.mining.heavy_drills"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.mining.mining_ai",
+        "branch": "mining",
+        "epoch": 7,
+        "science_cost": 1120,
+        "name_ru": "mining ai",
+        "requirements": [
+          "research.mining.safe_explosives"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.logistics.route_scheduling",
+        "branch": "logistics",
+        "epoch": 1,
+        "science_cost": 70,
+        "name_ru": "route scheduling",
+        "requirements": [
+          "epoch.frontier"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.logistics.rail_freight",
+        "branch": "logistics",
+        "epoch": 3,
+        "science_cost": 280,
+        "name_ru": "rail freight",
+        "requirements": [
+          "research.logistics.route_scheduling"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.logistics.port_operations",
+        "branch": "logistics",
+        "epoch": 5,
+        "science_cost": 630,
+        "name_ru": "port operations",
+        "requirements": [
+          "research.logistics.rail_freight"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.logistics.autonomous_fleet",
+        "branch": "logistics",
+        "epoch": 7,
+        "science_cost": 1120,
+        "name_ru": "autonomous fleet",
+        "requirements": [
+          "research.logistics.port_operations"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.industry.steelmaking",
+        "branch": "industry",
+        "epoch": 1,
+        "science_cost": 70,
+        "name_ru": "steelmaking",
+        "requirements": [
+          "epoch.frontier"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.industry.chemical_synthesis",
+        "branch": "industry",
+        "epoch": 3,
+        "science_cost": 280,
+        "name_ru": "chemical synthesis",
+        "requirements": [
+          "research.industry.steelmaking"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.industry.precision_tools",
+        "branch": "industry",
+        "epoch": 5,
+        "science_cost": 630,
+        "name_ru": "precision tools",
+        "requirements": [
+          "research.industry.chemical_synthesis"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.industry.nanofabrication",
+        "branch": "industry",
+        "epoch": 7,
+        "science_cost": 1120,
+        "name_ru": "nanofabrication",
+        "requirements": [
+          "research.industry.precision_tools"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.cities.urban_planning",
+        "branch": "cities",
+        "epoch": 1,
+        "science_cost": 70,
+        "name_ru": "urban planning",
+        "requirements": [
+          "epoch.frontier"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.cities.water_purification",
+        "branch": "cities",
+        "epoch": 3,
+        "science_cost": 280,
+        "name_ru": "water purification",
+        "requirements": [
+          "research.cities.urban_planning"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.cities.mass_transit",
+        "branch": "cities",
+        "epoch": 5,
+        "science_cost": 630,
+        "name_ru": "mass transit",
+        "requirements": [
+          "research.cities.water_purification"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.cities.megacity_projects",
+        "branch": "cities",
+        "epoch": 7,
+        "science_cost": 1120,
+        "name_ru": "megacity projects",
+        "requirements": [
+          "research.cities.mass_transit"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.energy.thermal_grid",
+        "branch": "energy",
+        "epoch": 1,
+        "science_cost": 70,
+        "name_ru": "thermal grid",
+        "requirements": [
+          "epoch.frontier"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.energy.renewable_power",
+        "branch": "energy",
+        "epoch": 3,
+        "science_cost": 280,
+        "name_ru": "renewable power",
+        "requirements": [
+          "research.energy.thermal_grid"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.energy.smart_grid",
+        "branch": "energy",
+        "epoch": 5,
+        "science_cost": 630,
+        "name_ru": "smart grid",
+        "requirements": [
+          "research.energy.renewable_power"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.energy.fusion_pilot",
+        "branch": "energy",
+        "epoch": 7,
+        "science_cost": 1120,
+        "name_ru": "fusion pilot",
+        "requirements": [
+          "research.energy.smart_grid"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.ecology.tailings_recycling",
+        "branch": "ecology",
+        "epoch": 1,
+        "science_cost": 70,
+        "name_ru": "tailings recycling",
+        "requirements": [
+          "epoch.frontier"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.ecology.carbon_capture",
+        "branch": "ecology",
+        "epoch": 3,
+        "science_cost": 280,
+        "name_ru": "carbon capture",
+        "requirements": [
+          "research.ecology.tailings_recycling"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.ecology.industrial_symbiosis",
+        "branch": "ecology",
+        "epoch": 5,
+        "science_cost": 630,
+        "name_ru": "industrial symbiosis",
+        "requirements": [
+          "research.ecology.carbon_capture"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.ecology.circular_economy",
+        "branch": "ecology",
+        "epoch": 7,
+        "science_cost": 1120,
+        "name_ru": "circular economy",
+        "requirements": [
+          "research.ecology.industrial_symbiosis"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.personnel.trade_school",
+        "branch": "personnel",
+        "epoch": 1,
+        "science_cost": 70,
+        "name_ru": "trade school",
+        "requirements": [
+          "epoch.frontier"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.personnel.safety_training",
+        "branch": "personnel",
+        "epoch": 3,
+        "science_cost": 280,
+        "name_ru": "safety training",
+        "requirements": [
+          "research.personnel.trade_school"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.personnel.engineering_academy",
+        "branch": "personnel",
+        "epoch": 5,
+        "science_cost": 630,
+        "name_ru": "engineering academy",
+        "requirements": [
+          "research.personnel.safety_training"
+        ],
+        "visible": true
+      },
+      {
+        "id": "research.personnel.corporate_institute",
+        "branch": "personnel",
+        "epoch": 7,
+        "science_cost": 1120,
+        "name_ru": "corporate institute",
+        "requirements": [
+          "research.personnel.engineering_academy"
+        ],
+        "visible": true
+      }
+    ]
+  },
+  "city_types": [
+    "mining",
+    "agricultural",
+    "industrial",
+    "port",
+    "tourism",
+    "university",
+    "metropolis"
+  ],
+  "city_systems": [
+    "population",
+    "municipal_budget",
+    "demand",
+    "utilities",
+    "pollution",
+    "reputation",
+    "project_phases",
+    "competition"
+  ],
+  "branches": [
+    "geology",
+    "mining",
+    "logistics",
+    "industry",
+    "cities",
+    "energy",
+    "ecology",
+    "personnel"
+  ],
+  "compatibility": {
+    "legacy_save_version": 4,
+    "namespace": "campaign_v3",
+    "migration": "keep_legacy_game_running",
+    "never_regenerate_discovered": true
+  }
+}
