@@ -2,6 +2,7 @@ extends Control
 const ResponsiveDialog = preload("res://scripts/responsive_dialog.gd")
 const BRIGHT_ATLAS = preload("res://assets/casual11/buildings-clean.png")
 const RoadNetwork = preload("res://scripts/road_network.gd")
+const ContinentMap = preload("res://scripts/v3/continent_map.gd")
 # Real independent transparent world sprites. Each corresponds to one gameplay entity.
 const WORLD_ART := {
     "mine": preload("res://assets/world/mine.webp"),
@@ -103,6 +104,11 @@ var selected_route_target := 0
 var selected_slot := 0
 var selected_plot := 0
 var selected_continent_city := "city_001"
+# Whole-continent overview at startup. The original four-mine map is city_001.
+var view_mode := "continent"
+var continent_map = ContinentMap.new()
+var continent_center := Vector2(512.0,512.0)
+var continent_zoom := 1.0
 var selected_municipal_project := ""
 var selected_continent_mine_slot := 0
 var selected_continent_floor := 1
@@ -518,7 +524,9 @@ func pack_state() -> Dictionary:
     return {"mines":mine_owned,"factories":factory_owned,"recipes":factory_recipes,
         "warehouse_owned":warehouse_owned,"warehouse_slots":warehouse_slots,
         "levels":factory_levels,"progress":factory_progress,
-        "camera":[world_camera.x,world_camera.y],"zoom":world_zoom,"expansion_owned":expansion_owned}
+        "camera":[world_camera.x,world_camera.y],"zoom":world_zoom,"expansion_owned":expansion_owned,
+        "continent_center":[continent_center.x,continent_center.y],
+        "continent_zoom":continent_zoom,"continent_city":selected_continent_city}
 
 func restore_state(data: Dictionary) -> void:
     for i in range(4):
@@ -559,6 +567,16 @@ func restore_state(data: Dictionary) -> void:
     if saved_camera.size() == 2:
         world_camera = Vector2(clampf(float(saved_camera[0]),1.0,float(MAP_W-2)),clampf(float(saved_camera[1]),1.0,float(MAP_H-2)))
     world_zoom = clampf(float(data.get("zoom", 0.88)), 0.5, 1.45)
+    var saved_center: Array = data.get("continent_center",[])
+    if saved_center.size() == 2:
+        continent_center = Vector2(float(saved_center[0]),float(saved_center[1]))
+    continent_zoom = clampf(float(data.get("continent_zoom",1.0)),1.0,3.5)
+    var saved_city := str(data.get("continent_city","city_001"))
+    if game.campaign_v3 != null and not game.campaign_v3.find_city(saved_city).is_empty():
+        selected_continent_city = saved_city
+    clamp_continent_camera()
+    # Every launch starts at the entire continent, even with legacy local saves.
+    view_mode = "continent"
 
 func process_industry(delta: float) -> void:
     time += delta
@@ -627,6 +645,108 @@ func pan(delta: Vector2) -> void:
     world_camera -= Vector2((a+b)*0.5,(b-a)*0.5)
     world_camera.x = clampf(world_camera.x,1.0,MAP_W-2.0)
     world_camera.y = clampf(world_camera.y,1.0,MAP_H-2.0)
+
+func continent_frame() -> Rect2:
+    var available := Rect2(16.0,top_bar_height()+52.0,
+        maxf(100.0,size.x-32.0),maxf(100.0,size.y-top_bar_height()-bottom_bar_height()-70.0))
+    var edge := minf(available.size.x,available.size.y)
+    return Rect2(available.position+Vector2((available.size.x-edge)*0.5,0),Vector2(edge,edge))
+
+func clamp_continent_camera() -> void:
+    var half := 512.0/maxf(1.0,continent_zoom)
+    continent_center.x = clampf(continent_center.x,half,1024.0-half)
+    continent_center.y = clampf(continent_center.y,half,1024.0-half)
+
+func continent_screen(point: Vector2) -> Vector2:
+    var region := continent_frame()
+    return region.position+region.size*0.5+(point-continent_center)*region.size.x*continent_zoom/1024.0
+
+func continent_camera_pan(delta: Vector2) -> void:
+    var map_rect := continent_frame()
+    continent_center -= delta*1024.0/maxf(1.0,map_rect.size.x*continent_zoom)
+    clamp_continent_camera()
+
+func set_continent_zoom(next_zoom: float) -> void:
+    continent_zoom = clampf(next_zoom,1.0,3.5)
+    clamp_continent_camera()
+
+func enter_continent() -> void:
+    panel = ""
+    view_mode = "continent"
+    if dialog != null:
+        dialog.hide()
+    queue_redraw()
+
+func enter_selected_city() -> void:
+    panel = ""
+    view_mode = "city" if selected_continent_city == "city_001" else "regional"
+    if dialog != null:
+        dialog.hide()
+    queue_redraw()
+
+func continent_city_button() -> Rect2:
+    var width := clampf(size.x*0.22,118.0,240.0)
+    return Rect2(size.x-width-17.0,top_bar_height()+12.0,width,38.0)
+
+func continent_city_hit(p: Vector2) -> String:
+    if game.campaign_v3 == null:
+        return ""
+    if not continent_frame().has_point(p):
+        return ""
+    var closest_id := ""
+    var minimum := 24.0
+    for city in game.campaign_v3.cities:
+        var at: Array = city["position"]
+        var center := continent_screen(Vector2(float(at[0]),float(at[1])))
+        var distance := center.distance_to(p)
+        if distance < minimum:
+            minimum = distance
+            closest_id = str(city["id"])
+    return closest_id
+
+func tapped_continent(p: Vector2) -> void:
+    if continent_city_button().has_point(p):
+        enter_selected_city()
+        return
+    var hit := continent_city_hit(p)
+    if hit != "":
+        selected_continent_city = hit
+        panel = "continent_city"
+        show_panel()
+
+func region_hotspots() -> Array:
+    if game.campaign_v3 == null:
+        return []
+    var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
+    if city.is_empty():
+        return []
+    var sites: Array = []
+    var quantities: Dictionary = city.get("lots",{})
+    var types := ["mine","factory","warehouse","commercial","municipal","energy"]
+    var ids: Array = []
+    for kind in types:
+        for j in range(int(quantities.get(kind,0))):
+            ids.append(kind)
+    var count := mini(ids.size(),24)
+    var columns := 6
+    var width := size.x*0.82
+    var height := size.y-top_bar_height()-bottom_bar_height()-75.0
+    for i in range(count):
+        var row := int(i / columns)
+        var column := i % columns
+        var x := size.x*0.09+(float(column)+0.5)*width/columns
+        var y := top_bar_height()+58.0+(float(row)+0.5)*height/4.0
+        sites.append({"type":ids[i],"screen":Vector2(x,y),
+            "radius":minf(width/columns,height/4.0)*0.38})
+    return sites
+
+func tapped_regional(p: Vector2) -> void:
+    for region in region_hotspots():
+        var position: Vector2 = region["screen"]
+        if position.distance_to(p) < maxf(29.0,float(region["radius"])):
+            panel = "city_mines" if region["type"] == "mine" else "city_projects"
+            show_panel()
+            return
 
 func _gui_input(event: InputEvent) -> void:
     if event is InputEventScreenTouch:
