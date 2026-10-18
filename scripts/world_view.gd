@@ -2283,9 +2283,9 @@ func draw_regional_house(p: Vector2,style: int,floors: int) -> void:
     var w := 11.0*scale
     var h := 5.5*scale
     var height := (5.0+float(floors)*5.0)*scale
-    var pale := [Color("#ffeed1"),Color("#dcebf2"),Color("#f2d9c6"),
+    var pale: Color = [Color("#ffeed1"),Color("#dcebf2"),Color("#f2d9c6"),
         Color("#d6e8d5")][posmod(style,4)]
-    var roof := [Color("#b85845"),Color("#456e9a"),Color("#bf7d45"),
+    var roof: Color = [Color("#b85845"),Color("#456e9a"),Color("#bf7d45"),
         Color("#5d7d72")][posmod(style,4)]
     draw_colored_polygon(PackedVector2Array([
         p+Vector2(-w,0),p+Vector2(0,h),p+Vector2(0,h-height),p+Vector2(-w,-height)]),
