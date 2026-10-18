@@ -2,6 +2,7 @@ extends Control
 const WorldView = preload("res://scripts/world_view.gd")
 const ResponsiveDialog = preload("res://scripts/responsive_dialog.gd")
 const Operations = preload("res://scripts/operations.gd")
+const CampaignStateV3 = preload("res://scripts/v3/campaign_state.gd")
 # DailyCorp 0.1: original mobile mining and logistics prototype.
 const W := 42
 const H := 42
@@ -25,6 +26,8 @@ const TILE := 52.0
 
 var operations = null
 var operations_saved: Dictionary = {}
+var campaign_v3 = null
+var campaign_v3_saved: Dictionary = {}
 var passive_progress: Dictionary = {}
 var ore_amounts: Dictionary = {}
 var drop_serial := 0
@@ -66,6 +69,10 @@ var mouse_moved := false
 func _ready() -> void:
     if not load_game():
         fresh_game()
+    # New continent systems run alongside legacy map during migration.
+    # Legacy progress and the v4 save schema remain untouched.
+    campaign_v3 = CampaignStateV3.new()
+    campaign_v3.initialize(campaign_v3_saved)
     world_view = WorldView.new()
     world_view.game = self
     add_child(world_view)
@@ -141,6 +148,7 @@ func queued_ore(kind: int) -> int:
     return total
 
 func fresh_game() -> void:
+    campaign_v3_saved = {}
     rng.randomize()
     grid.clear()
     orders.clear()
@@ -836,6 +844,7 @@ func save_game() -> void:
     snapshot["ore_amounts"] = ore_amounts
     snapshot["drop_serial"] = drop_serial
     snapshot["passive_progress"] = passive_progress
+    snapshot["campaign_v3"] = campaign_v3.save_snapshot() if campaign_v3 != null else campaign_v3_saved
     var file := FileAccess.open(SAVE_FILE, FileAccess.WRITE)
     if file != null:
         file.store_string(JSON.stringify(snapshot))
@@ -860,6 +869,7 @@ func load_game() -> bool:
     grid = saved_grid
     world_saved = data.get("surface", {})
     operations_saved = data.get("operations",{})
+    campaign_v3_saved = data.get("campaign_v3",{})
     ore_amounts = data.get("ore_amounts",{})
     drop_serial = maxi(0,int(data.get("drop_serial",0)))
     passive_progress = data.get("passive_progress",{})
