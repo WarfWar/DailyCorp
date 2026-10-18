@@ -218,6 +218,15 @@ jobs:
             exit 1
           fi
 
+      - name: Verify procedural city maps and explicit freight delivery
+        run: |
+          set -o pipefail
+          timeout 90s godot --headless --path . --script res://tests/v3_city_logistics_smoke.gd 2>&1 | tee /tmp/city-logistics.log
+          grep -q "CITY LOGISTICS TEST PASSED" /tmp/city-logistics.log
+          if grep -E "SCRIPT ERROR|Parse Error|CITY LOGISTICS TEST FAILED" /tmp/city-logistics.log; then
+            exit 1
+          fi
+
       - name: Export debug APK
         run: |
           mkdir -p build
