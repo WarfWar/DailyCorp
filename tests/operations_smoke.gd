@@ -20,7 +20,7 @@ func _check() -> void:
     game.cash = 50000
     # Isolate ongoing logistics from previous smoke test saved data.
     ops.buffers[0] = {"coal":0,"copper":0,"iron":0,"gold":0}
-    ops.vehicles = [{"id":1,"mine":0,"level":1,"state":"idle","material":"","amount":0,"remaining":0.0,"destination":{"type":"warehouse","index":3}}]
+    ops.vehicles = [{"id":1,"mine":0,"level":1,"state":"idle","material":"","amount":0,"remaining":0.0,"source":{"type":"none","index":-1},"destination":{"type":"none","index":-1},"assignment":{}}]
     world.factory_owned[0] = true
     world.factory_recipes[0] = "steel"
     for key in ["coal","copper","iron","gold","steel","wire"]:
@@ -84,12 +84,21 @@ func _check() -> void:
     if not ops.transfer_worker(original_id,original_mine):
         die("Cannot transfer worker back to first mine")
         return
+    # A new vehicle has no automatic mine assignment.
+    if not ops.vehicles[0].get("assignment",{}).is_empty():
+        die("Truck automatically assigned to mine")
+        return
     # Delivery to factory uses genuine truck travel and local factory input buffers.
     ops.buffers[0] = {"coal":3,"copper":0,"iron":3,"gold":0}
-    if not ops.set_route(0,"iron","factory",0) or not ops.set_route(0,"coal","factory",0):
-        die("Cannot choose factory destination for ore")
+    if not ops.configure_truck(1,"mine",0,"factory",0,"iron").get("ok",false):
+        die("Manual factory destination for iron unavailable")
         return
-    for n in range(8):
+    for n in range(12):
+        ops.process_transport(100.0)
+    if not ops.configure_truck(1,"mine",0,"factory",0,"coal").get("ok",false):
+        die("Manual factory destination for coal unavailable")
+        return
+    for n in range(12):
         ops.process_transport(100.0)
     if int(ops.factory_inputs[0]["iron"]) < 2 or int(ops.factory_inputs[0]["coal"]) < 1:
         die("Transport did not bring iron and coal to factory")
@@ -104,8 +113,8 @@ func _check() -> void:
         return
     # Routes can also target nearby starter warehouse.
     ops.buffers[0]["gold"] = 2
-    if not ops.set_route(0,"gold","warehouse",3):
-        die("Cannot select starter warehouse")
+    if not ops.configure_truck(1,"mine",0,"warehouse",3,"gold").get("ok",false):
+        die("Cannot manually assign mine to warehouse")
         return
     for n in range(12):
         ops.process_transport(100.0)
@@ -141,8 +150,16 @@ func _check() -> void:
     var task: Dictionary = ops.contract()
     game.stock[str(task["key"])] = int(task["quantity"])
     var before_cash: int = game.cash
-    if not ops.fulfill_contract() or game.cash != before_cash + int(task["reward"]) or ops.reputation < 1:
-        die("City order payout or reputation incorrect")
+    if ops.fulfill_contract():
+        die("Instant city contract delivery must not bypass trucks")
+        return
+    if not ops.configure_truck(truck_id,"warehouse",3,"contract",0,str(task["key"])).get("ok",false):
+        die("Cannot assign warehouse to contract")
+        return
+    for n in range(20):
+        ops.process_transport(100.0)
+    if game.cash != before_cash + int(task["reward"]) or ops.reputation < 1 or not ops.completed_contracts.has(0):
+        die("Physical contract shipment did not pay after full delivery")
         return
     game.save_game()
     var snapshot = JSON.parse_string(FileAccess.get_file_as_string(game.SAVE_FILE))
