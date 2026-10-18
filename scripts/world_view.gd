@@ -87,6 +87,8 @@ const PRODUCTS := {"coal":"Уголь","copper":"Медь","iron":"Железо"
 const PRICES := {"coal":12,"copper":28,"iron":42,"gold":110,"steel":160,"wire":60,"parts":495,"electronics":470}
 
 var world_roads: Dictionary = {}
+var site_visual_positions: Dictionary = {}
+var layout_ready := false
 var road_planner = RoadNetwork.new()
 var expansion_owned: Array = [false,false,false,false,false,false,false,false,false,false,false,false]
 var game = null
@@ -559,21 +561,21 @@ func tapped(p: Vector2) -> void:
         return
     var hit_radius := ISO_W * world_zoom * 0.67
     for i in range(MINES.size()):
-        if world_screen(Vector2(MINES[i]["pos"])).distance_to(p) < hit_radius:
+        if minf(world_screen(building_visual_anchor(MINES[i]["pos"])).distance_to(p),world_screen(Vector2(MINES[i]["pos"])).distance_to(p)) < hit_radius:
             selected_kind = "mine"
             selected_id = i
             panel = "place"
             show_panel()
             return
     for i in range(FACTORIES.size()):
-        if world_screen(Vector2(FACTORIES[i]["pos"])).distance_to(p) < hit_radius:
+        if minf(world_screen(building_visual_anchor(FACTORIES[i]["pos"])).distance_to(p),world_screen(Vector2(FACTORIES[i]["pos"])).distance_to(p)) < hit_radius:
             selected_kind = "factory"
             selected_id = i
             panel = "place"
             show_panel()
             return
     for i in range(WAREHOUSES.size()):
-        if world_screen(Vector2(WAREHOUSES[i]["pos"])).distance_to(p) < hit_radius:
+        if minf(world_screen(building_visual_anchor(WAREHOUSES[i]["pos"])).distance_to(p),world_screen(Vector2(WAREHOUSES[i]["pos"])).distance_to(p)) < hit_radius:
             selected_kind = "warehouse"
             selected_id = i
             panel = "warehouse"
@@ -582,11 +584,11 @@ func tapped(p: Vector2) -> void:
     for point in [{"pos":BARRACKS_POS,"panel":"barracks"},
         {"pos":HANGAR_POS,"panel":"hangar"},
         {"pos":CONTRACT_POS,"panel":"contracts"}]:
-        if world_screen(Vector2(point["pos"])).distance_to(p) < hit_radius*0.75:
+        if minf(world_screen(building_visual_anchor(point["pos"])).distance_to(p),world_screen(Vector2(point["pos"])).distance_to(p)) < hit_radius*0.75:
             panel = str(point["panel"])
             show_panel()
             return
-    if world_screen(Vector2(MARKET_POS)).distance_to(p) < hit_radius:
+    if minf(world_screen(building_visual_anchor(MARKET_POS)).distance_to(p),world_screen(Vector2(MARKET_POS)).distance_to(p)) < hit_radius:
         panel = "trade"
         show_panel()
         return
@@ -1167,6 +1169,80 @@ func sort_entity_depth(a: Dictionary,b: Dictionary) -> bool:
     # Isometric actors must be sorted by their ground-contact Y, not by type.
     return (int(a["pos"].x)+int(a["pos"].y)) < (int(b["pos"].x)+int(b["pos"].y))
 
+func rebuild_site_layout() -> void:
+    # The graph nodes remain true loading/road entrances. Building artwork
+    # is placed on separate grass pads with a short service driveway.
+    if world_roads.is_empty():
+        make_road_network()
+    site_visual_positions.clear()
+    var occupied: Array = []
+    var entities := scene_entities()
+    var offsets: Array = [
+        Vector2i(-2,-1),Vector2i(2,1),Vector2i(-1,-2),Vector2i(1,2),
+        Vector2i(-2,1),Vector2i(2,-1),Vector2i(1,-2),Vector2i(-1,2),
+        Vector2i(-3,0),Vector2i(0,3),Vector2i(3,0),Vector2i(0,-3),
+        Vector2i(-3,-1),Vector2i(3,1),Vector2i(1,3),Vector2i(-1,-3)
+    ]
+    for entity in entities:
+        var origin: Vector2i = entity["pos"]
+        var chosen := Vector2(origin)
+        var selected_score := -INF
+        for delta in offsets:
+            var possible: Vector2i = origin+delta
+            if possible.x < 2 or possible.y < 2 or possible.x > MAP_W-3 or possible.y > MAP_H-3:
+                continue
+            if world_roads.has(road_key(possible.x,possible.y)):
+                continue
+            if field_kind(possible.x,possible.y).x == 2:
+                continue
+            var close_to_site := false
+            for item in entities:
+                var other: Vector2i = item["pos"]
+                if other != origin and Vector2(possible).distance_to(Vector2(other)) < 1.9:
+                    close_to_site = true
+                    break
+            if close_to_site:
+                continue
+            for used in occupied:
+                if Vector2(possible).distance_to(Vector2(used)) < 2.5:
+                    close_to_site = true
+                    break
+            if close_to_site:
+                continue
+            var road_clearance := 0
+            for ox in range(-1,2):
+                for oy in range(-1,2):
+                    if not world_roads.has(road_key(possible.x+ox,possible.y+oy)):
+                        road_clearance += 1
+            var score := float(road_clearance)*4.0-Vector2(origin).distance_to(Vector2(possible))
+            if score > selected_score:
+                selected_score = score
+                chosen = Vector2(possible)
+        site_visual_positions[road_key(origin.x,origin.y)] = chosen
+        occupied.append(chosen)
+    layout_ready = true
+
+func building_visual_anchor(site: Vector2i) -> Vector2:
+    if not layout_ready:
+        rebuild_site_layout()
+    return site_visual_positions.get(road_key(site.x,site.y),Vector2(site))
+
+func draw_service_drives(entities: Array) -> void:
+    # Local loading pads connect the building frontage to the real road graph;
+    # transport continues to navigate on the original connected road.
+    for entity in entities:
+        var entry: Vector2i = entity["pos"]
+        var pad: Vector2 = building_visual_anchor(entry)
+        if pad.distance_to(Vector2(entry)) < 0.9:
+            continue
+        var road_point := world_screen(Vector2(entry))
+        var building_point := world_screen(pad)
+        if road_point.x < -240 or road_point.x > size.x+240:
+            continue
+        var near_building := road_point.lerp(building_point,0.66)
+        draw_line(road_point,near_building,Color("#e9e8d9"),maxf(9.0,15.0*world_zoom),true)
+        draw_line(road_point,near_building,Color("#858c8b"),maxf(6.0,10.0*world_zoom),true)
+
 func building_span(p: Vector2, entities: Array) -> float:
     # Keep buildings within their neighborhood rather than painting over adjacent sites.
     var normal_size := ISO_W*world_zoom*1.05
@@ -1370,6 +1446,8 @@ func draw_target_reticle() -> void:
         "land": location = plot_anchor(selected_plot)
     if location.x < 0:
         return
+    if panel != "land":
+        location = building_visual_anchor(Vector2i(roundi(location.x),roundi(location.y)))
     var center := world_screen(location)
     if center.x < -90 or center.x > size.x+90 or center.y < -90 or center.y > size.y+90:
         return
@@ -1449,6 +1527,8 @@ func _draw() -> void:
             tile_draw(position,ground.x,ground.y)
     draw_road_system()
     draw_casual_decor()
+    var entities: Array = scene_entities()
+    draw_service_drives(entities)
     for index in range(EXPANSION_PLOTS.size()):
         var location: Vector2i = EXPANSION_PLOTS[index]
         var center := world_screen(plot_anchor(index))
@@ -1456,9 +1536,8 @@ func _draw() -> void:
             continue
         draw_empty_plot(center,index)
     # The art layer follows actual depth, then one final text/marker pass.
-    var entities: Array = scene_entities()
     for item in entities:
-        var point: Vector2 = world_screen(Vector2(item["pos"]))
+        var point: Vector2 = world_screen(building_visual_anchor(item["pos"]))
         if point.x < -200 or point.x > size.x+200 or point.y < -200 or point.y > size.y+200:
             continue
         draw_building_body(point,str(item["kind"]),bool(item["owned"]),int(item["index"]),building_span(point,entities))
@@ -1479,7 +1558,7 @@ func _draw() -> void:
             var motion: Vector2 = road_planner.point_along(route,progress)
             draw_truck(world_screen(motion),true)
     for item in entities:
-        var point: Vector2 = world_screen(Vector2(item["pos"]))
+        var point: Vector2 = world_screen(building_visual_anchor(item["pos"]))
         if point.x > -110 and point.x < size.x+110 and point.y > -110 and point.y < size.y+110:
             draw_building_label(point,bool(item["owned"]),str(item["label"]),str(item["desc"]))
     draw_target_reticle()
