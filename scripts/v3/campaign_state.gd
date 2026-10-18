@@ -59,6 +59,84 @@ func register_mine_purchase(city_id: int,slot_id: int) -> Dictionary:
     mine_deeds[key] = purchased.duplicate(true)
     return purchased
 
+# First playable continent mining loop. All costs and geology are deterministic.
+# Wrapper protects the game's money from double purchases; legacy test registration stays available.
+func mine_purchase_cost(city_id: int,slot_id: int) -> int:
+    var city: Dictionary = find_city("city_%03d" % city_id)
+    if city.is_empty() or slot_id < 0 or slot_id >= int(city["lots"].get("mine",0)):
+        return -1
+    return 190+slot_id*65+posmod(city_id*17,5)*18
+
+func purchase_mine(city_id: int,slot_id: int,available_cash: int) -> Dictionary:
+    var cost := mine_purchase_cost(city_id,slot_id)
+    if cost < 0:
+        return {"ok":false,"reason":"invalid_lot"}
+    if not registered_mine(city_id,slot_id).is_empty():
+        return {"ok":false,"reason":"already_owned"}
+    if available_cash < cost:
+        return {"ok":false,"reason":"insufficient_cash","cost":cost}
+    var mine: Dictionary = register_mine_purchase(city_id,slot_id)
+    if mine.is_empty():
+        return {"ok":false,"reason":"generation_failed"}
+    var saved: Dictionary = mine_deeds["%d/%d" % [city_id,slot_id]]
+    saved["explored_floors"] = [1]
+    mine_deeds["%d/%d" % [city_id,slot_id]] = saved
+    return {"ok":true,"cost":cost,"cash":available_cash-cost,"mine":saved.duplicate(true)}
+
+func mine_floor_targets(city_id: int,slot_id: int,floor: int,max_targets: int = 6) -> Array:
+    var mine := registered_mine(city_id,slot_id)
+    if mine.is_empty() or not mine.get("explored_floors",[]).has(floor):
+        return []
+    var results: Array = []
+    for y in range(generator.MINE_FLOOR_SIZE):
+        for x in range(generator.MINE_FLOOR_SIZE):
+            var cell: Dictionary = generator.mineral_cell(mine,floor,x,y)
+            if cell.get("type","") != "ore":
+                continue
+            var remaining := ore_remaining(city_id,slot_id,floor,x,y)
+            if remaining > 0:
+                results.append({"x":x,"y":y,"item_id":cell["item_id"],
+                    "grade":cell["grade"],"remaining":remaining,
+                    "total":cell["units"]})
+                if results.size() >= maxi(1,max_targets):
+                    return results
+    return results
+
+func next_floor_cost(floor: int) -> int:
+    return maxi(0,35+floor*8)
+
+func unlock_next_floor(city_id: int,slot_id: int,current_floor: int,cash: int) -> Dictionary:
+    var mine := registered_mine(city_id,slot_id)
+    if mine.is_empty():
+        return {"ok":false,"reason":"not_owned"}
+    if current_floor < 1 or current_floor >= int(mine["depth"]):
+        return {"ok":false,"reason":"maximum_depth"}
+    var explored: Array = mine.get("explored_floors",[])
+    if not explored.has(current_floor):
+        return {"ok":false,"reason":"previous_floor_locked"}
+    if explored.has(current_floor+1):
+        return {"ok":true,"cash":cash,"floor":current_floor+1,"cost":0}
+    var cost := next_floor_cost(current_floor)
+    if cash < cost:
+        return {"ok":false,"reason":"insufficient_cash","cost":cost}
+    var key := "%d/%d" % [city_id,slot_id]
+    explored.append(current_floor+1)
+    mine["explored_floors"] = explored
+    mine_deeds[key] = mine
+    return {"ok":true,"cash":cash-cost,"floor":current_floor+1,"cost":cost}
+
+func extract_to_company_stock(city_id: int,slot_id: int,floor: int,x: int,y: int) -> Dictionary:
+    var mine := registered_mine(city_id,slot_id)
+    if mine.is_empty() or not mine.get("explored_floors",[]).has(floor):
+        return {"ok":false,"reason":"floor_locked"}
+    var result := extract_ore_unit(city_id,slot_id,floor,x,y)
+    if bool(result.get("ok",false)):
+        var key := str(result["item_id"])
+        catalog_stock[key] = int(catalog_stock.get(key,0))+int(result["amount"])
+        result["warehouse_total"] = catalog_stock[key]
+        technology.record_event("continent_ore_mined")
+    return result
+
 func registered_mine(city_id: int,slot_id: int) -> Dictionary:
     var key := "%d/%d" % [city_id,slot_id]
     return mine_deeds.get(key,{}).duplicate(true)
