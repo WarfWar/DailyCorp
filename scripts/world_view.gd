@@ -102,6 +102,9 @@ var selected_route_material := "iron"
 var selected_route_target := 0
 var selected_slot := 0
 var selected_plot := 0
+var selected_continent_city := "city_001"
+var selected_municipal_project := ""
+var city_list_offset := 0
 var purchase_effect_plot := -1
 var purchase_effect_time := 0.0
 
@@ -346,6 +349,60 @@ func show_panel() -> void:
                     "Стоимость земли: %d ₽" % price,
                     "Пока покупка даёт только право владения.",
                     "Новые типы построек добавим в дальнейшем."]
+        "cities":
+            title = "Континент · города"
+            if game.campaign_v3 == null:
+                lines = ["Карта городов пока недоступна."]
+            else:
+                var cities: Array = game.campaign_v3.cities
+                lines = ["На континенте: %d городов" % cities.size(),
+                    "Выбери город, чтобы посмотреть его бюджет и муниципальные заказы."]
+                for j in range(city_list_offset,mini(city_list_offset+6,cities.size())):
+                    var city: Dictionary = cities[j]
+                    var record: Dictionary = game.campaign_v3.city_economy.city_record(city)
+                    lines.append("%s · %s · население %d · ур.%d" % [
+                        city["name"],city["specialization"],record["population"],record["rank"]])
+        "city_projects":
+            title = "Муниципальные проекты"
+            if game.campaign_v3 == null:
+                lines = ["Городская система не подключена."]
+            else:
+                var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
+                if city.is_empty():
+                    lines = ["Город не найден."]
+                else:
+                    var record: Dictionary = game.campaign_v3.city_economy.city_record(city)
+                    lines = [str(city["name"])+" · "+str(city["specialization"]),
+                        "Население: %d · ур.%d" % [record["population"],record["rank"]],
+                        "Бюджет города: %d ₽" % record["budget"],
+                        "Построено объектов: %d" % record["completed"].size()]
+                    var offers: Array = game.campaign_v3.city_contracts(selected_continent_city)
+                    if offers.is_empty():
+                        lines.append("Пока нет открытых проектов. Развивай технологии.")
+                    for project in offers:
+                        lines.append("%s — %d ₽" % [project["name_ru"],project["reward_money_base"]])
+        "city_project_details":
+            title = "Муниципальный заказ"
+            if game.campaign_v3 == null:
+                lines = ["Нет доступа к проекту."]
+            else:
+                var project: Dictionary = game.campaign_v3.city_economy.registry.city_project(selected_municipal_project)
+                var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
+                if project.is_empty() or city.is_empty():
+                    lines = ["Город или проект не найдены."]
+                else:
+                    lines = [str(project["name_ru"]),"Нужная эпоха: %d" % project["tech_tier"],
+                        "Вознаграждение: %d ₽" % project["reward_money_base"],
+                        "Материалы для строительства:"]
+                    for item_id in project.get("required_items",{}):
+                        lines.append("%s: %d / %d" % [item_id,
+                            int(game.campaign_v3.catalog_stock.get(item_id,0)),
+                            int(project["required_items"][item_id])])
+                    var status: Dictionary = game.campaign_v3.city_economy.preview(city,
+                        selected_municipal_project,game.campaign_v3.technology.current_epoch(),
+                        game.campaign_v3.catalog_stock)
+                    if not status.get("ok",false):
+                        lines.append("Ожидание: "+str(status.get("reason","материалы")))
         "contracts":
             var task: Dictionary = game.operations.contract()
             title = "Городские контракты"
@@ -689,7 +746,29 @@ func buttons() -> Array:
         "truck": return ["УЛУЧШИТЬ ГРУЗОВИК","ПЕРЕНАЗНАЧИТЬ ШАХТУ","НАЗАД"]
         "truck_transfer": return ["ШАХТА №1","ШАХТА №2","ШАХТА №3","ШАХТА №4","НАЗАД"]
         "land": return ["ЗАКРЫТЬ"] if expansion_owned[selected_plot] else ["КУПИТЬ УЧАСТОК","ЗАКРЫТЬ"]
-        "contracts": return ["СДАТЬ ЗАКАЗ","НАЗАД"]
+        "contracts": return ["СДАТЬ ЗАКАЗ","ГОРОДА КОНТИНЕНТА","НАЗАД"]
+        "cities":
+            if game.campaign_v3 == null:
+                return ["НАЗАД"]
+            var items: Array = []
+            var cities: Array = game.campaign_v3.cities
+            for j in range(city_list_offset,mini(city_list_offset+6,cities.size())):
+                items.append(str(cities[j]["name"]))
+            if city_list_offset > 0:
+                items.append("← ПРЕДЫДУЩИЕ ГОРОДА")
+            if city_list_offset+6 < cities.size():
+                items.append("СЛЕДУЮЩИЕ ГОРОДА →")
+            items.append("НАЗАД")
+            return items
+        "city_projects":
+            if game.campaign_v3 == null:
+                return ["НАЗАД"]
+            var projects: Array = []
+            for item in game.campaign_v3.city_contracts(selected_continent_city):
+                projects.append(str(item["name_ru"]))
+            projects.append("НАЗАД")
+            return projects
+        "city_project_details": return ["СДАТЬ МАТЕРИАЛЫ И ЗАВЕРШИТЬ","НАЗАД"]
         "assets": return ["К КАРТЕ","ТОРГОВЛЯ","КАЗАРМА","АНГАР","КОНТРАКТЫ","ИССЛЕДОВАНИЯ"]
         "research":
             var entries: Array = []
@@ -915,8 +994,52 @@ func action(i: int) -> void:
         "contracts":
             if i == 0:
                 pop("Заказ сдан, город доволен!" if game.operations.fulfill_contract() else "Нужно больше товара на главном складе")
+            elif i == 1:
+                city_list_offset = 0
+                panel = "cities"
             else:
                 panel = ""
+        "cities":
+            if game.campaign_v3 == null:
+                panel = "contracts"
+            else:
+                var city_items: Array = game.campaign_v3.cities
+                var count := mini(6,city_items.size()-city_list_offset)
+                if i < count:
+                    selected_continent_city = str(city_items[city_list_offset+i]["id"])
+                    panel = "city_projects"
+                else:
+                    var back_button := count if city_list_offset > 0 else -1
+                    var next_button := count+(1 if city_list_offset > 0 else 0) if city_list_offset+6 < city_items.size() else -1
+                    if i == back_button:
+                        city_list_offset = maxi(0,city_list_offset-6)
+                    elif i == next_button:
+                        city_list_offset += 6
+                    else:
+                        panel = "contracts"
+        "city_projects":
+            if game.campaign_v3 == null:
+                panel = "cities"
+            else:
+                var offered: Array = game.campaign_v3.city_contracts(selected_continent_city)
+                if i < offered.size():
+                    selected_municipal_project = str(offered[i]["id"])
+                    panel = "city_project_details"
+                else:
+                    panel = "cities"
+        "city_project_details":
+            if i == 0 and game.campaign_v3 != null:
+                var completion: Dictionary = game.campaign_v3.try_company_municipal_contract(
+                    selected_continent_city,selected_municipal_project)
+                if completion.get("ok",false):
+                    game.cash += int(completion["reward"])
+                    panel = "city_projects"
+                    pop("Городской проект завершён! +%d ₽" % completion["reward"])
+                    game.save_game()
+                else:
+                    pop("Невозможно завершить: "+str(completion.get("reason","ресурсы")))
+            else:
+                panel = "city_projects"
         "assets":
             match i:
                 0: panel = ""
