@@ -1350,7 +1350,7 @@ func action(i: int) -> void:
                 else:
                     panel = "truck_target"
         "truck_target":
-            var destinations := 8 if truck_source.get("type","") == "mine" else 4+game.operations.CONTRACTS.size()
+            var destinations: int = 8 if truck_source.get("type","") == "mine" else 4+game.operations.CONTRACTS.size()
             if i < 0 or i >= destinations:
                 panel = "truck_source"
             else:
@@ -2380,7 +2380,7 @@ func draw_regional_map() -> void:
         else:
             draw_circle(p,4.2*region_zoom,Color("#f6ffff"))
         if region_zoom > 0.60:
-            var title := {"mine":"ШАХТА","factory":"ЗАВОД","warehouse":"СКЛАД",
+            var title: String = {"mine":"ШАХТА","factory":"ЗАВОД","warehouse":"СКЛАД",
                 "commercial":"ТОРГОВЛЯ","municipal":"ГОРОД","energy":"ЭНЕРГИЯ"}.get(kind,"УЧАСТОК")
             var bounds := Rect2(p.x-43*region_zoom,p.y+radius*0.51,86*region_zoom,21*region_zoom)
             draw_rect(bounds,Color("#103449",0.90))
