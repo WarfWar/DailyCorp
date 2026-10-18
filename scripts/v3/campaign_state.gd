@@ -2,8 +2,10 @@ extends RefCounted
 ## V3 foundation is namespaced inside legacy save format v4: no destructive migration.
 const Generator = preload("res://scripts/v3/continent_generator.gd")
 const Technology = preload("res://scripts/v3/technology_system.gd")
+const CityEconomy = preload("res://scripts/v3/city_economy.gd")
 var generator = Generator.new()
 var technology = Technology.new()
+var city_economy = CityEconomy.new()
 var seed: int = 1182403
 var cities: Array = []
 var mine_deeds: Dictionary = {}
@@ -21,6 +23,7 @@ func initialize(saved: Dictionary = {}) -> void:
             mine_deeds[str(key)] = saved_mines[key].duplicate(true)
     region_discoveries = saved.get("region_discoveries",{}).duplicate(true)
     municipal_projects = saved.get("municipal_projects",{}).duplicate(true)
+    city_economy.initialize(seed,saved.get("city_economy",{}))
     technology.load_definitions()
     technology.import_state(saved.get("technology",{}))
 
@@ -28,6 +31,7 @@ func save_snapshot() -> Dictionary:
     return {"schema":1,"world_seed":seed,"city_target":cities.size(),
         "mine_deeds":mine_deeds.duplicate(true),"region_discoveries":region_discoveries.duplicate(true),
         "municipal_projects":municipal_projects.duplicate(true),
+        "city_economy":city_economy.export_state(),
         "technology":technology.export_state()}
 
 func register_mine_purchase(city_id: int,slot_id: int) -> Dictionary:
@@ -61,6 +65,33 @@ func complete_city_project(city_id: String,project_id: String) -> void:
     var projects: Dictionary = municipal_projects.get(city_id,{})
     projects[project_id] = "completed"
     municipal_projects[city_id] = projects
+
+func find_city(city_id: String) -> Dictionary:
+    for candidate in cities:
+        if str(candidate.get("id","")) == city_id:
+            return candidate.duplicate(true)
+    return {}
+
+func city_contracts(city_id: String,limit: int = 6) -> Array:
+    var city: Dictionary = find_city(city_id)
+    if city.is_empty():
+        return []
+    return city_economy.offers(city,technology.current_epoch(),limit)
+
+func complete_municipal_contract(city_id: String,project_id: String,stock: Dictionary) -> Dictionary:
+    # Strict atomic contract entry: no reward is applied until every input exists.
+    var city: Dictionary = find_city(city_id)
+    if city.is_empty():
+        return {"ok":false,"reason":"city_missing"}
+    var result: Dictionary = city_economy.complete(city,project_id,
+        technology.current_epoch(),stock)
+    if bool(result.get("ok",false)):
+        var projects: Dictionary = municipal_projects.get(city_id,{})
+        projects[project_id] = "completed"
+        municipal_projects[city_id] = projects
+        technology.grant_science(maxi(1,roundi(float(result["reputation"])*0.3)))
+        technology.record_event("municipal_contract",1)
+    return result
 
 func ore_remaining(city_id: int,slot_id: int,floor: int,x: int,y: int) -> int:
     var deed := registered_mine(city_id,slot_id)
