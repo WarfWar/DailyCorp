@@ -401,21 +401,12 @@ func mine_received(mine: int, key: String) -> void:
     buffers[mine][key] = int(buffers[mine].get(key,0)) + 1
 
 func contract() -> Dictionary:
-    return CONTRACTS[contract_index % CONTRACTS.size()]
+    for i in range(CONTRACTS.size()):
+        var idx := (contract_index+i)%CONTRACTS.size()
+        if not completed_contracts.has(idx):
+            return CONTRACTS[idx]
+    return CONTRACTS[contract_index%CONTRACTS.size()]
 
 func fulfill_contract() -> bool:
-    var task: Dictionary = contract()
-    var key: String = str(task["key"])
-    var needed := int(task["quantity"])
-    if int(game.stock.get(key,0)) < needed:
-        return false
-    game.stock[key] -= needed
-    game.cash += int(task["reward"])
-    reputation += 1
-    contract_index += 1
-    # The first V3 science source is tangible completion of municipal contracts.
-    if game.campaign_v3 != null:
-        game.campaign_v3.technology.grant_science(40)
-        game.campaign_v3.technology.record_event("city_contract",1)
-    game.save_game()
-    return true
+    # Contracts cannot be instantly sold out of pooled stock. A truck must arrive.
+    return false
