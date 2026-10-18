@@ -98,7 +98,7 @@ func supply_municipal_project(city_id: String,project_id: String,
     var active: Dictionary = municipal_projects.get(city_id,{})
     if not active.has(project_id) or not active[project_id] is Dictionary:
         return {"ok":false,"reason":"not_accepted"}
-    var template := municipal.catalog.city_project(project_id)
+    var template: Dictionary = municipal.catalog.city_project(project_id)
     if template.is_empty():
         return {"ok":false,"reason":"unknown_project"}
     var result := municipal.deliver(active[project_id],template,item_id,quantity,inventory)
@@ -113,7 +113,7 @@ func finish_municipal_project(city_id: String,project_id: String) -> Dictionary:
     var active: Dictionary = municipal_projects.get(city_id,{})
     if city.is_empty() or not active.has(project_id) or not active[project_id] is Dictionary:
         return {"ok":false,"reason":"not_accepted"}
-    var template := municipal.catalog.city_project(project_id)
+    var template: Dictionary = municipal.catalog.city_project(project_id)
     if template.is_empty():
         return {"ok":false,"reason":"unknown_project"}
     var result := municipal.complete(city,template,active[project_id])
