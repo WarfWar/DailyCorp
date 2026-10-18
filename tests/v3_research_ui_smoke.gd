@@ -36,7 +36,12 @@ func _check() -> void:
     if not science.unlocked.has(first_id) or science.science_points >= before:
         fail("Interactive research was not purchased")
         return
-    var task: Dictionary = game.operations.contract()
+    game.operations.completed_contracts = []
+    game.operations.contract_progress = {}
+    game.operations.vehicles = [{"id":1,"mine":0,"level":1,"state":"idle","material":"",
+        "amount":0,"remaining":0.0,"source":{"type":"none","index":-1},
+        "destination":{"type":"none","index":-1},"assignment":{}}]
+    var task: Dictionary = game.operations.CONTRACTS[0]
     var item: String = str(task["key"])
     game.stock[item] = int(task["quantity"])
     var science_before: int = science.science_points
