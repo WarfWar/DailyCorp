@@ -1,6 +1,6 @@
 extends Control
 const ResponsiveDialog = preload("res://scripts/responsive_dialog.gd")
-const BRIGHT_ATLAS = preload("res://assets/casual11/buildings.webp")
+const BRIGHT_ATLAS = preload("res://assets/casual11/buildings-clean.png")
 const RoadNetwork = preload("res://scripts/road_network.gd")
 # Real independent transparent world sprites. Each corresponds to one gameplay entity.
 const WORLD_ART := {
@@ -457,10 +457,10 @@ func process_industry(delta: float) -> void:
         queue_redraw()
 
 func top_bar_height() -> float:
-    return clampf(size.y * 0.12, 82.0, 145.0)
+    return 108.0 if size.x < 700.0 else 70.0
 
 func bottom_bar_height() -> float:
-    return clampf(size.y * 0.105, 82.0, 122.0)
+    return 82.0
 
 func world_screen(p: Vector2) -> Vector2:
     var rel := p-world_camera
@@ -937,10 +937,10 @@ func tile_draw(p: Vector2, row: int, column: int) -> void:
     var ry := ISO_H*world_zoom*0.50
     var color := Color("#75d546")
     if row == 0:
-        color = [Color("#76d84b"),Color("#70d246"),Color("#7bde50"),
-            Color("#72d749"),Color("#6fd047"),Color("#7bd750")][posmod(column,6)]
+        color = [Color("#87c965"),Color("#85c763"),Color("#89ca68"),
+            Color("#86c865"),Color("#84c662"),Color("#88c967")][posmod(column,6)]
     elif row == 1:
-        color = Color("#a4b979") if column%3 == 0 else Color("#a3c584")
+        color = Color("#8ac56b") if column%3 == 0 else Color("#86c568")
     elif row == 2:
         color = Color("#149cdf") if column%2 == 0 else Color("#168ddd")
     var points := PackedVector2Array([
@@ -953,18 +953,17 @@ func tile_draw(p: Vector2, row: int, column: int) -> void:
         draw_line(p+Vector2(-rx*0.12,0),p+Vector2(rx*0.10,-ry*0.30),Color("#85987a",0.40),2.0*world_zoom,true)
 
 func draw_casual_tree(p: Vector2,variant: int) -> void:
-    var z := clampf(world_zoom,0.48,1.50)
-    var h := (30.0+float(posmod(variant,3))*6.0)*z
-    var b := 14.0*z
-    draw_ellipse_shadow(p+Vector2(3,1)*z,12.0*z,4.0*z)
-    draw_rect(Rect2(p.x-2*z,p.y-h*0.36,4*z,h*0.40),Color("#7b643c"))
+    var z := world_zoom
+    var h := (32.0+float(posmod(variant,3))*5.0)*z
+    var sway := sin(time*0.7+float(variant))*1.2*z
+    draw_ellipse_shadow(p+Vector2(4,1)*z,13*z,5*z)
+    draw_line(p,p+Vector2(0,-h*0.6),Color("#806843"),4*z,true)
+    # Rounded, shaded crowns match the soft miniature buildings.
     for i in range(3):
-        var y := p.y-h*0.24-float(i)*h*0.21
-        var spread := b*(1.0-float(i)*0.12)
-        draw_colored_polygon(PackedVector2Array([
-            Vector2(p.x,y-h*0.46),Vector2(p.x-spread,y+spread*0.50),
-            Vector2(p.x+spread,y+spread*0.50)]),
-            [Color("#168c3c"),Color("#20a94a"),Color("#32b94a")][i])
+        var c := p+Vector2(sway+(i-1)*7*z,-h*(0.60+0.14*(i%2)))
+        draw_circle(c,12*z,Color("#388d43"))
+        draw_circle(c+Vector2(-3,-4)*z,10*z,Color("#56ac49"))
+        draw_circle(c+Vector2(-5,-6)*z,6*z,Color("#80c957"))
 
 func draw_ellipse_shadow(p: Vector2,rx: float,ry: float) -> void:
     draw_colored_polygon(PackedVector2Array([
@@ -999,8 +998,10 @@ func draw_casual_decor() -> void:
             if busy:
                 continue
             var seed := posmod(x*71+y*47+x*y*3,37)
-            if seed <= 4:
+            if seed <= 8:
                 draw_casual_tree(pos+Vector2(0,-9)*world_zoom,seed)
+                if seed < 3:
+                    draw_casual_tree(pos+Vector2(23,4)*world_zoom,seed+1)
             elif seed == 9:
                 draw_casual_rock(pos+Vector2(0,-6)*world_zoom,x+y)
 
@@ -1076,39 +1077,38 @@ func road_travel_steps(mine: int, destination: Dictionary) -> int:
     return maxi(0,route.size()-1)
 
 func draw_road_link(a: Vector2,b: Vector2) -> void:
-    var lane := maxf(7.0,23.0*world_zoom)
-    draw_line(a,b,Color("#edf0e9"),lane+7.0*world_zoom,true)
-    draw_line(a,b,Color("#555965"),lane,true)
-    draw_line(a,b,Color("#626773"),lane-5.0*world_zoom,true)
-    var delta := b-a
-    for segment in range(2):
-        var t := (float(segment)+0.25)/2.0
-        draw_line(a+delta*t,a+delta*(t+0.20),Color("#eff1e9"),maxf(1,2.2*world_zoom),true)
+    # Compatibility helper. Network rendering below uses global layer passes.
+    draw_line(a,b,Color("#65717b"),23.0*world_zoom,true)
 
 func draw_road_system() -> void:
     if world_roads.is_empty():
         make_road_network()
-    for x in range(MAP_W):
-        for y in range(MAP_H):
-            if not world_roads.has(road_key(x,y)):
-                continue
-            var p := world_screen(Vector2(x,y))
-            if p.x < -190 or p.x > size.x+190 or p.y < -190 or p.y > size.y+190:
-                continue
-            if world_roads.has(road_key(x+1,y)):
-                draw_road_link(p,world_screen(Vector2(x+1,y)))
-            if world_roads.has(road_key(x,y+1)):
-                draw_road_link(p,world_screen(Vector2(x,y+1)))
-    # Intersection caps share precisely one center coordinate.
-    for x in range(MAP_W):
-        for y in range(MAP_H):
-            if not world_roads.has(road_key(x,y)):
-                continue
-            var p := world_screen(Vector2(x,y))
-            if p.x < -100 or p.x > size.x+100 or p.y < -100 or p.y > size.y+100:
-                continue
-            if road_planner.neighbors(Vector2i(x,y)).size() >= 2:
-                draw_circle(p,maxf(3.0,8.5*world_zoom),Color("#626773"))
+    var segments: Array = []
+    var junctions: Array = []
+    for key in world_roads:
+        var parts: PackedStringArray = str(key).split(":")
+        var cell := Vector2i(int(parts[0]),int(parts[1]))
+        var p := world_screen(Vector2(cell))
+        if p.x < -190 or p.x > size.x+190 or p.y < -190 or p.y > size.y+190:
+            continue
+        junctions.append(p)
+        for offset in [Vector2i.RIGHT,Vector2i.DOWN]:
+            var next: Vector2i = cell+offset
+            if world_roads.has(road_key(next.x,next.y)):
+                segments.append([p,world_screen(Vector2(next))])
+    # Paint ALL curbs before ALL asphalt. No curb can cross a neighboring lane.
+    for layer in range(2):
+        var width := (29.0 if layer == 0 else 23.0)*world_zoom
+        var color := Color("#dbe2ce") if layer == 0 else Color("#65717b")
+        for edge in segments:
+            draw_line(edge[0],edge[1],color,width,true)
+        for p in junctions:
+            draw_circle(p,width*0.5,color)
+    # Mark only the middle of each link: turns and junctions remain clear.
+    for edge in segments:
+        var a: Vector2 = edge[0]
+        var b: Vector2 = edge[1]
+        draw_line(a.lerp(b,0.34),a.lerp(b,0.66),Color("#f0edda"),2*world_zoom,true)
 
 func atlas_building(kind: String, owned: bool, index: int) -> Vector2i:
     match kind:
@@ -1178,6 +1178,13 @@ func building_span(p: Vector2, entities: Array) -> float:
             nearest = minf(nearest,distance)
     return clampf(minf(normal_size,nearest*1.15),55.0*world_zoom,normal_size)
 
+func bright_region(index: int) -> Rect2:
+    # Authored bounds of complete isolated sprites; never assume an equal grid.
+    var columns := [0.0,476.0,900.0,1342.0,1774.0]
+    var col := index%4
+    var row := int(index/4)
+    return Rect2(columns[col],float(row)*443.0,columns[col+1]-columns[col],443.0)
+
 func draw_building_body(p: Vector2,kind: String,owned: bool,index: int,span: float = -1.0) -> void:
     var art_id := 0
     match kind:
@@ -1187,11 +1194,11 @@ func draw_building_body(p: Vector2,kind: String,owned: bool,index: int,span: flo
         "market", "contract": art_id = 3
         "hangar": art_id = 4
         "barracks": art_id = 5
-    var width := (ISO_W*world_zoom*1.42) if span <= 0 else span*1.48
+    var width := (ISO_W*world_zoom*1.42) if span <= 0 else span*1.20
     if kind == "market" or kind == "contract":
         width *= 0.88
-    var box := Rect2(p.x-width*0.50,p.y-width*0.78,width,width)
-    var src := Rect2(float(art_id%4)*320.0,float(int(art_id / 4))*320.0,320.0,320.0)
+    var box := Rect2(p.x-width*0.50,p.y-width*0.94,width,width)
+    var src := bright_region(art_id)
     var tint := Color.WHITE if owned else Color(0.80,0.89,0.93,0.88)
     draw_texture_rect_region(BRIGHT_ATLAS,box,src,tint)
     if owned and kind == "factory":
@@ -1203,15 +1210,17 @@ func draw_building_body(p: Vector2,kind: String,owned: bool,index: int,span: flo
 func draw_building_label(p: Vector2,owned: bool,label: String,desc: String) -> void:
     var w := clampf(136.0*world_zoom,100,166)
     var h := clampf(41.0*world_zoom,31,51)
-    var center := p+Vector2(0,-83.0*world_zoom)
+    var center := p+Vector2(0,24.0*world_zoom)
     var first := Rect2(center.x-w*0.5,center.y-h*0.5,w,h*0.58)
     rounded_plate(first,Color("#092d44",0.96),Color("#23617b"),14)
     var size_label := clampi(roundi(w/maxf(8.0,float(label.length())*0.73)),10,17)
     txt(label,first.position+Vector2(10,first.size.y*0.74),size_label,Color.WHITE)
-    var second := Rect2(center.x-w*0.28,first.end.y,w*0.56,h*0.42)
+    if world_zoom < 0.75:
+        return
+    var second := Rect2(center.x-w*0.5,first.end.y,w,h*0.42)
     rounded_plate(second,Color("#f5f8fb",0.98),Color("#d8e4e7"),11)
     var text_value := desc if owned else "₽ "+desc.replace(" ₽","")
-    txt(text_value,second.position+Vector2(5,second.size.y*0.73),clampi(roundi(world_zoom*12),10,13),Color("#17364d"))
+    txt(text_value,second.position+Vector2(5,second.size.y*0.73),clampi(roundi((w-12)/maxf(8.0,float(text_value.length())*0.65)),9,12),Color("#17364d"))
 
 func sci_plate(rect: Rect2,selected: bool = false) -> void:
     draw_rect(rect,Color("#081723",0.90))
@@ -1309,7 +1318,7 @@ func draw_empty_plot(p: Vector2, index: int) -> void:
     var owned := bool(expansion_owned[index])
     var width := ISO_W*world_zoom*1.25
     draw_texture_rect_region(BRIGHT_ATLAS,Rect2(p.x-width*0.50,p.y-width*0.51,width,width),
-        Rect2(3*320.0,320.0,320.0,320.0))
+        bright_region(7))
     var bubble := p+Vector2(0,-width*0.24)
     draw_circle(bubble,15*world_zoom,Color("#21ca21") if not owned else Color("#2b83df"))
     draw_arc(bubble,15*world_zoom,0,TAU,20,Color.WHITE,2.0,true)
@@ -1384,8 +1393,8 @@ func draw_world_hud() -> void:
     var compact := w < 700.0
     # Floating game panels, with greenery still visible underneath.
     draw_rect(Rect2(0,0,w,top),Color("#78d0eb",0.16))
-    var logo_w := minf(315,w*0.30) if not compact else minf(260,w*0.45)
-    var logo_h := maxf(42.0,minf(59.0,top*0.45))
+    var logo_w := minf(205,w*0.22) if not compact else minf(260,w*0.45)
+    var logo_h := maxf(42.0,minf(59.0,top*0.76))
     rounded_plate(Rect2(12,8,logo_w,logo_h),Color("#092b42",0.98),Color("#3c7a8d"),20)
     for i in range(3):
         draw_rect(Rect2(25+i*7,30-i*6,5,12+i*6),Color("#49b8ed"))

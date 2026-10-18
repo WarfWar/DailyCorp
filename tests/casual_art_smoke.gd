@@ -20,7 +20,7 @@ func _check() -> void:
         bad("Actual map not visible")
         return
     var atlas: Texture2D = world.BRIGHT_ATLAS
-    if atlas == null or atlas.get_width() != 1280 or atlas.get_height() != 640:
+    if atlas == null or atlas.get_width() != 1774 or atlas.get_height() != 887:
         bad("Approved eight-sprite art pack not imported correctly")
         return
     if world.BRIGHT_ATLAS.get_image().get_pixel(0,0).a > 0.08:
