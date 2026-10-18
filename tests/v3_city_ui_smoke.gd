@@ -16,10 +16,10 @@ func _check() -> void:
         return
     view.panel = "contracts"
     view.show_panel()
-    if view.buttons().size() != 3 or view.buttons()[0] != "СДАТЬ ЗАКАЗ":
+    if view.buttons().size() != 7 or not str(view.buttons()[0]).contains("Строительство моста"):
         bad("Legacy contract action was changed")
         return
-    view.action(1)
+    view.action(game.operations.CONTRACTS.size())
     if view.panel != "cities" or view.buttons().size() < 7:
         bad("No city list accessible from old contracts")
         return
