@@ -93,7 +93,36 @@ func build(city: Dictionary) -> Dictionary:
                 avenue.call(path_cell.x,path_cell.y)
             lots.append({"type":kind,"slot":slot,"pos":best,"entrance":nearest,
                 "id":"%s/%s/%d" % [identity,kind,slot]})
-    var neighborhood := []
+    # Residential/service blocks are part of the city scenery, not purchasable
+    # industrial slots; do not overlap roads or buildable property.
+    var residential: Array = []
+    var homes := rng.randi_range(22,42)
+    if special == "metropolis":
+        homes += 18
+    for attempt in range(350):
+        if residential.size() >= homes:
+            break
+        var x := rng.randi_range(3,GRID_W-4)
+        var y := rng.randi_range(3,GRID_H-4)
+        if streets.has(key(x,y)) or occupied.has(key(x,y)):
+            continue
+        var pos := Vector2i(x,y)
+        var collides := false
+        for site in lots:
+            if pos.distance_to(site["pos"]) < 2.3:
+                collides = true
+                break
+        if collides:
+            continue
+        for house in residential:
+            if pos.distance_to(house["pos"]) < 1.65:
+                collides = true
+                break
+        if collides:
+            continue
+        residential.append({"pos":pos,"style":rng.randi_range(0,3),
+            "floors":rng.randi_range(2,6) if special == "metropolis" else rng.randi_range(1,3)})
+
     for y in range(GRID_H):
         var line: Array = []
         for x in range(GRID_W):
@@ -114,6 +143,6 @@ func build(city: Dictionary) -> Dictionary:
             line.append(terrain)
         neighborhood.append(line)
     var result := {"id":identity,"seed":seed,"roads":streets,"lots":lots,
-        "terrain":neighborhood,"center":center,"width":GRID_W,"height":GRID_H}
+        "terrain":neighborhood,"residential":residential,"center":center,"width":GRID_W,"height":GRID_H}
     cached[identity] = result
     return result
