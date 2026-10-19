@@ -28,7 +28,10 @@ data class Recipe(val output: String, val ingredients: Map<String, Int>, val sec
 
 data class MineState(val lotId: Int, val depth: Int, val ores: List<String>,
     val reserves: MutableMap<String, Int>, var workers: Int = 1,
-    val loading: MutableMap<String, Int> = mutableMapOf(), var cooldown: Int = 0) : Serializable
+    val loading: MutableMap<String, Int> = mutableMapOf(), var cooldown: Int = 0,
+    var interior: UndergroundMine? = null) : Serializable {
+    companion object { private const val serialVersionUID: Long = -9128487685651322306L }
+}
 
 data class FactoryState(val lotId: Int, var recipeId: String = "steel",
     val inputs: MutableMap<String, Int> = mutableMapOf(), var progress: Int = 0) : Serializable
@@ -57,7 +60,10 @@ data class Contract(val id: Int, val cityId: Int, val material: String,
 data class GameState(val seed: Long, val cities: List<City>, val companies: MutableMap<Int, CityCompany>,
     val trucks: MutableList<Truck>, val contracts: MutableList<Contract>,
     var money: Long = 26000, var era: Int = 1, var science: Int = 0,
-    var totalShipped: Long = 0, var gameSeconds: Long = 0) : Serializable
+    var totalShipped: Long = 0, var gameSeconds: Long = 0,
+    var unlockedResearch: MutableSet<String>? = mutableSetOf()) : Serializable {
+    companion object { private const val serialVersionUID: Long = -7769203087618670042L }
+}
 
 object Catalog {
     // First eight are stable compatibility IDs for economy and logistics.
@@ -253,10 +259,68 @@ class GameEngine(val state: GameState) {
         truck.route=null;return true
     }
     fun buyEra():Boolean {
-        if(state.era>=10)return false
-        val cost=state.era*100
-        if(state.science<cost || state.money<state.era*500L)return false
-        state.science-=cost;state.money-=state.era*500L;state.era++;return true
+        if (!ScienceTree.canAdvanceEra(state)) return false
+        state.science -= state.era*100
+        state.money -= state.era*500L
+        state.era++
+        return true
+    }
+    fun research(id:String):Boolean = ScienceTree.unlock(state,id)
+    fun mineFloor(cityId:Int,lotId:Int):UndergroundFloor? {
+        val mine = company(cityId).mines[lotId] ?: return null
+        return MineWorld.floor(mine,city(cityId).seed xor lotId.toLong())
+    }
+    fun dig(cityId:Int,lotId:Int,x:Int,y:Int):Boolean {
+        val mine = company(cityId).mines[lotId] ?: return false
+        return MineWorld.toggleDig(mine,city(cityId).seed xor lotId.toLong(),x,y)
+    }
+    fun hireMiner(cityId:Int,lotId:Int):Boolean {
+        val mine = company(cityId).mines[lotId] ?: return false
+        val cost = 200L * mine.workers
+        if(mine.workers>=12 || state.money<cost)return false
+        state.money-=cost;mine.workers++
+        mineFloor(cityId,lotId)
+        return true
+    }
+    fun buyMineCart(cityId:Int,lotId:Int):Boolean {
+        val mine = company(cityId).mines[lotId] ?: return false
+        val underground = MineWorld.interior(mine)
+        val cost = 240L * underground.cartsOwned
+        if(underground.cartsOwned>=8 || state.money<cost)return false
+        state.money-=cost;underground.cartsOwned++
+        mineFloor(cityId,lotId)
+        return true
+    }
+    fun improveDrill(cityId:Int,lotId:Int):Boolean {
+        val mine = company(cityId).mines[lotId] ?: return false
+        val underground = MineWorld.interior(mine)
+        val price = 250L*underground.drillLevel
+        if (underground.drillLevel>=8 || state.money<price)return false
+        state.money-=price;underground.drillLevel++
+        return true
+    }
+    fun improveMineCart(cityId:Int,lotId:Int):Boolean {
+        val mine = company(cityId).mines[lotId] ?: return false
+        val underground = MineWorld.interior(mine)
+        val price = 300L*underground.cartLevel
+        if(underground.cartLevel>=8 || state.money<price)return false
+        state.money-=price;underground.cartLevel++
+        return true
+    }
+    fun deepenMine(cityId:Int,lotId:Int):Boolean {
+        val mine = company(cityId).mines[lotId] ?: return false
+        val underground = MineWorld.interior(mine)
+        val current = mineFloor(cityId,lotId) ?: return false
+        val cost = 250L*underground.unlockedFloor
+        if(underground.unlockedFloor >= mine.depth || current.excavated<6 || state.money<cost)return false
+        state.money-=cost;underground.unlockedFloor++
+        underground.activeFloor=underground.unlockedFloor
+        mineFloor(cityId,lotId)
+        return true
+    }
+    fun selectMineFloor(cityId:Int,lotId:Int,number:Int):Boolean {
+        val mine = company(cityId).mines[lotId] ?: return false
+        return MineWorld.changeFloor(mine,city(cityId).seed xor lotId.toLong(),number)
     }
     fun routeOptions(cityId:Int,mode:RouteType): Pair<List<Lot>,List<Pair<Int,String>>> {
         val c=company(cityId)
@@ -284,13 +348,8 @@ class GameEngine(val state: GameState) {
             for (city in state.cities) {
                 val c=company(city.id)
                 for(mine in c.mines.values){
-                    mine.cooldown++
-                    if(mine.cooldown<max(2,7-mine.workers))continue
-                    mine.cooldown=0
-                    val resource=mine.ores.firstOrNull { (mine.reserves[it]?:0)>0 } ?:continue
-                    if((mine.loading[resource]?:0)>=80)continue
-                    mine.reserves[resource]=mine.reserves.getValue(resource)-1
-                    mine.loading[resource]=(mine.loading[resource]?:0)+1
+                    MineWorld.step(mine,city.seed xor mine.lotId.toLong(),
+                        ScienceTree.drillBoost(state),ScienceTree.cartBoost(state))
                 }
                 for(factory in c.factories.values){
                     val recipe=Catalog.recipes[factory.recipeId]?:continue
