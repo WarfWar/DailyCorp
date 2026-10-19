@@ -15,10 +15,9 @@ jobs:
         run: |
           set -euxo pipefail
           tar -xJf bootstrap/native-source.tar.xz
-          rm -f .github/workflows/bootstrap.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .
+          git add README.md app tests build.gradle.kts settings.gradle.kts gradle.properties .gitignore
           if ! git diff --cached --quiet; then
             git commit -m "Expand independent Kotlin Android source for DailyCorp"
             git push origin HEAD:native-rewrite
