@@ -39,7 +39,7 @@ func setup(owner_game, owner_world, saved: Dictionary) -> void:
         routes.append(routing)
         factory_inputs.append({"coal":0,"copper":0,"iron":0,"gold":0})
     personnel = [{"id":1,"mine":0,"level":1},{"id":2,"mine":0,"level":1}]
-    vehicles = [{"id":1,"mine":0,"level":1,"state":"idle","material":"","amount":0,"remaining":0.0,
+    vehicles = [{"id":1,"mine":-1,"level":1,"state":"idle","material":"","amount":0,"remaining":0.0,
         "source":{"type":"none","index":-1},"destination":{"type":"none","index":-1},"assignment":{}}]
     if not saved.is_empty():
         personnel = []
@@ -54,7 +54,7 @@ func setup(owner_game, owner_world, saved: Dictionary) -> void:
                     "material":str(item.get("material","")),"amount":maxi(0,int(item.get("amount",0))),
                     "remaining":maxf(0.0,float(item.get("remaining",0.0))),
                     "source":item.get("source",{"type":"none","index":-1}),
-                    "destination":item.get("destination",{"type":"warehouse","index":3}),
+                    "destination":item.get("destination",{"type":"none","index":-1}),
                     "assignment":item.get("assignment",{})})
         var legacy_buffers: Array = saved.get("buffers",[])
         var legacy_routes: Array = saved.get("routes",[])
@@ -78,12 +78,12 @@ func setup(owner_game, owner_world, saved: Dictionary) -> void:
         shipping_total = maxi(0,int(saved.get("shipping_total",0)))
         contract_progress = saved.get("contract_progress",{}).duplicate(true)
         completed_contracts = saved.get("completed_contracts",[]).duplicate()
+        # Keep any legacy shipment in progress, but never silently recreate
+        # a recurring mine assignment from its last-known cargo.
         for truck in vehicles:
-            if str(truck.get("state","idle")) != "idle" and truck.get("assignment",{}).is_empty():
-                var old_source := {"type":"mine","index":int(truck.get("mine",0))}
-                truck["source"] = old_source
-                truck["assignment"] = {"source":old_source,"destination":truck["destination"],
-                    "material":truck.get("material","iron")}
+            if str(truck.get("state","idle")) == "idle" and truck.get("assignment",{}).is_empty():
+                truck["source"] = {"type":"none","index":-1}
+                truck["destination"] = {"type":"none","index":-1}
     else:
         # Legacy saves: old mine staff were counted rather than represented by IDs.
         var old_count := clampi(game.worker_count,1,10)
@@ -163,7 +163,7 @@ func hire_truck() -> bool:
     if game.cash < cost or vehicles.size() >= 16:
         return false
     game.cash -= cost
-    vehicles.append({"id":next_truck,"mine":0,"level":1,"state":"idle","material":"","amount":0,"remaining":0.0,
+    vehicles.append({"id":next_truck,"mine":-1,"level":1,"state":"idle","material":"","amount":0,"remaining":0.0,
         "source":{"type":"none","index":-1},"destination":{"type":"none","index":-1},"assignment":{}})
     next_truck += 1
     game.save_game()
@@ -191,9 +191,10 @@ func transfer_truck(id: int,mine: int) -> bool:
         return false
     for truck in vehicles:
         if int(truck["id"]) == id and truck["state"] == "idle":
-            truck["mine"] = mine
+            truck["mine"] = mine # Legacy field; an explicit shipment is still required.
             truck["assignment"] = {}
-            truck["source"] = {"type":"mine","index":mine}
+            truck["source"] = {"type":"none","index":-1}
+            truck["destination"] = {"type":"none","index":-1}
             game.save_game()
             return true
     return false
@@ -285,10 +286,14 @@ func cargo_in_transit(target: Dictionary,material: String) -> int:
 func configure_truck(id: int,from_type: String,from_index: int,to_type: String,to_index: int,material: String) -> Dictionary:
     if not ["mine","warehouse"].has(from_type) or not ["factory","warehouse","contract"].has(to_type):
         return {"ok":false,"reason":"route_type"}
-    if from_type == "mine" and (not ORES.has(material) or to_type == "contract"):
+    # Only these four dispatch types exist: mine -> factory / warehouse,
+    # warehouse -> factory / contract. No implicit mine attachment.
+    if (from_type == "mine" and not ["factory","warehouse"].has(to_type)) or (from_type == "warehouse" and not ["factory","contract"].has(to_type)):
+        return {"ok":false,"reason":"route_type"}
+    if from_type == "mine" and not ORES.has(material):
         return {"ok":false,"reason":"mine_ore_only"}
-    if from_type == "warehouse" and to_type == "warehouse":
-        return {"ok":false,"reason":"same_storage"}
+    if to_type == "warehouse" and not ORES.has(material):
+        return {"ok":false,"reason":"warehouse_ore_only"}
     if to_type == "contract" and (to_index < 0 or to_index >= CONTRACTS.size() or str(CONTRACTS[to_index]["key"]) != material or contract_remaining(to_index) == 0):
         return {"ok":false,"reason":"invalid_contract"}
     var source := {"type":from_type,"index":from_index}
@@ -381,7 +386,15 @@ func deliver(truck: Dictionary) -> void:
     var target: Dictionary = truck["destination"]
     var amount := mini(int(truck["amount"]),target_capacity(target,key))
     if amount <= 0:
-        return # Cargo remains onboard until space becomes free.
+        # Another truck may have completed this contract while we were en route.
+        # Return undeliverable cargo rather than stranding the vehicle forever.
+        if str(target.get("type","")) == "contract" and contract_remaining(int(target.get("index",-1))) == 0:
+            game.stock[key] = int(game.stock.get(key,0))+int(truck["amount"])
+            truck["amount"] = 0
+            truck["state"] = "return"
+            truck["remaining"] = truck_seconds(truck)
+            game.save_game()
+        return # Other destinations wait for available storage space.
     if target["type"] == "factory":
         var index := int(target["index"])
         factory_inputs[index][key] = int(factory_inputs[index].get(key,0))+amount

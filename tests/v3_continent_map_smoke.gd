@@ -49,8 +49,12 @@ func _test() -> void:
     view.close_panel()
     view.panel = "continent_city"
     view.action(0)
+    if view.view_mode != "regional":
+        fail("Starter city must also open its unique procedural city map")
+        return
+    view.tapped(view.bottom_button(2).get_center())
     if view.view_mode != "city":
-        fail("Starter city cannot open its interactive industrial district")
+        fail("Starter city's industrial district became inaccessible")
         return
     view.enter_continent()
     if view.view_mode != "continent":

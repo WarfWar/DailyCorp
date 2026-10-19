@@ -13,18 +13,24 @@ func build(city: Dictionary) -> Dictionary:
     if city.is_empty():
         return {}
     var identity := str(city.get("id",""))
-    if cached.has(identity):
-        return cached[identity]
+    var cache_key := "%s:%d" % [identity,int(city.get("seed",1))]
+    if cached.has(cache_key):
+        return cached[cache_key]
     var seed: int = int(city.get("seed",1))
     var rng := RandomNumberGenerator.new()
     rng.seed = maxi(1,seed)
     var lots: Array = []
     var streets: Dictionary = {}
     var occupied: Dictionary = {}
-    var center := Vector2i(19,17)
-    # City arterial grid with variable street spacing and characteristic quarters.
+    # Road grids have stable per-city offsets. No two cities are forced to
+    # reuse identical boulevards or the exact same central block.
     var axis_x := [5,12,19,26,34]
     var axis_y := [5,12,19,26,32]
+    for i in range(axis_x.size()):
+        axis_x[i] += rng.randi_range(-2,2)
+    for i in range(axis_y.size()):
+        axis_y[i] += rng.randi_range(-2,2)
+    var center := Vector2i(axis_x[2],axis_y[2])
     var avenue := func(x: int,y: int) -> void:
         streets[key(x,y)] = true
     for yy in axis_y:
@@ -145,5 +151,5 @@ func build(city: Dictionary) -> Dictionary:
         neighborhood.append(line)
     var result := {"id":identity,"seed":seed,"roads":streets,"lots":lots,
         "terrain":neighborhood,"residential":residential,"center":center,"width":GRID_W,"height":GRID_H}
-    cached[identity] = result
+    cached[cache_key] = result
     return result

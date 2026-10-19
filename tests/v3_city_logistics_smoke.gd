@@ -19,8 +19,8 @@ func _verify() -> void:
     if first["lots"] != repeat["lots"] or first["roads"] != repeat["roads"]:
         fail("Regenerated city changed after reopening")
         return
-    if first["lots"] == next["lots"] and first["terrain"] == next["terrain"]:
-        fail("Different cities have the same map")
+    if first["roads"] == next["roads"] or (first["lots"] == next["lots"] and first["terrain"] == next["terrain"]):
+        fail("Different cities do not have individual street layouts and districts")
         return
     if first["roads"].size() < 170 or first["lots"].size() < 8:
         fail("Procedural city missing interconnected roads and districts")
@@ -49,6 +49,23 @@ func _verify() -> void:
         "source":{"type":"none","index":-1},"destination":{"type":"none","index":-1},"assignment":{}}]
     if not ops.vehicles[0]["assignment"].is_empty():
         fail("Truck automatically assigned to a mine")
+        return
+    world.panel = "truck_route_type"
+    if world.buttons().size() != 5:
+        fail("Missing explicit 4-mode dispatch picker")
+        return
+    world.selected_truck = 0
+    world.action(0)
+    if world.truck_route_kind != "mine_factory" or world.panel != "truck_source" or world.buttons().size() != 5:
+        fail("Cannot choose mine-to-factory transport")
+        return
+    world.action(0)
+    if world.panel != "truck_target" or world.buttons().size() != 5 or not str(world.buttons()[0]).begins_with("ЗАВОД"):
+        fail("Mine-to-factory destination list was not filtered")
+        return
+    world.close_panel()
+    if ops.configure_truck(1,"mine",0,"contract",0,"steel").get("ok",false):
+        fail("Mine-to-contract shortcut must be disabled")
         return
     var assignment: Dictionary = ops.configure_truck(1,"mine",0,"factory",0,"iron")
     if not assignment.get("ok",false):

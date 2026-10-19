@@ -104,6 +104,7 @@ var truck_source: Dictionary = {"type":"none","index":-1}
 var truck_destination: Dictionary = {"type":"none","index":-1}
 var selected_contract := 0
 var contract_route_mode := false
+var truck_route_kind := ""
 var selected_route_material := "iron"
 var selected_route_target := 0
 var selected_slot := 0
@@ -353,15 +354,23 @@ func show_panel() -> void:
                     str(job["source"]["type"]),int(job["source"]["index"])+1,
                     str(job["destination"]["type"]),int(job["destination"]["index"])+1,
                     str(job["material"])])
+        "truck_route_type":
+            title = "Назначение грузовика"
+            lines = ["Выбери тип маршрута. Никаких автоматических назначений.",
+                "Шахта → завод: сырьё для производства.",
+                "Шахта → склад: добытая руда на хранение.",
+                "Склад → завод: сырьё и полуфабрикаты.",
+                "Склад → контракт: отправка груза заказчику."]
         "truck_source":
-            title = "Где загрузить груз?"
-            lines = ["Выбери купленную шахту или склад.",
-                "Транспорт не прикрепляется к шахте автоматически."]
+            title = "Откуда забрать ресурс?"
+            lines = ["Режим: "+truck_route_kind.replace("_"," → "),
+                "Выбери купленную точку погрузки.",
+                "Автоматической привязки транспорта к шахтам нет."]
         "truck_target":
             title = "Куда доставить?"
-            lines = ["Шахта → склад / завод.",
-                "Склад → завод / городской контракт.",
-                "Грузовик должен быть свободен."]
+            lines = ["Выбери получателя: завод, склад или контракт.",
+                "Доступны только получатели выбранного типа маршрута.",
+                "Перевозка возможна только по существующим дорогам."]
         "truck_material":
             title = "Выбери материал"
             lines = ["Назначение создаётся только после подтверждения груза.",
@@ -371,9 +380,11 @@ func show_panel() -> void:
             title = str(task["title"])
             lines = ["Поставить: %s × %d" % [PRODUCTS[str(task["key"])],task["quantity"]],
                 "Доставлено: %d / %d ед." % [int(game.operations.contract_progress.get(str(selected_contract),0)),task["quantity"]],
+                "Осталось доставить: %d ед." % game.operations.contract_remaining(selected_contract),
+                "На складах: %d ед." % int(game.stock.get(str(task["key"]),0)),
                 "Награда: %d ₽" % task["reward"],
-                "Выплата только после приезда грузовика.",
-                "Выбери свободный транспорт для доставки со склада."]
+                "Выплата только после фактической разгрузки.",
+                "Выбери грузовик и склад-отправитель."]
         "contract_fleet":
             title = "Назначить доставку"
             lines = ["Выбери грузовик для городского заказа.",
@@ -534,13 +545,13 @@ func show_panel() -> void:
                         lines.append("Ожидание: "+str(status.get("reason","материалы")))
         "contracts":
             title = "Контракты · диспетчер поставок"
-            lines = ["Список заказов города. Платёж после фактической доставки.",
-                "Для каждого заказа требуется отдельный товар."]
+            lines = ["Реестр заказов компании · поставки только грузовиками.",
+                "Выбери заказ → машину → склад, выплаты за готовый заказ."]
             for j in range(game.operations.CONTRACTS.size()):
                 var entry: Dictionary = game.operations.CONTRACTS[j]
                 var count: int = int(game.operations.contract_progress.get(str(j),0))
                 var label := "ВЫПОЛНЕНО" if game.operations.completed_contracts.has(j) else "%d/%d" % [count,entry["quantity"]]
-                lines.append("%d. %s · %s" % [j+1,entry["title"],label])
+                lines.append("%02d. %s · %s · %d ₽" % [j+1,entry["title"],label,entry["reward"]])
     if info_seconds > 0.0:
         lines.push_front(info)
     var commands_to_show: Array = buttons()
@@ -729,7 +740,14 @@ func enter_continent() -> void:
 
 func enter_selected_city() -> void:
     panel = ""
-    view_mode = "city" if selected_continent_city == "city_001" else "regional"
+    # Every city, including city_001, opens its persistent procedural map.
+    # The starter industrial scene remains accessible from the city's toolbar.
+    view_mode = "regional"
+    if game.campaign_v3 != null:
+        var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
+        var layout: Dictionary = city_layout.build(city)
+        if not layout.is_empty():
+            region_center = Vector2(layout["center"])
     if dialog != null:
         dialog.hide()
     queue_redraw()
@@ -904,8 +922,18 @@ func tapped(p: Vector2) -> void:
                     match i:
                         0: enter_continent()
                         1: panel = "city_mines"
-                        2: panel = "city_projects"
-                        3: game.save_game(); pop("Компания сохранена")
+                        2:
+                            if selected_continent_city == "city_001":
+                                view_mode = "city"
+                                queue_redraw()
+                            else:
+                                panel = "contracts"
+                        3:
+                            if selected_continent_city == "city_001":
+                                panel = "contracts"
+                            else:
+                                game.save_game()
+                                pop("Компания сохранена")
                 else:
                     match i:
                         0: panel = "trade"
@@ -1043,27 +1071,29 @@ func buttons() -> Array:
                 result.append("ГРУЗОВИК #%d · УРОВЕНЬ %d" % [truck["id"],truck["level"]])
             return result
         "truck": return ["УЛУЧШИТЬ","НАЗНАЧИТЬ МАРШРУТ","СНЯТЬ С МАРШРУТА","НАЗАД"]
+        "truck_route_type": return ["ШАХТА → ЗАВОД","ШАХТА → СКЛАД","СКЛАД → ЗАВОД","СКЛАД → КОНТРАКТ","НАЗАД"]
         "truck_source":
             var sources: Array = []
-            if not contract_route_mode:
+            if truck_route_kind.begins_with("mine_"):
                 for j in range(4):
-                    sources.append("ШАХТА: "+str(MINES[j]["name"]))
-            for j in range(4):
-                sources.append("СКЛАД: "+str(WAREHOUSES[j]["name"]))
+                    sources.append("ШАХТА: %s%s" % [str(MINES[j]["name"])," · закрыта" if not mine_owned[j] else ""])
+            else:
+                for j in range(4):
+                    sources.append("СКЛАД: %s%s" % [str(WAREHOUSES[j]["name"])," · закрыт" if not warehouse_owned[j] else ""])
             sources.append("НАЗАД")
             return sources
         "truck_target":
             var choices: Array = []
-            if truck_source.get("type","") == "mine":
-                for j in range(4):
-                    choices.append("СКЛАД: "+str(WAREHOUSES[j]["name"]))
-                for j in range(4):
-                    choices.append("ЗАВОД: "+str(FACTORIES[j]["name"]))
-            else:
-                for j in range(4):
-                    choices.append("ЗАВОД: "+str(FACTORIES[j]["name"]))
-                for j in range(game.operations.CONTRACTS.size()):
-                    choices.append("КОНТРАКТ: "+str(game.operations.CONTRACTS[j]["title"]))
+            match truck_route_kind:
+                "mine_warehouse":
+                    for j in range(4):
+                        choices.append("СКЛАД: %s%s" % [str(WAREHOUSES[j]["name"])," · закрыт" if not warehouse_owned[j] else ""])
+                "warehouse_contract":
+                    for j in range(game.operations.CONTRACTS.size()):
+                        choices.append("КОНТРАКТ: "+str(game.operations.CONTRACTS[j]["title"]))
+                _:
+                    for j in range(4):
+                        choices.append("ЗАВОД: %s%s" % [str(FACTORIES[j]["name"])," · закрыт" if not factory_owned[j] else ""])
             choices.append("НАЗАД")
             return choices
         "truck_material":
@@ -1321,47 +1351,51 @@ func action(i: int) -> void:
                 pop("Машина модернизирована" if game.operations.upgrade_truck(truck_id) else "Не хватает ресурсов или максимальный уровень")
             elif i == 1:
                 contract_route_mode = false
+                truck_route_kind = ""
                 truck_source = {"type":"none","index":-1}
                 truck_destination = {"type":"none","index":-1}
-                panel = "truck_source"
+                panel = "truck_route_type"
             elif i == 2:
                 var truck_id := int(game.operations.vehicles[selected_truck]["id"])
                 pop("Маршрут снят" if game.operations.clear_truck_route(truck_id) else "Дождись завершения рейса")
             else:
                 panel = "hangar"
-        "truck_source":
-            var mines := 0 if contract_route_mode else 4
-            if i >= mines+4:
-                panel = "contract_detail" if contract_route_mode else "truck"
+        "truck_route_type":
+            if i >= 0 and i < 4:
+                truck_route_kind = ["mine_factory","mine_warehouse","warehouse_factory","warehouse_contract"][i]
+                contract_route_mode = false
+                panel = "truck_source"
             else:
-                var source_type := "mine" if i < mines else "warehouse"
-                var source_index := i if i < mines else i-mines
-                truck_source = {"type":source_type,"index":source_index}
-                if contract_route_mode:
-                    var item_key := str(game.operations.CONTRACTS[selected_contract]["key"])
-                    var vehicle_id := int(game.operations.vehicles[selected_truck]["id"])
-                    var result: Dictionary = game.operations.configure_truck(vehicle_id,"warehouse",source_index,
-                        "contract",selected_contract,item_key)
-                    if result.get("ok",false):
-                        pop("Назначен маршрут: склад → контракт")
-                        panel = "contract_detail"
-                    else:
-                        pop("Невозможно назначить: "+str(result.get("reason","недоступно")))
+                panel = "truck"
+        "truck_source":
+            if i < 0 or i >= 4:
+                panel = "contract_detail" if contract_route_mode else "truck_route_type"
+            else:
+                var source_type := "mine" if truck_route_kind.begins_with("mine_") else "warehouse"
+                var source_index := i
+                if (source_type == "mine" and not mine_owned[source_index]) or (source_type == "warehouse" and not warehouse_owned[source_index]):
+                    pop("Сначала приобрети точку погрузки")
                 else:
-                    panel = "truck_target"
+                    truck_source = {"type":source_type,"index":source_index}
+                    if contract_route_mode:
+                        var item_key := str(game.operations.CONTRACTS[selected_contract]["key"])
+                        var vehicle_id := int(game.operations.vehicles[selected_truck]["id"])
+                        var result: Dictionary = game.operations.configure_truck(vehicle_id,"warehouse",source_index,
+                            "contract",selected_contract,item_key)
+                        if result.get("ok",false):
+                            pop("Назначен маршрут: склад → контракт")
+                            panel = "contract_detail"
+                        else:
+                            pop("Невозможно назначить: "+str(result.get("reason","недоступно")))
+                    else:
+                        panel = "truck_target"
         "truck_target":
-            var destinations: int = 8 if truck_source.get("type","") == "mine" else 4+game.operations.CONTRACTS.size()
+            var destinations: int = game.operations.CONTRACTS.size() if truck_route_kind == "warehouse_contract" else 4
             if i < 0 or i >= destinations:
                 panel = "truck_source"
             else:
-                var dest_type := ""
-                var dest_index := 0
-                if truck_source.get("type","") == "mine":
-                    dest_type = "warehouse" if i < 4 else "factory"
-                    dest_index = i if i < 4 else i-4
-                else:
-                    dest_type = "factory" if i < 4 else "contract"
-                    dest_index = i if i < 4 else i-4
+                var dest_type := "warehouse" if truck_route_kind == "mine_warehouse" else ("contract" if truck_route_kind == "warehouse_contract" else "factory")
+                var dest_index := i
                 truck_destination = {"type":dest_type,"index":dest_index}
                 if dest_type == "contract":
                     var job_id := int(game.operations.vehicles[selected_truck]["id"])
@@ -1399,6 +1433,8 @@ func action(i: int) -> void:
         "contract_fleet":
             if i >= 0 and i < game.operations.vehicles.size():
                 selected_truck = i
+                truck_route_kind = "warehouse_contract"
+                contract_route_mode = true
                 truck_destination = {"type":"contract","index":selected_contract}
                 panel = "truck_source"
             else:
@@ -2422,7 +2458,10 @@ func draw_regional_map() -> void:
     draw_rect(Rect2(0,size.y-b,size.x,b),Color("#08283e",0.97))
     txt("Уникальная карта города · двигай и масштабируй · выбери участок",
         Vector2(16,size.y-b-12),clampi(roundi(size.x*0.012),10,14),Color("#f4f2e5"))
-    draw_mode_navigation(["КОНТИНЕНТ","ШАХТЫ","КОНТРАКТЫ","СОХР."])
+    if selected_continent_city == "city_001":
+        draw_mode_navigation(["КОНТИНЕНТ","ШАХТЫ","ПРОИЗВОДСТВО","КОНТРАКТЫ"])
+    else:
+        draw_mode_navigation(["КОНТИНЕНТ","ШАХТЫ","КОНТРАКТЫ","СОХР."])
 
 func draw_mode_navigation(names: Array) -> void:
     var b := bottom_bar_height()
