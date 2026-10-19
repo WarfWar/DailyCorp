@@ -115,7 +115,9 @@ var view_mode := "continent"
 var continent_map = ContinentMap.new()
 var city_layout = CityLayout.new()
 var region_center := Vector2(19,17)
-var region_zoom := 0.93
+var region_zoom := 1.42
+var selected_region_kind := ""
+var selected_region_slot := 0
 var continent_center := Vector2(512.0,512.0)
 var continent_zoom := 1.0
 var selected_municipal_project := ""
@@ -451,6 +453,15 @@ func show_panel() -> void:
                         lines.append("Пока нет открытых проектов. Развивай технологии.")
                     for project in offers:
                         lines.append("%s — %d ₽" % [project["name_ru"],project["reward_money_base"]])
+        "city_lot_detail":
+            var selected_city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
+            var names: Dictionary = {"factory":"Завод","warehouse":"Склад",
+                "commercial":"Торговля","municipal":"Мэрия","energy":"Электростанция"}
+            title = "%s · участок %d" % [str(names.get(selected_region_kind,"Участок")),selected_region_slot+1]
+            lines = [str(selected_city.get("name","Город")),
+                "Подъезд к площадке подключён к городской дорожной сети.",
+                "Здание больше не расположено на дороге.",
+                "Промышленное производство пока доступно в районе города 001."]
         "city_mines":
             var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
             title = "Геология · "+str(city.get("name","город"))
@@ -818,7 +829,9 @@ func tapped_regional(p: Vector2) -> void:
                 selected_continent_mine_slot = int(region["slot"])
                 panel = "city_mine_detail"
             else:
-                panel = "city_projects"
+                selected_region_kind = str(region["type"])
+                selected_region_slot = int(region["slot"])
+                panel = "city_lot_detail"
             show_panel()
             return
 
@@ -860,7 +873,7 @@ func _gui_input(event: InputEvent) -> void:
             if view_mode == "continent":
                 set_continent_zoom(continent_zoom*ratio)
             elif view_mode == "regional":
-                region_zoom = clampf(region_zoom*ratio,0.53,2.0)
+                region_zoom = clampf(region_zoom*ratio,0.64,2.55)
             elif view_mode == "city":
                 world_zoom = clampf(world_zoom*ratio,0.5,1.45)
         accept_event()
@@ -1142,6 +1155,7 @@ func buttons() -> Array:
             projects.append("СКЛАД КОНТИНЕНТА")
             projects.append("НАЗАД")
             return projects
+        "city_lot_detail": return ["НАЗАД"]
         "city_mines":
             var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
             var entries: Array = []
@@ -1501,6 +1515,8 @@ func action(i: int) -> void:
                     panel = "city_materials"
                 else:
                     panel = "cities"
+        "city_lot_detail":
+            panel = ""
         "city_mines":
             var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
             var max_sites := int(city.get("lots",{}).get("mine",0))
@@ -2316,9 +2332,9 @@ func draw_continent() -> void:
 
 func draw_regional_house(p: Vector2,style: int,floors: int) -> void:
     var scale := region_zoom
-    var w := 11.0*scale
-    var h := 5.5*scale
-    var height := (5.0+float(floors)*5.0)*scale
+    var w := 13.5*scale
+    var h := 6.5*scale
+    var height := (6.0+float(floors)*5.0)*scale
     var pale: Color = [Color("#ffeed1"),Color("#dcebf2"),Color("#f2d9c6"),
         Color("#d6e8d5")][posmod(style,4)]
     var roof: Color = [Color("#b85845"),Color("#456e9a"),Color("#bf7d45"),
@@ -2335,7 +2351,7 @@ func draw_regional_house(p: Vector2,style: int,floors: int) -> void:
         Color("#7398a8"),2.4*scale,true)
 
 func draw_regional_map() -> void:
-    draw_rect(Rect2(Vector2.ZERO,size),Color("#8cc3d7"))
+    draw_rect(Rect2(Vector2.ZERO,size),Color("#39a1d9"))
     if game.campaign_v3 == null:
         return
     var city: Dictionary = game.campaign_v3.find_city(selected_continent_city)
@@ -2359,17 +2375,17 @@ func draw_regional_map() -> void:
             if p.x < -rx*2 or p.x > size.x+rx*2 or p.y < view_top-ry*3 or p.y > view_bottom+ry*3:
                 continue
             var cell := str(ground[y][x])
-            var color := Color("#8fcb79") if (x+y)%4 < 2 else Color("#95d180")
+            var color := Color("#8cc777")
             match cell:
-                "trees": color = Color("#71b979")
-                "flower": color = Color("#aad88b")
-                "stone": color = Color("#a8a693")
-                "water": color = Color("#41b1d6")
-                "field": color = Color("#c7d078")
-                "rock": color = Color("#a3c3a0")
+                "trees": color = Color("#7cbb70")
+                "flower": color = Color("#91c780")
+                "stone": color = Color("#a8a793")
+                "water": color = Color("#34a8d6")
+                "field": color = Color("#c1c877")
+                "rock": color = Color("#83bd72")
             draw_colored_polygon(PackedVector2Array([
                 p+Vector2(0,-ry),p+Vector2(rx,0),p+Vector2(0,ry),p+Vector2(-rx,0)]),color)
-            if cell == "trees" and region_zoom > 0.55:
+            if cell == "trees" and region_zoom > 0.75 and (x*17+y*31)%6 == 0:
                 draw_circle(p+Vector2(0,-ry*0.45),4.0*region_zoom,Color("#2d8259"))
             elif cell == "water" and (x+y)%5 == 0:
                 draw_line(p-Vector2(rx*0.33,0),p+Vector2(rx*0.14,ry*0.1),Color("#d5f4ef",0.57),1.4,true)
@@ -2388,8 +2404,8 @@ func draw_regional_map() -> void:
                 segments.append([screen,regional_screen(Vector2(cell+delta))])
     # Continuous curb/asphalt passes avoid seams through intersections.
     for layer in range(2):
-        var width := (18.0 if layer == 0 else 13.0)*region_zoom
-        var color := Color("#d3d9cd") if layer == 0 else Color("#536371")
+        var width := (24.0 if layer == 0 else 19.0)*region_zoom
+        var color := Color("#c9cec8") if layer == 0 else Color("#697581")
         for edge in segments:
             draw_line(edge[0],edge[1],color,width,true)
         for center in nodes:
@@ -2403,14 +2419,24 @@ func draw_regional_map() -> void:
         draw_circle(civic,16*region_zoom,Color("#e8d5a1"))
         draw_circle(civic,7*region_zoom,Color("#d09b5c"))
         txt("ЦЕНТР",civic+Vector2(-25,29)*region_zoom,maxi(10,roundi(12*region_zoom)),Color("#183d4b"))
+    var scenery: Array = []
     for home in layout.get("residential",[]):
-        var house_position: Vector2 = regional_screen(Vector2(home["pos"]))
-        if house_position.x < -70 or house_position.x > size.x+70 or house_position.y < view_top-70 or house_position.y > view_bottom+70:
+        scenery.append({"kind":"house","screen":regional_screen(Vector2(home["pos"])),
+            "style":int(home["style"]),"floors":int(home["floors"])})
+    for lot_site in region_hotspots():
+        var site: Dictionary = lot_site.duplicate()
+        site["kind"] = "lot"
+        scenery.append(site)
+    # One painter's order: houses cannot overpaint the feet of buildings.
+    scenery.sort_custom(func(a,b): return float(a["screen"].y) < float(b["screen"].y))
+    for item in scenery:
+        if str(item["kind"]) == "house":
+            var house_position: Vector2 = item["screen"]
+            if house_position.x < -120 or house_position.x > size.x+120 or house_position.y < view_top-120 or house_position.y > view_bottom+120:
+                continue
+            draw_regional_house(house_position,int(item["style"]),int(item["floors"]))
             continue
-        draw_regional_house(house_position,int(home["style"]),int(home["floors"]))
-    var sites := region_hotspots()
-    sites.sort_custom(func(a,b): return float(a["screen"].y) < float(b["screen"].y))
-    for spot in sites:
+        var spot: Dictionary = item
         var p: Vector2 = spot["screen"]
         if p.x < -100 or p.x > size.x+100 or p.y < view_top-105 or p.y > view_bottom+105:
             continue
@@ -2420,33 +2446,40 @@ func draw_regional_map() -> void:
         if kind == "mine":
             var cid := int(selected_continent_city.trim_prefix("city_").to_int())
             mine_owned_here = not game.campaign_v3.registered_mine(cid,int(spot["slot"])).is_empty()
-        var radius := clampf(22*region_zoom,13,31)
-        var fill := Color("#7baeb6",0.72)
+        var radius := 28.0*region_zoom
+        var fill := Color("#d7c99d")
+        var sprite_key := kind
         match kind:
-            "mine": fill = Color("#9a9582",0.82)
-            "factory": fill = Color("#cf9c71",0.80)
-            "warehouse": fill = Color("#5b9ec4",0.84)
-            "commercial": fill = Color("#e2bd79",0.78)
-            "municipal": fill = Color("#9ec7a5",0.78)
-            "energy": fill = Color("#b5b2d2",0.78)
-        draw_colored_polygon(PackedVector2Array([p+Vector2(0,-radius*0.53),
-            p+Vector2(radius,0),p+Vector2(0,radius*0.53),p+Vector2(-radius,0)]),fill)
-        var owned := mine_owned_here
-        if owned or kind == "municipal" or kind == "commercial":
-            var sprite: Texture2D = WORLD_ART.get("mine" if kind=="mine" else ("market" if kind=="municipal" or kind=="commercial" else "warehouse"),null)
-            if sprite != null:
-                var width := clampf(78*region_zoom,42,110)
-                draw_texture_rect(sprite,Rect2(p.x-width*0.5,p.y-width*0.84,width,width),false,
-                    Color(1,1,1,0.93))
-        else:
-            draw_circle(p,4.2*region_zoom,Color("#f6ffff"))
-        if region_zoom > 0.60:
+            "mine": fill = Color("#b9ad90")
+            "factory": fill = Color("#cbb6a1")
+            "warehouse": fill = Color("#c2d2d5")
+            "commercial":
+                fill = Color("#dacda5")
+                sprite_key = ["market","hangar","barracks"][posmod(int(spot["slot"]),3)]
+            "municipal":
+                fill = Color("#e4d3a8")
+                sprite_key = "barracks"
+            "energy":
+                fill = Color("#c6c2ad")
+                sprite_key = "factory"
+        draw_colored_polygon(PackedVector2Array([p+Vector2(0,-radius*0.46),
+            p+Vector2(radius*0.87,0),p+Vector2(0,radius*0.46),
+            p+Vector2(-radius*0.87,0)]),fill)
+        var sprite: Texture2D = WORLD_ART.get(sprite_key,null)
+        if sprite != null:
+            var width := clampf(100.0*region_zoom,72.0,225.0)
+            var opacity := 1.0 if (kind != "mine" or mine_owned_here) else 0.67
+            draw_texture_rect(sprite,Rect2(p.x-width*0.5,p.y-width*0.88,width,width),false,
+                Color(1,1,1,opacity))
+        if region_zoom > 0.82:
             var title: String = {"mine":"ШАХТА","factory":"ЗАВОД","warehouse":"СКЛАД",
-                "commercial":"ТОРГОВЛЯ","municipal":"ГОРОД","energy":"ЭНЕРГИЯ"}.get(kind,"УЧАСТОК")
-            var bounds := Rect2(p.x-43*region_zoom,p.y+radius*0.51,86*region_zoom,21*region_zoom)
-            draw_rect(bounds,Color("#103449",0.90))
-            txt("%s %s" % [title,lot],bounds.position+Vector2(5,14)*region_zoom,
-                maxi(9,roundi(11*region_zoom)),Color.WHITE)
+                "commercial":"ТОРГОВЛЯ","municipal":"МЭРИЯ","energy":"ЭНЕРГИЯ"}.get(kind,"УЧАСТОК")
+            var caption := "%s %s" % [title,lot]
+            var label_width := clampf(float(caption.length())*7.0*region_zoom+18.0,76.0,158.0)
+            var bounds := Rect2(p.x-label_width*0.5,p.y+radius*0.54,label_width,22.0*region_zoom)
+            draw_rect(bounds,Color("#0c344c",0.92))
+            txt(caption,bounds.position+Vector2(8,15)*region_zoom,
+                maxi(10,roundi(12*region_zoom)),Color.WHITE)
     draw_rect(Rect2(0,0,size.x,t),Color("#082b3e",0.96))
     txt("DAILYCORP / "+str(city["name"]),Vector2(20,32),clampi(roundi(size.x*0.020),16,25),Color.WHITE)
     var info: Dictionary = game.campaign_v3.city_economy.city_record(city)
