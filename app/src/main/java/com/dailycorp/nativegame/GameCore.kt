@@ -11,7 +11,8 @@ data class Point(val x: Int, val y: Int) : Serializable
 
 enum class BuildingKind(val title: String) : Serializable {
     MINE("Шахта"), FACTORY("Завод"), WAREHOUSE("Склад"),
-    MARKET("Рынок"), MUNICIPAL("Мэрия"), ENERGY("Энергия")
+    MARKET("Рынок"), MUNICIPAL("Мэрия"), ENERGY("Энергия"),
+    RESEARCH("Исследовательский центр")
 }
 
 data class Lot(val id: Int, val kind: BuildingKind, val pos: Point, val gate: Point) : Serializable
@@ -163,7 +164,8 @@ object CityGenerator {
                 BuildingKind.WAREHOUSE to 2+random.nextInt(3),
                 BuildingKind.MARKET to 1,
                 BuildingKind.MUNICIPAL to 1,
-                BuildingKind.ENERGY to 1
+                BuildingKind.ENERGY to 1,
+                BuildingKind.RESEARCH to 1
             )
             val map = plan(citySeed,counts)
             City(id, "Город %03d".format(id),specialization,citySeed,3500+random.nextInt(24000),map.lots)
