@@ -26,6 +26,11 @@ jobs:
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.1"
+      - name: Reuse native debug signing certificate
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: dailycorp-native-rebuilt-debug-v1
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
