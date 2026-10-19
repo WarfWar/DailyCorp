@@ -32,6 +32,16 @@ func _verify() -> void:
         if p.x < 1 or p.x >= maker.GRID_W-1 or p.y < 1 or p.y >= maker.GRID_H-1:
             fail("Building site off city map")
             return
+        var entrance: Vector2i = lot["entrance"]
+        if first["roads"].has(maker.key(p.x,p.y)):
+            fail("Building footprint overlaps a road")
+            return
+        if not first["roads"].has(maker.key(entrance.x,entrance.y)):
+            fail("City lot entrance not connected to a road")
+            return
+        if absi(p.x-entrance.x)+absi(p.y-entrance.y) != 1:
+            fail("City lot is detached from its access road")
+            return
     if kinds.size() < 4:
         fail("City does not include diversified lots")
         return
