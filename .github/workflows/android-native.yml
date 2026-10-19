@@ -30,6 +30,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+      - name: Run mining, transport and research unit tests
+        run: gradle --no-daemon :app:testDebugUnitTest
       - name: Build new Kotlin Android APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Upload installable APK
