@@ -1,0 +1,54 @@
+name: DailyCorp Native Android APK
+on:
+  push:
+    branches: [native-rewrite]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test-and-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout native code
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Use preinstalled Android SDK
+        run: |
+          set -euxo pipefail
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=${ANDROID_HOME}" >> "$GITHUB_ENV"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.1"
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Build new Kotlin Android APK
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DailyCorp-Native-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish direct APK link
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="native-alpha"
+          cp app/build/outputs/apk/debug/app-debug.apk DailyCorp-Native.apk
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "DailyCorp Native Alpha" \
+              --notes "Полностью нативный Kotlin Android клиент без Godot." --prerelease
+          fi
+          gh release upload "$TAG" DailyCorp-Native.apk --clobber
+          gh release edit "$TAG" --target "$GITHUB_SHA" --notes "Нативная сборка Kotlin из $GITHUB_SHA. Начальная версия с городами, шахтами, заводами, четырьмя маршрутами и контрактами."
