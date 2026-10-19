@@ -164,6 +164,7 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                     BuildingKind.MARKET -> Color.rgb(218,162,95)
                     BuildingKind.MUNICIPAL -> Color.rgb(202,185,147)
                     BuildingKind.ENERGY -> Color.rgb(142,172,158)
+                    BuildingKind.RESEARCH -> Color.rgb(108,151,190)
                 }
                 val w=20f*zoom*d;val h=12f*zoom*d
                 diamond(canvas,x,y+4f*zoom*d,w*1.2f,h*1.5f,
