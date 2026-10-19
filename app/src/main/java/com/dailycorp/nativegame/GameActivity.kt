@@ -2,6 +2,7 @@ package com.dailycorp.nativegame
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -44,6 +45,7 @@ class GameActivity : Activity() {
         window.statusBarColor=bg
         window.navigationBarColor=bg
         game=loadGame()
+        GameSession.engine=game
         buildUi()
         handler.postDelayed(uiTick,1000)
     }
@@ -112,12 +114,14 @@ class GameActivity : Activity() {
         }
         if(map.continentMode){
             add("Город 001"){map.cityId=1;map.continentMode=false;updateActions();refresh()}
+            add("Научный центр"){showResearch()}
             add("Компания"){showCompany()}
             add("Транспорт"){showTrucks()}
             add("Контракты"){showContracts()}
         } else {
             add("← Континент"){map.continentMode=true;updateActions();refresh()}
             add("Шахты"){showSites(BuildingKind.MINE)}
+            add("Научный центр"){showResearch()}
             add("Заводы"){showSites(BuildingKind.FACTORY)}
             add("Склады"){showSites(BuildingKind.WAREHOUSE)}
             add("Транспорт"){showTrucks()}
@@ -160,12 +164,13 @@ class GameActivity : Activity() {
             else -> true
         }
         val options=when(lot.kind){
-            BuildingKind.MINE -> if(purchased)arrayOf("Показать добычу","Ускорить добычу") else arrayOf("Купить шахту")
+            BuildingKind.MINE -> if(purchased)arrayOf("Спуститься в шахту","Нанять шахтёра") else arrayOf("Купить шахту")
             BuildingKind.FACTORY -> if(purchased)arrayOf("Производство","Изменить рецепт") else arrayOf("Купить завод")
             BuildingKind.WAREHOUSE -> if(purchased)arrayOf("Посмотреть склад") else arrayOf("Купить склад")
             BuildingKind.MARKET -> arrayOf("Продать ресурсы")
             BuildingKind.MUNICIPAL -> arrayOf("Контракты города")
             BuildingKind.ENERGY -> arrayOf("Информация")
+            BuildingKind.RESEARCH -> arrayOf("Древо науки")
         }
         AlertDialog.Builder(this).setTitle("${lot.kind.title} №${lot.id+1}").setItems(options){_,which ->
             when(lot.kind){
@@ -178,6 +183,7 @@ class GameActivity : Activity() {
                 BuildingKind.MARKET -> sellResources()
                 BuildingKind.MUNICIPAL -> showContracts()
                 BuildingKind.ENERGY -> showText("Энергетика","Энергетические сети будут развиваться вместе с новыми технологическими эпохами.")
+                BuildingKind.RESEARCH -> showResearch()
             }
             save();refresh()
         }.setNegativeButton("Назад",null).show()
@@ -185,15 +191,14 @@ class GameActivity : Activity() {
     private fun showText(title:String,body:String){AlertDialog.Builder(this).setTitle(title).setMessage(body)
         .setPositiveButton("ОК",null).show()}
     private fun showMine(lot:Lot){
-        val mine=game.company(map.cityId).mines.getValue(lot.id)
-        val lines=mine.ores.map{"${Catalog.name(it)}: погрузка ${mine.loading[it]?:0}, запас ${mine.reserves[it]?:0}"}
-        showText("Шахта №${lot.id+1} · глубина ${mine.depth} этажей",lines.joinToString("\n")+"\nРабочих: ${mine.workers}")
+        GameSession.engine=game
+        GameSession.cityId=map.cityId
+        GameSession.mineLotId=lot.id
+        startActivity(Intent(this,MineActivity::class.java)
+            .putExtra("cityId",map.cityId).putExtra("lotId",lot.id))
     }
     private fun upgradeMine(lot:Lot){
-        val mine=game.company(map.cityId).mines.getValue(lot.id)
-        val cost=200L*mine.workers
-        if(mine.workers>=6 || game.state.money<cost) {message("Нужно ${money(cost)} или достигнут предел рабочих");return}
-        game.state.money-=cost;mine.workers++;message("В шахте теперь ${mine.workers} рабочих")
+        message(if(game.hireMiner(map.cityId,lot.id))"Шахтёр нанят" else "Недостаточно средств или лимит работников")
     }
     private fun showFactory(lot:Lot){
         val factory=game.company(map.cityId).factories.getValue(lot.id)
@@ -306,6 +311,10 @@ class GameActivity : Activity() {
             }
         }
     }
+    private fun showResearch(){
+        GameSession.engine=game
+        startActivity(Intent(this,ResearchActivity::class.java))
+    }
     private fun showCompany(){
         val c=game.company(map.cityId)
         val info="Баланс: ${money(game.state.money)}\nЭпоха: ${game.state.era}/10\n"+
@@ -314,8 +323,9 @@ class GameActivity : Activity() {
             "Заводов: ${c.factories.size}\nСкладов: ${c.warehouses.size}\nГрузовиков: ${game.state.trucks.size}\n"+
             "Перевезено: ${game.state.totalShipped} ед."
         AlertDialog.Builder(this).setTitle("DailyCorp · компания").setMessage(info)
-            .setPositiveButton("Следующая эпоха") { _,_ ->
-                message(if(game.buyEra())"Открыта эпоха ${game.state.era}!" else "Нужно ${game.state.era*100} науки и ${money(game.state.era*500L)}")
+            .setPositiveButton("Древо науки") { _,_ -> showResearch() }
+            .setNeutralButton("Следующая эпоха") { _,_ ->
+                message(if(game.buyEra())"Открыта эпоха ${game.state.era}!" else "Сначала исследуй горное дело эпохи. Нужно ${game.state.era*100} науки и ${money(game.state.era*500L)}")
                 save()
             }.setNegativeButton("Закрыть",null).show()
     }
