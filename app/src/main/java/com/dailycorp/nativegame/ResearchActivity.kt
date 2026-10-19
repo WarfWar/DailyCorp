@@ -15,7 +15,7 @@ import android.widget.TextView
 class ResearchActivity:Activity(){
     private lateinit var game:GameEngine
     private lateinit var root:LinearLayout
-    private val background=Color.rgb(10,34,49)
+    private val screenColor=Color.rgb(10,34,49)
     private fun px(n:Int)=(n*resources.displayMetrics.density).toInt()
     override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState)
@@ -33,7 +33,7 @@ class ResearchActivity:Activity(){
         setPadding(px(13),px(6),px(11),px(6))
     }
     private fun build(){
-        val shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(background)}
+        val shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(screenColor)}
         shell.addView(text("ИССЛЕДОВАТЕЛЬСКИЙ ЦЕНТР",21f))
         shell.addView(text("Текущая эпоха "+game.state.era+"/10 · "+ScienceTree.eraNames[game.state.era-1]+
             " · Очки науки "+game.state.science,13f,true))
