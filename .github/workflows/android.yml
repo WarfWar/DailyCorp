@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -240,3 +240,20 @@ jobs:
           path: build/DailyCorp-debug.apk
           if-no-files-found: error
           retention-days: 30
+
+      # A permanent direct APK URL, without the GitHub Actions ZIP wrapper.
+      - name: Publish direct APK download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="android-latest"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --target "$GITHUB_SHA" \
+              --title "DailyCorp Android · последняя сборка" \
+              --notes "Прямая загрузка APK; обновляется после успешной сборки main." \
+              --prerelease
+          fi
+          gh release upload "$TAG" build/DailyCorp-debug.apk --clobber
+          gh release edit "$TAG" --notes "Android debug APK из коммита $GITHUB_SHA. Файл обновляется после каждого успешного тестирования и экспорта."
+          echo "APK: https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/DailyCorp-debug.apk"
