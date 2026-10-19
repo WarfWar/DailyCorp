@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application android:label="DailyCorp Native" android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false" android:allowBackup="true">
+        <activity android:name=".MineActivity" android:exported="false" />
+        <activity android:name=".ResearchActivity" android:exported="false" />
         <activity android:name=".GameActivity" android:screenOrientation="unspecified" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
