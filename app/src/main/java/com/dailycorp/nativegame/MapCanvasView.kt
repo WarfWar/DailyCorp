@@ -23,6 +23,7 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
     var onCityTap: (Int) -> Unit = {}
     var onLotTap: (Lot) -> Unit = {}
     private val cache = mutableMapOf<Int, MapPlan>()
+    private val art = GameArt(context)
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val shape = Path()
     private var panX = 0f
@@ -61,6 +62,17 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
     private fun cachedPlan():MapPlan=cache.getOrPut(cityId){ CityGenerator.plan(engine.city(cityId)) }
     private fun onScreen(x:Float,y:Float,margin:Float=140f):Boolean =
         x>=-margin && x<=width+margin && y>=-margin && y<=height+margin
+    private fun terrainSprite(x:Int,y:Int,seed:Long):String {
+        val value=(((x/3)*173+(y/4)*97+((seed xor (seed ushr 15)).toInt())) and 127)
+        return when {
+            value<=3 -> "continent.mountains"
+            value<=8 -> "continent.forest"
+            value==9 -> "continent.lake"
+            value==10 -> "continent.rocky_coast"
+            value==11 -> "continent.swamp"
+            else -> "continent.meadow"
+        }
+    }
     private fun terrain(x:Int,y:Int,seed:Long):Int {
         val v=(((x*17+y*29+((seed xor (seed ushr 16)).toInt())) xor ((x/4)*3079 + (y/5)*991)) and 31)
         return when {
@@ -85,6 +97,20 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         diamond(canvas,cx,cy,rx,ry,Color.rgb(112,169,116))
         diamond(canvas,cx-rx*0.07f,cy-ry*0.03f,rx*0.81f,ry*0.82f,Color.rgb(137,190,119))
         diamond(canvas,cx+rx*0.13f,cy+ry*0.04f,rx*0.48f,ry*0.40f,Color.rgb(167,191,126))
+        // Illustrated continent patches from the supplied biome atlas.
+        val scenery=listOf("continent.forest","continent.lake","continent.mountains",
+            "continent.river_curve","continent.swamp","continent.beach",
+            "continent.meadow","continent.highway","continent.industrial_edge",
+            "continent.volcano","continent.snow","continent.rocky_coast",
+            "continent.port","continent.river_bridge","continent.trainline")
+        for(i in scenery.indices){
+            val col=i%5
+            val row=i/5
+            val tx=cx+(col-2f)*rx*0.38f
+            val ty=cy+(row-1f)*ry*0.66f
+            val tw=rx*0.40f; val th=ry*0.72f
+            if(onScreen(tx,ty,tw))art.draw(canvas,scenery[i],tx,ty,tw,th)
+        }
         for(city in engine.state.cities){
             val (x,y)=cityPin(city.id)
             if(!onScreen(x,y,25f))continue
@@ -121,6 +147,16 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                 val (sx,sy)=projected(Point(x,y))
                 if(!onScreen(sx,sy,halfW*2))continue
                 diamond(canvas,sx,sy,halfW+0.45f,halfH+0.45f,terrain(x,y,engine.city(cityId).seed))
+                if(zoom>=0.76f){
+                    // Crop atlas art to the isometric diamond; no square seams or overlaps.
+                    val saved=canvas.save()
+                    shape.reset();shape.moveTo(sx,sy-halfH);shape.lineTo(sx+halfW,sy)
+                    shape.lineTo(sx,sy+halfH);shape.lineTo(sx-halfW,sy);shape.close()
+                    canvas.clipPath(shape)
+                    art.draw(canvas,terrainSprite(x,y,engine.city(cityId).seed),
+                        sx-halfW,sy-halfH,sx+halfW,sy+halfH)
+                    canvas.restoreToCount(saved)
+                }
             }
         }
         // Roads only occupy reserved cells. They never pass through any lot.
@@ -136,6 +172,25 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                 if(zoom>0.85f)line(canvas,x,y,tx,ty,Color.rgb(240,231,201),1f*zoom*d)
             }
         }
+        // The road network remains topologically connected; modular road decals
+        // show junctions and curves without changing pathfinding or lot locations.
+        for(p in plan.roads){
+            if((p.x+p.y)%2!=0)continue
+            val (rx,ry)=projected(p)
+            if(!onScreen(rx,ry,halfW*3))continue
+            val neighbours=listOf(Point(1,0),Point(-1,0),Point(0,1),Point(0,-1))
+                .count {Point(p.x+it.x,p.y+it.y) in plan.roads}
+            val roadAsset=when(neighbours){
+                4->"infra.road_cross"
+                3->"infra.road_t"
+                2->"infra.road_straight"
+                else->"infra.road_curve"
+            }
+            if(neighbours>=3 || (p.x+p.y)%4==0) {
+                art.draw(canvas,roadAsset,rx-halfW*1.18f,ry-halfH*1.45f,
+                    rx+halfW*1.18f,ry+halfH*1.45f)
+            }
+        }
         val scenery=mutableListOf<Triple<Point,Lot?,Boolean>>()
         for(home in plan.homes)scenery.add(Triple(home,null,true))
         for(lot in plan.lots)scenery.add(Triple(lot.pos,lot,false))
@@ -146,9 +201,16 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
             if(isHome){
                 if(zoom<0.72f)continue
                 val n=((at.x*47+at.y*19)%4)
-                drawBuilding(canvas,x,y,8*zoom*d,7*zoom*d,
-                    arrayOf(Color.rgb(218,199,157),Color.rgb(212,218,205),Color.rgb(227,202,182),Color.rgb(175,199,213))[n],
-                    11f*zoom*d,n,false)
+                val key=when(n%3){
+                    0->"buildings.home_1"
+                    1->"buildings.home_5"
+                    else->"buildings.home_10"
+                }
+                if(!art.draw(canvas,key,x-17f*zoom*d,y-22f*zoom*d,
+                        x+17f*zoom*d,y+9f*zoom*d)){
+                    drawBuilding(canvas,x,y,8*zoom*d,7*zoom*d,
+                        Color.rgb(210,206,182),11f*zoom*d,n,false)
+                }
             }else if(lot!=null){
                 val c=engine.company(cityId)
                 val owned=when(lot.kind){
@@ -169,8 +231,13 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                 val w=20f*zoom*d;val h=12f*zoom*d
                 diamond(canvas,x,y+4f*zoom*d,w*1.2f,h*1.5f,
                     if(owned)Color.rgb(210,204,163) else Color.rgb(194,185,152))
-                if(owned)drawBuilding(canvas,x,y,w,h,main,27f*zoom*d,lot.id%4,true)
-                else {
+                if(owned) {
+                    val sprite=art.buildingKey(lot.kind,lot.id)
+                    if(!art.draw(canvas,sprite,x-39f*zoom*d,y-53f*zoom*d,
+                            x+39f*zoom*d,y+12f*zoom*d)){
+                        drawBuilding(canvas,x,y,w,h,main,27f*zoom*d,lot.id%4,true)
+                    }
+                } else {
                     line(canvas,x-6*zoom*d,y,x+6*zoom*d,y,Color.rgb(240,244,224),3f*zoom*d)
                     line(canvas,x,y-6*zoom*d,x,y+6*zoom*d,Color.rgb(240,244,224),3f*zoom*d)
                 }
