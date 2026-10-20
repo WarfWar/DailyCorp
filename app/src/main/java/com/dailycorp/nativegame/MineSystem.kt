@@ -172,7 +172,9 @@ object MineWorld {
             floor.excavated++
         }
         for (cart in floor.carts) {
-            if (cart.delay > 0) { cart.delay--; continue }
+            // Old v1 snapshots can contain a delay counter; clear it.
+            // A cart advances every tick, without waiting on intermediate cells.
+            cart.delay = 0
             val current = Point(cart.x, cart.y)
             val depot = Point(ENTRANCE_X, ENTRANCE_Y)
             if (cart.amount > 0) {
@@ -203,7 +205,7 @@ object MineWorld {
                     }
                 }
             }
-            if (cartBonus == 0 && underground.cartLevel < 2) cart.delay = 1
+
         }
     }
 }

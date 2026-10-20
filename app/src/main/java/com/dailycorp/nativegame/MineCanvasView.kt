@@ -147,7 +147,7 @@ class MineCanvasView(context:Context, private val game:GameEngine, val cityId:In
         }
         for(cart in floor.carts){
             val track=cartTracks.getOrPut(cart.id){
-                MotionTrack(cart.x.toFloat(),cart.y.toFloat(),950L)
+                MotionTrack(cart.x.toFloat(),cart.y.toFloat(),1000L)
             }
             track.target(cart.x.toFloat(),cart.y.toFloat(),now)
             val moving=track.animating(now)

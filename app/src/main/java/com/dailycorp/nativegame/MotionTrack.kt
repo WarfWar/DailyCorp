@@ -22,11 +22,11 @@ class MotionTrack(x: Float, y: Float, private val durationMs: Long = 900L) {
     fun position(nowMs: Long): AnimatedPoint {
         if (!moving) return end
         val fraction = ((nowMs-startedAtMs).toFloat()/max(1L,durationMs).toFloat()).coerceIn(0f,1f)
-        // Smoothstep: gradual departure and arrival; no coordinate jumps.
-        val eased = fraction*fraction*(3f-2f*fraction)
+        // Linear interpolation avoids artificial braking at every cell.
+        // Keep the actor at the current interpolated point when targets change.
         if (fraction >= 1f) moving = false
-        return AnimatedPoint(start.x+(end.x-start.x)*eased,
-            start.y+(end.y-start.y)*eased)
+        return AnimatedPoint(start.x+(end.x-start.x)*fraction,
+            start.y+(end.y-start.y)*fraction)
     }
     fun animating(nowMs: Long): Boolean = moving && nowMs-startedAtMs < durationMs
 }
