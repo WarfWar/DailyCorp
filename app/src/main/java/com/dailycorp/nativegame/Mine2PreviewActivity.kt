@@ -103,14 +103,25 @@ class Mine2PreviewActivity:Activity(){
         header.addView(status)
         root.addView(header)
         view=Mine2PreviewView(this,world)
-        view.onPlan={a,b->
-            val count=world.orderArea(a,b)
-            Toast.makeText(this,if(count>0)"Задач добавлено: "+count
-                else "Область не исследована или превышен лимит",
-                Toast.LENGTH_SHORT).show()
+        view.onPlan={a,_->
+            val c=world.cell(a.x,a.y)
+            val ordered=world.toggleCellOrder(a)
+            Toast.makeText(this,if(ordered)"Добыча назначена: "+
+                (c?.resource?.let{Catalog.name(it)} ?: "порода")+
+                " · осталось "+(c?.deposit?:0)+" ед."
+                else "Задание снято",Toast.LENGTH_SHORT).show()
             refresh();view.invalidate()
         }
+        view.onSelected={p,count->
+            val cell=world.cell(p.x,p.y)
+            Toast.makeText(this,
+                (cell?.resource?.let{Catalog.name(it)}?:"Порода")+
+                " · "+count+" ед. · нажми на клетку ещё раз",
+                Toast.LENGTH_SHORT).show()
+        }
         view.onSurvey={p->
+            // Panning is always enabled. A paid scan is a one-shot tool.
+            view.resetScanner()
             if(readOnly){
                 Toast.makeText(this,"Сохранение недоступно: разведка отключена",
                     Toast.LENGTH_LONG).show()
@@ -151,9 +162,10 @@ class Mine2PreviewActivity:Activity(){
                 marginEnd=px(5)
             })
         }
-        add("⛏ Проходка"){view.mode=Mine2PreviewView.Mode.DIG;refresh()}
-        add("✋ Обзор"){view.mode=Mine2PreviewView.Mode.PAN;refresh()}
-        add("⌕ Разведка ₽"){view.mode=Mine2PreviewView.Mode.SURVEY;refresh()}
+        add("⌕ Разведка ₽"){view.mode=Mine2PreviewView.Mode.SURVEY;refresh()
+            Toast.makeText(this,"Коснись точки сканирования · карту можно двигать",
+                Toast.LENGTH_LONG).show()
+        }
         add("＋ Шахтёр"){
             if(readOnly){
                 Toast.makeText(this,"Сохранение недоступно",Toast.LENGTH_SHORT).show()
@@ -246,11 +258,9 @@ class Mine2PreviewActivity:Activity(){
         refresh()
     }
     private fun refresh(){
-        val label=when(view.mode){
-            Mine2PreviewView.Mode.DIG->"Выдели участок проходки"
-            Mine2PreviewView.Mode.PAN->"Перемещай карту одним пальцем"
-            Mine2PreviewView.Mode.SURVEY->"Нажми рядом с известной зоной"
-        }
+        val label=if(view.mode==Mine2PreviewView.Mode.SURVEY)
+            "Разведка: нажми на точку сканирования; обзор работает постоянно"
+            else "Проведи пальцем — обзор; 2 нажатия на породу — назначить/отменить добычу"
         status.text="Глубина "+(world.config.depthCells*world.config.metersPerCell)+
             " м · Пройдено "+world.totalExcavated+
             " · Заданий "+world.pendingCount()+
