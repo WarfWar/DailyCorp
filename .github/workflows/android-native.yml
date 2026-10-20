@@ -38,6 +38,24 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+      - name: Validate user-supplied 132-sprite art pack
+        run: |
+          python3 - <<'PY'
+          import json, struct
+          from pathlib import Path
+          root=Path("app/src/main/assets")
+          atlas=(root/"dailycorp_resources.webp").read_bytes()
+          assert atlas[:4]==b"RIFF" and atlas[8:12]==b"WEBP"
+          assert struct.unpack("<I",atlas[4:8])[0]+8==len(atlas)
+          info=json.loads((root/"dailycorp_sprite_map.json").read_text(encoding="utf-8"))
+          sprites=info["sprites"]
+          assert len(sprites)==132 and len(set(sprites.values()))==132
+          for key in ("continent.meadow","continent.river","infra.road_cross",
+                      "buildings.home_10","buildings.warehouse_10",
+                      "buildings.university_10","mine.iron","mine.track","mine.shaft"):
+              assert key in sprites, key
+          print("ART ATLAS PASSED: 132 unique tiles and essential asset categories")
+          PY
       - name: Run mining, transport and research unit tests
         run: gradle --no-daemon :app:testDebugUnitTest
       - name: Build new Kotlin Android APK
