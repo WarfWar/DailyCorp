@@ -215,6 +215,27 @@ class Mine2World(val config:Mine2Config):Serializable {
         return surveyFogV2!!
     }
     fun isSurveyDim(x:Int,y:Int):Boolean=CellPos(x,y) in surveyFog()
+    // Optional in old Mine2 saves. No rails or carts until the player enables logistics.
+    private var transportV3:Mine2Transport?=null
+    fun existingTransport():Mine2Transport?=transportV3
+    fun transport():Mine2Transport {
+        if(transportV3==null){
+            val home=CellPos(config.width/2,3)
+            transportV3=Mine2Transport(home)
+            // Material mined in pre-transport versions is at the shaft staging
+            // area. It must still be loaded by a physical cart before delivery.
+            for((material,amount) in stockpile)
+                transportV3!!.addPile(home,material,amount)
+        }
+        return transportV3!!
+    }
+    /** Called ONLY by the cart after actual physical unloading at the lift. */
+    fun removeFromUndergroundStockpile(material:String,amount:Int) {
+        require(amount>0)
+        val available=stockpile[material]?:0
+        check(available>=amount){"Mine cargo accounting underflow"}
+        stockpile[material]=available-amount
+    }
     private var minersV2:MutableList<Mine2Miner>?=null
     var timeTicks=0L
         private set
@@ -400,6 +421,7 @@ class Mine2World(val config:Mine2Config):Serializable {
             if(block.kind==RockKind.ORE && material!=null && block.deposit>0){
                 block.deposit--
                 stockpile[material]=(stockpile[material]?:0)+1
+                transportV3?.addPile(CellPos(worker.x,worker.y),material,1)
                 minedMaterial=material
                 minedAmount++
                 if(block.deposit>0){
@@ -418,6 +440,7 @@ class Mine2World(val config:Mine2Config):Serializable {
             totalExcavated++
             reveal(target.x,target.y,2)
         }
+        transportV3?.step(this)
         return Mine2StepResult(excavated,minedMaterial,minedAmount,pendingCount(),
             if(excavated)"Проходка завершена" else if(moved>0)"Шахтёры перемещаются"
                 else if(pendingCount()==0)"Нет заданий" else "Проходка или ожидание доступа",
