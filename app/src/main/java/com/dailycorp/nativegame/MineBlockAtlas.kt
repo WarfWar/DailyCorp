@@ -14,7 +14,7 @@ import android.graphics.RectF
  */
 class MineBlockAtlas(context:Context) {
     companion object {
-        private const val CELL=40
+        private const val CELL=128
         private const val COLS=6
         private val keys=listOf(
             "ore_bauxite","ore_chromium","ore_clay","ore_coal","ore_cobalt",

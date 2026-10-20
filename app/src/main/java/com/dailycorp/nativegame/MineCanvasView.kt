@@ -21,6 +21,7 @@ class MineCanvasView(context:Context, private val game:GameEngine, val cityId:In
     var onCellTap: ((Int,Int)->Unit)? = null
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
     private val art=GameArt(context)
+    private val blocks=MineBlockAtlas(context)
     private val sprites=MineSpriteFrames(context)
     private val minerDirection=mutableMapOf<Int,Boolean>()
     private val lastMinerX=mutableMapOf<Int,Int>()
@@ -86,7 +87,14 @@ class MineCanvasView(context:Context, private val game:GameEngine, val cityId:In
             fill(colorFor(block,y))
             canvas.drawRect(l,top,l+t+0.6f,top+t+0.6f,paint)
             val artKey=art.mineKey(block,y+(u.activeFloor-1)*4)
-            art.draw(canvas,artKey,l,top,l+t+0.55f,top+t+0.55f)
+            val texture=when(block.terrain){
+                MineTerrain.BEDROCK -> "terrain_bedrock"
+                MineTerrain.ROCK -> if(y<6)"terrain_soil" else "terrain_stone"
+                MineTerrain.ORE -> MineBlockAtlas.textureForMaterial(block.material)
+                else -> null
+            }
+            if(texture==null || !blocks.draw(canvas,texture,l,top,l+t+0.55f,top+t+0.55f))
+                art.draw(canvas,artKey,l,top,l+t+0.55f,top+t+0.55f)
             if(block.terrain==MineTerrain.ROCK || block.terrain==MineTerrain.ORE){
                 if(block.ordered){
                     fill(Color.argb(120,255,195,72));canvas.drawRect(l+2,top+2,l+t-2,top+t-2,paint)

@@ -68,6 +68,32 @@ jobs:
           assert len(data)>1000
           print("MINER AND CART SIDEVIEW ANIMATIONS:",len(data),"bytes")
           PY
+      - name: Validate HD mining frame and Style B tile atlases
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          root=Path("app/src/main/assets/dailycorp/mine")
+          def dimensions(path):
+              data=path.read_bytes()
+              assert data[:4]==b"RIFF" and data[8:12]==b"WEBP"
+              assert struct.unpack_from("<I",data,4)[0]+8==len(data)
+              if data[12:16]==b"VP8X":
+                  w=1+int.from_bytes(data[24:27],"little")
+                  h=1+int.from_bytes(data[27:30],"little")
+              else:
+                  start=data.find(b"\x9d\x01\x2a")
+                  assert start>0
+                  w=struct.unpack_from("<H",data,start+3)[0]&0x3fff
+                  h=struct.unpack_from("<H",data,start+5)[0]&0x3fff
+              return w,h,len(data)
+          ore=dimensions(root/"style_b_blocks.webp")
+          anim=dimensions(root/"sideview_frames.webp")
+          assert ore[:2]==(768,768), ore
+          assert anim[:2]==(768,2048), anim
+          assert ore[2]>50000 and anim[2]>200000
+          print("High-resolution texture pack:",ore," miner/cart animation:",anim)
+          PY
       - name: Run mining, transport and research unit tests
         run: gradle --no-daemon :minecore:test :app:testDebugUnitTest
       - name: Build new Kotlin Android APK

@@ -22,6 +22,7 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
     var onSelected:((CellPos,Int)->Unit)?=null
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val art=GameArt(context)
+    private val blocks=MineBlockAtlas(context)
     private val sprites=MineSpriteFrames(context)
     private val tracks=mutableMapOf<Int,Mine2MotionTrack>()
     private val facing=mutableMapOf<Int,Boolean>()
@@ -124,8 +125,24 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
                     continue
                 }
                 if(!c.explored)continue
-                if(zoom>0.53f)art.draw(canvas,asset(c),l,p,l+t+0.5f,p+t+0.5f)
-                fill(Color.argb(if(world.isSurveyDim(x,y))155 else 68,0,0,0))
+                if(zoom>0.53f){
+                    val texture=when(c.kind) {
+                        RockKind.SOIL -> "terrain_soil"
+                        RockKind.ROCK,RockKind.HARD_ROCK,RockKind.DEEP_ROCK -> "terrain_stone"
+                        RockKind.BEDROCK -> "terrain_bedrock"
+                        RockKind.ORE -> c.resource?.let {MineBlockAtlas.textureForMaterial(it)}
+                        else -> null
+                    }
+                    if(texture==null || !blocks.draw(canvas,texture,l,p,l+t+0.5f,p+t+0.5f))
+                        art.draw(canvas,asset(c),l,p,l+t+0.5f,p+t+0.5f)
+                }
+                val shadow=when {
+                    world.isSurveyDim(x,y) -> 112
+                    c.kind==RockKind.DEEP_ROCK -> 58
+                    c.kind==RockKind.HARD_ROCK -> 32
+                    else -> 20
+                }
+                fill(Color.argb(shadow,0,0,0))
                 canvas.drawRect(l,p,l+t+0.5f,p+t+0.5f,paint)
                 if(c.kind==RockKind.ORE && c.deposit>0){
                     // Remaining resource units, plus drilling progress per unit.

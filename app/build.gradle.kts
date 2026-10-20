@@ -9,8 +9,8 @@ android {
         applicationId = "com.dailycorp.nativegame.rebuilt"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.10.0-alpha"
+        versionCode = 11
+        versionName = "0.11.0-alpha"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
