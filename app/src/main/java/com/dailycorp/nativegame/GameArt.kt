@@ -53,7 +53,20 @@ class GameArt(context: Context) {
         val b=bitmap ?:return false
         val rect=tiles[id] ?:return false
         if(right<=left || bottom<=top)return false
-        canvas.drawBitmap(b,rect,RectF(left,top,right,bottom),paint)
+        // The supplied presentation sheets have small captions below some ores
+        // and level badges below some buildings. Exclude those from gameplay.
+        val source=when {
+            id.startsWith("mine.") && id !in setOf("mine.soil","mine.stone",
+                "mine.deep_stone","mine.abyss","mine.empty","mine.reinforced",
+                "mine.shaft","mine.track") ->
+                Rect(rect.left+2,rect.top+1,rect.right-2,rect.bottom-12)
+            id.startsWith("buildings.") ->
+                Rect(rect.left,rect.top,rect.right,rect.bottom-12)
+            id.startsWith("infra.") ->
+                Rect(rect.left,rect.top,rect.right,rect.bottom-5)
+            else -> rect
+        }
+        canvas.drawBitmap(b,source,RectF(left,top,right,bottom),paint)
         return true
     }
 
