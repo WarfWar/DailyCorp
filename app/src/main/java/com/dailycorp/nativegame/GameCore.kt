@@ -351,12 +351,13 @@ class GameEngine(val state: GameState) {
                 val c=company(city.id)
                 for(mine in c.mines.values){
                     MineWorld.step(mine,city.seed xor mine.lotId.toLong(),
-                        ScienceTree.drillBoost(state),ScienceTree.cartBoost(state))
+                        ScienceTree.drillBoost(state),ScienceTree.cartBoost(state),
+                        ScienceTree.geologyBoost(state))
                 }
                 for(factory in c.factories.values){
                     val recipe=Catalog.recipes[factory.recipeId]?:continue
                     if(recipe.ingredients.any{(item,amount)->(factory.inputs[item]?:0)<amount}){factory.progress=0;continue}
-                    factory.progress++
+                    factory.progress+=1+ScienceTree.productionBoost(state)
                     if(factory.progress>=recipe.seconds){
                         for((item,amount) in recipe.ingredients)factory.inputs[item]=factory.inputs.getValue(item)-amount
                         c.storage[recipe.output]=(c.storage[recipe.output]?:0)+1
@@ -390,13 +391,15 @@ class GameEngine(val state: GameState) {
                 val onRoad=state.trucks.filter {it!==truck && it.route?.mode==route.mode &&
                     it.route?.cityId==route.cityId && it.route?.targetId==route.targetId &&
                     it.route?.material==route.material && it.carrying>0}.sumOf{it.carrying}
-                val amount=min(min(available,max(0,needed-onRoad)),4+truck.level*3)
+                val amount=min(min(available,max(0,needed-onRoad)),
+                    4+truck.level*3+ScienceTree.logisticsBoost(state)*2)
                 if(amount<=0)continue
                 inventory[route.material]=available-amount
                 truck.carrying=amount
                 val from=lot(route.cityId,route.sourceLot)?.pos ?:continue
                 val to=lot(route.cityId,route.targetId)?.pos ?:from
-                truck.timeLeft=max(2,(abs(from.x-to.x)+abs(from.y-to.y))*2/truck.level)
+                truck.timeLeft=max(2,(abs(from.x-to.x)+abs(from.y-to.y))*2/
+                    (truck.level+ScienceTree.logisticsBoost(state)))
             }
         }
     }
@@ -427,7 +430,7 @@ class GameEngine(val state: GameState) {
                 val valid=min(amount,contract.amount-contract.delivered)
                 contract.delivered+=valid
                 if(valid<amount)c.storage[route.material]=(c.storage[route.material]?:0)+(amount-valid)
-                if(contract.complete){state.money+=contract.reward;state.science+=30}
+                if(contract.complete){state.money+=contract.reward;state.science+=30+ScienceTree.contractScienceBoost(state)}
             }
         }
         state.totalShipped+=amount
