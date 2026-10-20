@@ -21,10 +21,17 @@ class MineActivity : Activity() {
     private var cityId = 1
     private var lotId = -1
     private val handler = Handler(Looper.getMainLooper())
+    private var tickCount=0
     private val update = object:Runnable {
         override fun run() {
-            if (::mineView.isInitialized) { updateInfo(); mineView.invalidate() }
-            handler.postDelayed(this,800)
+            if (::mineView.isInitialized) {
+                engine.tick()
+                tickCount++
+                if(tickCount%15==0)GameSession.save(this@MineActivity)
+                updateInfo()
+                mineView.invalidate()
+            }
+            handler.postDelayed(this,1000)
         }
     }
     private fun px(n:Int) = (n*resources.displayMetrics.density).toInt()
@@ -90,7 +97,13 @@ class MineActivity : Activity() {
         root.addView(scroll,LinearLayout.LayoutParams(-1,px(62)))
         setContentView(root)
         updateInfo()
-        handler.postDelayed(update,800)
+    }
+    override fun onResume() {
+        super.onResume()
+        if(::mineView.isInitialized){
+            handler.removeCallbacks(update)
+            handler.postDelayed(update,1000)
+        }
     }
     private fun updateInfo() {
         val mine=engine.company(cityId).mines[lotId]?:return
@@ -103,6 +116,10 @@ class MineActivity : Activity() {
             " · Разработано "+floor.excavated+" клеток · Задач "+orders+
             "\nНажми на породу: рабочие проложат проход; вагонетки вывезут руду."
     }
-    override fun onPause(){super.onPause();GameSession.save(this)}
+    override fun onPause(){
+        handler.removeCallbacks(update)
+        super.onPause()
+        GameSession.save(this)
+    }
     override fun onDestroy(){handler.removeCallbacks(update);super.onDestroy()}
 }
