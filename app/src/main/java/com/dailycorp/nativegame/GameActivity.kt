@@ -225,14 +225,65 @@ class GameActivity : Activity() {
     private fun showFactory(lot:Lot){
         val factory=game.company(map.cityId).factories.getValue(lot.id)
         val recipe=Catalog.recipes[factory.recipeId]
-        val stored=factory.inputs.entries.joinToString("\n"){"${Catalog.name(it.key)}: ${it.value}"}
-        showText("Завод №${lot.id+1}","Рецепт: ${Catalog.name(factory.recipeId)}\nТребуется: ${recipe?.ingredients}\nВходные материалы:\n${stored.ifEmpty{"Нет материалов"}}")
+        val requirements=recipe?.ingredients?.entries?.joinToString("\n"){(id,amount)->
+            val available=Catalog.available(factory.inputs,id)
+            "  ${Catalog.ingredientName(id)}: $available/$amount"
+        } ?: "Неизвестный рецепт"
+        val inventory=factory.inputs.entries.filter{it.value>0}
+            .joinToString("\n"){(id,amount)->"  ${Catalog.name(id)} ×$amount"}
+        val details="Эпоха ${game.state.era}/10 · рецептов ${Catalog.recipes.size}\n"+
+            "Производство: ${Catalog.name(factory.recipeId)}\n"+
+            "Прогресс: ${factory.progress}/${recipe?.seconds ?: 0} сек.\n\n"+
+            "НЕОБХОДИМЫЕ МАТЕРИАЛЫ:\n$requirements\n\n"+
+            "НА СКЛАДЕ ЗАВОДА:\n${inventory.ifEmpty{"Нет ресурсов"}}"
+        AlertDialog.Builder(this).setTitle("Завод №${lot.id+1}")
+            .setMessage(details)
+            .setPositiveButton("Выбрать производство"){_,_->chooseRecipe(lot)}
+            .setNegativeButton("Назад",null).show()
     }
     private fun chooseRecipe(lot:Lot){
-        val options=Catalog.recipes.values.toList()
-        choices("Выбрать продукцию",options.map{"${Catalog.name(it.output)} · ${it.ingredients.entries.joinToString{r->"${Catalog.name(r.key)} ×${r.value}"}}"}){
-            message(if(game.setRecipe(map.cityId,lot.id,options[it].output))"Рецепт обновлён" else "Ошибка")
-            save()
+        val all=Catalog.recipes.values.toList()
+        val groups=mutableListOf<Pair<String,List<Recipe>>>()
+        groups.add("Доступные сейчас" to all.filter{
+            (Catalog.byId[it.output]?.era?:99)<=game.state.era
+        })
+        groups.add("Базовые товары и стройматериалы" to all.filter{
+            it.output !in ProductionExpansion.recipes
+        })
+        groups.add("Переработка руды · любой сорт" to all.filter{
+            it.output.startsWith("refined_")
+        })
+        for(era in 1..10){
+            groups.add("Эпоха $era · ${ScienceTree.eraNames[era-1]}" to all.filter{
+                it.output.startsWith("epoch_${era}_")
+            })
+        }
+        choices("Категории производства · ${all.size} рецепта",groups.map{(title,items)->
+            "$title · ${items.size} позиций"
+        }){selected->
+            val (groupName,options)=groups[selected]
+            choices(groupName,options.map{recipe->
+                val era=Catalog.byId[recipe.output]?.era?:1
+                val locked=if(era>game.state.era)"🔒 " else ""
+                "$locked${Catalog.name(recipe.output)} · эпоха $era"
+            }){index->
+                val recipe=options[index]
+                val era=Catalog.byId[recipe.output]?.era?:1
+                val ingredients=recipe.ingredients.entries.joinToString("\n"){(id,amount)->
+                    "• ${Catalog.ingredientName(id)} ×$amount"
+                }
+                AlertDialog.Builder(this)
+                    .setTitle(Catalog.name(recipe.output))
+                    .setMessage("Эпоха: $era/10\nВремя: ${recipe.seconds} сек.\n\n"+
+                        "Для одной единицы продукции:\n$ingredients"+
+                        if(era>game.state.era)"\n\nСначала открой соответствующую эпоху." else "")
+                    .setPositiveButton(if(era>game.state.era)"Недоступно" else "Назначить"){_,_->
+                        message(if(game.setRecipe(map.cityId,lot.id,recipe.output))
+                            "Завод переключён на ${Catalog.name(recipe.output)}"
+                            else "Рецепт закрыт или завод не приобретён")
+                        save()
+                    }.setNegativeButton("Назад",null).show()
+            }
         }
     }
     private fun showStorage(){
