@@ -152,7 +152,8 @@ class Mine2WorldTest {
         // Topmost ore eligible for mining immediately beside the shaft.
         for(seed in 1L..300L) {
             val candidate=Mine2World.create(config.copy(seed=seed))
-            if(candidate.cell(x,5)?.kind==RockKind.ORE){
+            if(candidate.cell(x,5)?.kind==RockKind.ORE &&
+                (candidate.cell(x,5)?.deposit?:0)>1){
                 world=candidate;break
             }
         }

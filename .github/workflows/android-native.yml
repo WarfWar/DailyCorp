@@ -56,6 +56,18 @@ jobs:
               assert key in sprites, key
           print("ART ATLAS PASSED: 132 unique tiles and essential asset categories")
           PY
+      - name: Validate user-supplied mining animation atlas
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          p=Path('app/src/main/assets/dailycorp/mine/sideview_frames.webp')
+          data=p.read_bytes()
+          assert data[:4]==b'RIFF' and data[8:12]==b'WEBP'
+          assert struct.unpack('<I',data[4:8])[0]+8==len(data)
+          assert len(data)>1000
+          print("MINER AND CART SIDEVIEW ANIMATIONS:",len(data),"bytes")
+          PY
       - name: Run mining, transport and research unit tests
         run: gradle --no-daemon :minecore:test :app:testDebugUnitTest
       - name: Build new Kotlin Android APK
