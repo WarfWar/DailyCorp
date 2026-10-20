@@ -27,7 +27,7 @@ object ProductionExpansion {
         mapOf("iron" to 3,"gravel" to 2),
         mapOf("iron" to 3,"copper" to 1),
         mapOf("iron" to 4,"coal" to 2),
-        mapOf("copper" to 3,"coal" to 2),
+        mapOf("copper" to 3,"coal" to 2,"shale" to 2),
         mapOf("clay" to 2,"sand" to 2),
         mapOf("iron" to 3,"gravel" to 3),
         mapOf("copper" to 2,"iron" to 3),
