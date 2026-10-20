@@ -71,6 +71,28 @@ object Mine2Geology {
         val grade=(1+(field*3.0).toInt()).coerceIn(1,4)
         return selected to grade
     }
+    /** Common mineral lenses. Their outlines are driven by continuous world
+     * fields; deposits vary deterministically on each cell inside the lens.
+     */
+    private fun basicAt(config:Mine2Config,x:Int,y:Int):String? {
+        if(x<2 || x>=config.width-2 || y<5)return null
+        val field=noise(x/11.0,y/11.5,config.seed xor 0x12F8AF6113FBC5E1L)*0.75+
+            noise(x/3.8,y/5.2,config.seed xor 0x413A1BE557E1FAB7L)*0.25
+        if(field<0.12)return null
+        val index=(noise(x/27.0,y/24.0,config.seed xor 0x55438D716A9C4CB7L)+1.0)*0.5
+        val options=when {
+            y<25 -> listOf("clay","sand","gravel","salt","shale")
+            y<95 -> listOf("gravel","granite","salt","sulfur","shale","clay")
+            else -> listOf("granite","shale","sulfur","salt","gravel")
+        }
+        return options[(index*options.size).toInt().coerceIn(0,options.lastIndex)]
+    }
+    private fun resourceAmount(config:Mine2Config,x:Int,y:Int,grade:Int):Int {
+        // Independent variation per cell without breaking the enclosing deposit.
+        val local=random(x,y,config.seed xor 0x2461BB90772D319FL)
+        val variation=((local+1.0)*0.5*max(3,grade*8)).toInt()
+        return 1+variation+(y/85)
+    }
     fun generate(config:Mine2Config,index:Int):Mine2Chunk {
         require(index>=0 && index*CHUNK_ROWS<config.depthCells)
         val from=index*CHUNK_ROWS
@@ -90,8 +112,15 @@ object Mine2Geology {
                         val ore=oreAt(config,x,y)
                         if(ore!=null){
                             RockCell(RockKind.ORE,ore.first,
-                                deposit=1+ore.second*2,grade=ore.second,
+                                deposit=resourceAmount(config,x,y,ore.second),
+                                grade=ore.second,
                                 hardness=2+ore.second+y/35)
+                        }else if(basicAt(config,x,y)!=null){
+                            val material=basicAt(config,x,y)!!
+                            val grade=(1+y/60).coerceIn(1,4)
+                            RockCell(RockKind.ORE,material,
+                                deposit=resourceAmount(config,x,y,grade),
+                                grade=grade,hardness=2+grade+y/45)
                         }else{
                             val rock=when {
                                 y<10 -> RockKind.SOIL
@@ -168,6 +197,23 @@ class Mine2World(val config:Mine2Config):Serializable {
         private set
     var surveysPerformed=0
         private set
+    // Backward-compatible additions: old 0.7 saves deserialize these as 0/null.
+    private var shaftLevelV2=0
+    private var surveyFogV2:MutableSet<CellPos>?=null
+    val shaftLevel:Int get()=max(1,shaftLevelV2)
+    val crewLimit:Int get()=8+(shaftLevel-1)*4
+    fun upgradePrice():Long=1300L*shaftLevel.toLong()*shaftLevel.toLong()
+    fun canUpgrade():Boolean=shaftLevel<7
+    fun upgradeShaft():Boolean {
+        if(!canUpgrade())return false
+        shaftLevelV2=shaftLevel+1
+        return true
+    }
+    private fun surveyFog():MutableSet<CellPos> {
+        if(surveyFogV2==null)surveyFogV2=mutableSetOf()
+        return surveyFogV2!!
+    }
+    fun isSurveyDim(x:Int,y:Int):Boolean=CellPos(x,y) in surveyFog()
     private var minersV2:MutableList<Mine2Miner>?=null
     var timeTicks=0L
         private set
@@ -180,7 +226,7 @@ class Mine2World(val config:Mine2Config):Serializable {
     }
     fun hireMiner():Boolean {
         val workers=miners()
-        if(workers.size>=8)return false
+        if(workers.size>=crewLimit)return false
         val id=(workers.maxOfOrNull{it.id}?:0)+1
         minersV2!!.add(Mine2Miner(id,config.width/2,3))
         return true
@@ -191,7 +237,7 @@ class Mine2World(val config:Mine2Config):Serializable {
         val chunk=chunks.getOrPut(index){Mine2Geology.generate(config,index)}
         return chunk.cells[y%Mine2Geology.CHUNK_ROWS][x]
     }
-    fun reveal(x:Int,y:Int,radius:Int):Int {
+    fun reveal(x:Int,y:Int,radius:Int,fromSurvey:Boolean=false):Int {
         var newly=0
         val r=radius.coerceIn(0,12)
         for(py in max(0,y-r)..min(config.depthCells-1,y+r))
@@ -199,7 +245,10 @@ class Mine2World(val config:Mine2Config):Serializable {
                 val dx=px-x;val dy=py-y
                 if(dx*dx+dy*dy>r*r)continue
                 val target=cell(px,py)?:continue
-                if(!target.explored){target.explored=true;newly++}
+                if(!target.explored){target.explored=true;newly++
+                    if(fromSurvey)surveyFog().add(CellPos(px,py))
+                }
+                if(!fromSurvey)surveyFog().remove(CellPos(px,py))
             }
         return newly
     }
@@ -209,24 +258,24 @@ class Mine2World(val config:Mine2Config):Serializable {
     fun surveyQuote(x:Int,y:Int):SurveyQuote {
         if(cell(x,y)==null)return SurveyQuote(x,y,0,0,false,"Вне шахты")
         var nearKnown=false
-        for(yy in max(0,y-8)..min(config.depthCells-1,y+8))
-            for(xx in max(0,x-8)..min(config.width-1,x+8)){
+        for(yy in max(0,y-10)..min(config.depthCells-1,y+10))
+            for(xx in max(0,x-10)..min(config.width-1,x+10)){
                 val dx=xx-x;val dy=yy-y
-                if(dx*dx+dy*dy<=64 && cell(xx,yy)?.explored==true)
+                if(dx*dx+dy*dy<=100 && cell(xx,yy)?.explored==true)
                     nearKnown=true
             }
         if(!nearKnown)return SurveyQuote(x,y,0,0,false,
             "Сначала разведай прилегающую область")
         var newCells=0
-        for(py in max(0,y-5)..min(config.depthCells-1,y+5))
-            for(px in max(0,x-5)..min(config.width-1,x+5)){
+        for(py in max(0,y-8)..min(config.depthCells-1,y+8))
+            for(px in max(0,x-8)..min(config.width-1,x+8)){
                 val dx=px-x;val dy=py-y
-                if(dx*dx+dy*dy<=25 && cell(px,py)?.explored==false)newCells++
+                if(dx*dx+dy*dy<=64 && cell(px,py)?.explored==false)newCells++
             }
         if(newCells==0)return SurveyQuote(x,y,0,0,false,
             "Здесь уже всё исследовано")
         val depthMeters=y.toLong()*config.metersPerCell
-        val price=250L+(depthMeters/25L)*20L+surveysPerformed.toLong()*75L
+        val price=450L+(depthMeters/25L)*20L+surveysPerformed.toLong()*75L
         return SurveyQuote(x,y,price,newCells,true,"Готово к разведке")
     }
     /** Validates balance in the core, not just Android button logic.
@@ -236,7 +285,7 @@ class Mine2World(val config:Mine2Config):Serializable {
         val quote=surveyQuote(x,y)
         if(!quote.valid)return SurveyResult(false,reason=quote.reason)
         if(availableMoney<quote.price)return SurveyResult(false,reason="Не хватает денег")
-        val count=reveal(x,y,5)
+        val count=reveal(x,y,8,fromSurvey=true)
         if(count<=0)return SurveyResult(false,reason="Участок уже известен")
         surveysPerformed++
         surveysLeft=max(0,4-surveysPerformed)
