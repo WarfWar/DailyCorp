@@ -57,14 +57,33 @@ class Mine2PreviewActivity:Activity(){
             readOnly=true;Mine2World.create(config)
         }
     }
+    private fun syncDelivered(){
+        val mine=game.company(cityId).mines[lotId]?:return
+        val totals=world.existingTransport()?.delivered?:return
+        val applied=mine.mine2AppliedDeliveries ?: mutableMapOf<String,Int>().also{
+            mine.mine2AppliedDeliveries=it
+        }
+        for((material,total) in totals){
+            val previous=applied[material]?:0
+            if(total>previous){
+                mine.loading[material]=(mine.loading[material]?:0)+(total-previous)
+                applied[material]=total
+            }
+        }
+    }
     private fun save(){
         if(readOnly || !::world.isInitialized)return
         try{
+            // First persist cumulative physical delivery totals to Mine2.
+            // Then credit only their unapplied delta in the city save.
             val temp=File(filesDir,name()+".tmp")
             ObjectOutputStream(temp.outputStream()).use{it.writeObject(world)}
             if(!temp.renameTo(File(filesDir,name())))error("save rename failed")
-        }catch(_:Exception){}
-        GameSession.save(this)
+            syncDelivered()
+            GameSession.save(this)
+        }catch (_:Exception){
+            Toast.makeText(this,"Не удалось сохранить шахту 2.0",Toast.LENGTH_SHORT).show()
+        }
     }
     override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState)
@@ -84,6 +103,11 @@ class Mine2PreviewActivity:Activity(){
             ores=mine.ores.ifEmpty{listOf("coal","iron","copper","gold")}
         )
         world=load(config)
+        if(!readOnly){
+            mine.mine2ProductionEnabled=true
+            syncDelivered()
+            GameSession.save(this)
+        }
         val root=LinearLayout(this).apply{
             orientation=LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(8,8,10))
@@ -111,6 +135,30 @@ class Mine2PreviewActivity:Activity(){
                 " · осталось "+(c?.deposit?:0)+" ед."
                 else "Задание снято",Toast.LENGTH_SHORT).show()
             refresh();view.invalidate()
+        }
+        view.onRail={p->
+            if(readOnly){
+                Toast.makeText(this,"Сохранение недоступно",Toast.LENGTH_SHORT).show()
+            }else{
+                val transport=world.transport()
+                when{
+                    !transport.canBuildRail(world,p) ->
+                        Toast.makeText(this,"Рельсы можно класть только в открытом тоннеле рядом с готовым путём",
+                            Toast.LENGTH_LONG).show()
+                    game.state.money<transport.railPrice() ->
+                        Toast.makeText(this,"Не хватает денег на рельсы",Toast.LENGTH_SHORT).show()
+                    else -> {
+                        val cost=transport.railPrice()
+                        if(transport.buildRail(world,p)){
+                            game.state.money-=cost
+                            save()
+                            Toast.makeText(this,"Рельсы построены · −"+cost+" ₽",
+                                Toast.LENGTH_SHORT).show()
+                            refresh();view.invalidate()
+                        }
+                    }
+                }
+            }
         }
         view.onSurvey={p->
             // Panning is always enabled. A paid scan is a one-shot tool.
@@ -158,6 +206,42 @@ class Mine2PreviewActivity:Activity(){
         add("⌕ Разведка ₽"){view.mode=Mine2PreviewView.Mode.SURVEY;refresh()
             Toast.makeText(this,"Коснись точки сканирования · карту можно двигать",
                 Toast.LENGTH_LONG).show()
+        }
+        add("🛤 Рельсы"){
+            view.mode=if(view.mode==Mine2PreviewView.Mode.RAIL)
+                Mine2PreviewView.Mode.NORMAL else Mine2PreviewView.Mode.RAIL
+            Toast.makeText(this,
+                if(view.mode==Mine2PreviewView.Mode.RAIL)
+                    "Коснись проложенного тоннеля рядом с рельсами · стоимость от 60 ₽"
+                else "Строительство рельсов выключено",
+                Toast.LENGTH_SHORT).show()
+            refresh()
+        }
+        add("＋ Вагонетка"){
+            if(readOnly){
+                Toast.makeText(this,"Сохранение недоступно",Toast.LENGTH_SHORT).show()
+            }else{
+                val transport=world.transport()
+                val price=transport.cartPrice()
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("Шахтная вагонетка · "+price+" ₽")
+                    .setMessage("Вместимость: "+transport.cartCapacity()+
+                        " ед.\nДоступно: "+transport.carts.size+"/8"+
+                        "\nВагонетка ездит только по построенным рельсам."+
+                        "\nПосле возврата к стволу руда попадает в городскую погрузку.")
+                    .setPositiveButton("Купить"){_,_->
+                        if(game.state.money<price){
+                            Toast.makeText(this,"Недостаточно денег",Toast.LENGTH_SHORT).show()
+                        }else if(transport.hireCart()){
+                            game.state.money-=price
+                            save()
+                            Toast.makeText(this,"Вагонетка добавлена",Toast.LENGTH_SHORT).show()
+                        }else{
+                            Toast.makeText(this,"Достигнут лимит вагонеток",Toast.LENGTH_SHORT).show()
+                        }
+                        refresh();view.invalidate()
+                    }.setNegativeButton("Отмена",null).show()
+            }
         }
         add("＋ Шахтёр"){
             if(readOnly){
@@ -251,19 +335,28 @@ class Mine2PreviewActivity:Activity(){
         refresh()
     }
     private fun refresh(){
-        val label=if(view.mode==Mine2PreviewView.Mode.SURVEY)
-            "Разведка: нажми на точку сканирования; обзор работает постоянно"
-            else "Проведи пальцем — обзор; нажми на породу — назначить/отменить добычу"
+        val label=when(view.mode){
+            Mine2PreviewView.Mode.SURVEY ->
+                "Разведка: нажми на точку сканирования; обзор работает постоянно"
+            Mine2PreviewView.Mode.RAIL ->
+                "Рельсы: нажми на доступный тоннель рядом с уже построенным путём"
+            else -> "Проведи пальцем — обзор; нажми на породу — назначить/отменить добычу"
+        }
+        val transport=world.existingTransport()
+        val delivered=transport?.delivered?.values?.sum()?:0
+        val carts=transport?.carts?.size?:0
+        val rails=transport?.rails?.size?:0
         status.text="Глубина "+(world.config.depthCells*world.config.metersPerCell)+
             " м · Пройдено "+world.totalExcavated+
             " · Заданий "+world.pendingCount()+
             "\nШахта ур."+world.shaftLevel+" · Проходчики "+world.miners().size+
             "/"+world.crewLimit+" · Разведок "+world.surveysPerformed+
             " · Баланс "+game.state.money+" ₽"+
-            "\nПробная руда "+world.stockpile.values.sum()+
-            " · Разведка: от 450 ₽, радиус 8 кл."+
+            "\nПод землёй "+world.stockpile.values.sum()+
+            " · Доставлено "+delivered+" · Вагонетки "+carts+" · Рельсы "+rails+
+            "\nРазведка: от 450 ₽, радиус 8 кл."+
             "\n"+(if(readOnly)"Ошибка сохранения: действия отключены"
-                else "ТЕСТ: пробная руда пока не поступает в экономику")+
+                else "Руда поступает в погрузку после рейса вагонетки")+
             "\n"+label
     }
     override fun onResume(){
