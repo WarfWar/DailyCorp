@@ -146,6 +146,53 @@ class Mine2WorldTest {
         assertFalse(world.isSurveyDim(x+7,y))
         assertFalse(world.surveyPaid(x,y,999999L).successful)
     }
+    @Test fun oreYieldsOneUnitPerCompletedCycleAndKeepsOrderUntilEmpty(){
+        var world:Mine2World?=null
+        val x=config.width/2+1
+        // Topmost ore eligible for mining immediately beside the shaft.
+        for(seed in 1L..300L) {
+            val candidate=Mine2World.create(config.copy(seed=seed))
+            if(candidate.cell(x,5)?.kind==RockKind.ORE){
+                world=candidate;break
+            }
+        }
+        val mine=world?:error("Expected to discover at least one ore node")
+        val target=CellPos(x,5)
+        val initial=mine.cell(x,5)!!.deposit
+        assertTrue("Ore node should contain multiple units",initial>1)
+        assertTrue(mine.toggleCellOrder(target))
+        assertTrue(mine.cell(x,5)!!.ordered)
+        var gathered=0
+        for(i in 0 until 1200) {
+            val previous=mine.stockpile.values.sum()
+            mine.step(drillPower=2)
+            val delta=mine.stockpile.values.sum()-previous
+            assertTrue("No tick can pull the entire ore vein at once",delta in 0..1)
+            gathered+=delta
+            if(gathered==1){
+                assertEquals(initial-1,mine.cell(x,5)!!.deposit)
+                assertEquals(RockKind.ORE,mine.cell(x,5)!!.kind)
+                assertTrue(mine.cell(x,5)!!.ordered)
+                break
+            }
+        }
+        assertEquals(1,gathered)
+        var ticks=0
+        while(mine.cell(x,5)!!.kind==RockKind.ORE && ticks++<1200)
+            mine.step(drillPower=2)
+        assertEquals(RockKind.TUNNEL,mine.cell(x,5)!!.kind)
+        assertEquals(initial,mine.stockpile.values.sum())
+        assertFalse(mine.cell(x,5)!!.ordered)
+    }
+    @Test fun selectingOneCellCanAlsoCancelItsExistingDigOrder(){
+        val world=Mine2World.create(config)
+        val p=CellPos(config.width/2+1,4)
+        assertTrue(world.toggleCellOrder(p))
+        assertEquals(1,world.pendingCount())
+        assertFalse(world.toggleCellOrder(p))
+        assertEquals(0,world.pendingCount())
+        assertFalse(world.toggleCellOrder(CellPos(0,4)))
+    }
     @Test fun upgradingMineRaisesLimitAndSurvivesSave(){
         val world=Mine2World.create(config)
         assertEquals(8,world.crewLimit)
