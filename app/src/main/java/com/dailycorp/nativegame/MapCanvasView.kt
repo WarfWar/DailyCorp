@@ -201,10 +201,36 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
             if(isHome){
                 if(zoom<0.72f)continue
                 val n=((at.x*47+at.y*19)%4)
-                val key=when(n%3){
-                    0->"buildings.home_1"
-                    1->"buildings.home_5"
-                    else->"buildings.home_10"
+                // Non-interactive city scenery uses many supplied building and
+                // infrastructure sprites. Purchased lots retain their own logic.
+                val variety=(at.x*37+at.y*83+cityId*11) and 31
+                val key=when(variety){
+                    0->"buildings.school_10"
+                    1->"buildings.park_10"
+                    2->"buildings.hospital_10"
+                    3->"buildings.shop_10"
+                    4->"buildings.library_10"
+                    5->"buildings.fire_10"
+                    6->"buildings.police_10"
+                    7->"infra.fountain"
+                    8->"infra.playground"
+                    9->"infra.bench"
+                    10->"infra.bus_stop"
+                    11->"infra.alley"
+                    12->"infra.kiosk"
+                    13->"infra.parking"
+                    14->"buildings.quarter_10"
+                    15->"buildings.business_10"
+                    16->"buildings.hotel_10"
+                    17->"buildings.tourism_10"
+                    18->"buildings.stadium_10"
+                    19->"buildings.monument_10"
+                    20->"buildings.culture_10"
+                    else->when(n%3){
+                        0->"buildings.home_1"
+                        1->"buildings.home_5"
+                        else->"buildings.home_10"
+                    }
                 }
                 if(!art.draw(canvas,key,x-17f*zoom*d,y-22f*zoom*d,
                         x+17f*zoom*d,y+9f*zoom*d)){
