@@ -24,6 +24,12 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
     var onLotTap: (Lot) -> Unit = {}
     private val cache = mutableMapOf<Int, MapPlan>()
     private val biomeCache=mutableMapOf<Int,Array<Array<Biome>>>()
+    private val continentBiomes by lazy {
+        Array(72){ y -> Array(96){ x ->
+            BiomeGenerator.world(engine.state.seed,x,y)
+        }}
+    }
+    private val cityPins=mutableMapOf<Int,Point>()
     private val art = GameArt(context)
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val shape = Path()
@@ -108,7 +114,7 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         val cx=width*0.5f+panX;val cy=height*0.5f+panY
         return RectF(cx-w/2f,cy-h/2f,cx+w/2f,cy+h/2f)
     }
-    private fun cityWorldPoint(id:Int):Point {
+    private fun cityWorldPoint(id:Int):Point = cityPins.getOrPut(id){
         val row=(id-1)/8;val col=(id-1)%8
         val sx=9+col*11;val sy=10+row*10
         var best=Point(sx,sy)
@@ -116,12 +122,12 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         for(dy in -10..10)for(dx in -10..10){
             val x=(sx+dx).coerceIn(2,93)
             val y=(sy+dy).coerceIn(2,69)
-            val biome=BiomeGenerator.world(engine.state.seed,x,y)
+            val biome=continentBiomes[y][x]
             if(biome==Biome.OCEAN||biome==Biome.LAKE||biome==Biome.RIVER)continue
             val distance=dx*dx+dy*dy+(if(biome==Biome.COAST)8 else 0)
             if(distance<score){score=distance;best=Point(x,y)}
         }
-        return best
+        best
     }
     override fun onDraw(canvas:Canvas) {
         super.onDraw(canvas)
@@ -135,16 +141,16 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         val seed=engine.state.seed
         // One procedural map. No disconnected collage of example biomes.
         for(y in 0 until 72)for(x in 0 until 96){
-            fill(biomeColor(BiomeGenerator.world(seed,x,y),x,y,seed))
+            fill(biomeColor(continentBiomes[y][x],x,y,seed))
             val sx=rect.left+x*tw;val sy=rect.top+y*th
             canvas.drawRect(sx,sy,sx+tw+0.55f,sy+th+0.55f,paint)
         }
         // Biome silhouettes are sparse and only placed inside their native regions.
         for(y in 4 until 68 step 4)for(x in 4 until 92 step 4){
-            val biome=BiomeGenerator.world(seed,x,y)
+            val biome=continentBiomes[y][x]
             if(biome !in listOf(Biome.FOREST,Biome.MOUNTAINS,Biome.SNOW,Biome.DESERT))
                 continue
-            if(BiomeGenerator.world(seed,x+2,y)!=biome)continue
+            if(continentBiomes[y][x+2]!=biome)continue
             val px=rect.left+(x+0.5f)*tw
             val py=rect.top+(y+0.5f)*th
             biomeAccent(canvas,biome,x,y,px,py,tw*2.4f,th*2.4f)
