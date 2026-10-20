@@ -1,0 +1,174 @@
+package com.dailycorp.nativegame
+
+import android.app.Activity
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.graphics.Color
+import android.content.res.ColorStateList
+import android.view.Gravity
+import android.widget.*
+import com.dailycorp.minecore.*
+import java.io.File
+import java.io.ObjectInputStream
+import java.io.ObjectOutputStream
+
+/** Isolated Mine 2.0 playable prototype; the old mine economy remains untouched. */
+class Mine2PreviewActivity:Activity(){
+    private lateinit var game:GameEngine
+    private lateinit var world:Mine2World
+    private lateinit var view:Mine2PreviewView
+    private lateinit var status:TextView
+    private var cityId=1
+    private var lotId=-1
+    private var readOnly=false
+    private var steps=0
+    private val handler=Handler(Looper.getMainLooper())
+    private val timer=object:Runnable{
+        override fun run(){
+            if(::world.isInitialized){
+                world.step()
+                steps++
+                if(steps%2==0)game.tick()
+                if(steps%20==0)save()
+                refresh()
+                view.invalidate()
+            }
+            handler.postDelayed(this,500)
+        }
+    }
+    private fun px(n:Int)=(n*resources.displayMetrics.density).toInt()
+    private fun action(title:String,callback:()->Unit):Button=Button(this).apply{
+        text=title;isAllCaps=false;textSize=12f;setTextColor(Color.WHITE)
+        backgroundTintList=ColorStateList.valueOf(Color.rgb(29,108,145))
+        setOnClickListener{callback()}
+    }
+    private fun name()="mine2_v1_city_"+cityId+"_lot_"+lotId+".save"
+    private fun load(config:Mine2Config):Mine2World{
+        val source=File(filesDir,name())
+        if(!source.exists())return Mine2World.create(config)
+        return try{
+            val value=ObjectInputStream(source.inputStream()).use{it.readObject() as Mine2World}
+            if(value.config==config)value else{
+                readOnly=true;Mine2World.create(config)
+            }
+        }catch(_:Exception){
+            // Keep unrecognized/corrupt files intact, never silently overwrite.
+            readOnly=true;Mine2World.create(config)
+        }
+    }
+    private fun save(){
+        if(readOnly || !::world.isInitialized)return
+        try{
+            val temp=File(filesDir,name()+".tmp")
+            ObjectOutputStream(temp.outputStream()).use{it.writeObject(world)}
+            if(!temp.renameTo(File(filesDir,name())))error("save rename failed")
+        }catch(_:Exception){}
+        GameSession.save(this)
+    }
+    override fun onCreate(savedInstanceState:Bundle?){
+        super.onCreate(savedInstanceState)
+        cityId=intent.getIntExtra("cityId",GameSession.cityId)
+        lotId=intent.getIntExtra("lotId",GameSession.mineLotId)
+        game=GameSession.engine ?:try{
+            GameEngine(ObjectInputStream(openFileInput("dailycorp-native-v1.save"))
+                .use{it.readObject() as GameState})
+        }catch(_:Exception){GameEngine.newGame()}
+        GameSession.engine=game
+        val mine=game.company(cityId).mines[lotId]
+        if(mine==null){finish();return}
+        val config=Mine2Config(
+            seed=game.city(cityId).seed xor lotId.toLong()*9973L,
+            width=52,
+            depthCells=(mine.depth*8).coerceIn(120,1200),
+            ores=mine.ores.ifEmpty{listOf("coal","iron","copper","gold")}
+        )
+        world=load(config)
+        val root=LinearLayout(this).apply{
+            orientation=LinearLayout.VERTICAL
+            setBackgroundColor(Color.rgb(9,32,47))
+        }
+        val header=LinearLayout(this).apply{
+            orientation=LinearLayout.VERTICAL
+            setPadding(px(12),px(8),px(12),px(8))
+        }
+        header.addView(TextView(this).apply{
+            text="ШАХТА 2.0 · ГЕОЛОГИЯ"
+            textSize=20f;setTextColor(Color.WHITE)
+        })
+        status=TextView(this).apply{
+            textSize=12f;setTextColor(Color.rgb(196,222,230))
+            setPadding(0,px(8),0,0)
+        }
+        header.addView(status)
+        root.addView(header)
+        view=Mine2PreviewView(this,world)
+        view.onPlan={a,b->
+            val count=world.orderArea(a,b)
+            Toast.makeText(this,if(count>0)"Задач добавлено: "+count
+                else "Область не исследована или превышен лимит",
+                Toast.LENGTH_SHORT).show()
+            refresh();view.invalidate()
+        }
+        view.onSurvey={p->
+            val found=world.survey(p.x,p.y)
+            Toast.makeText(this,if(found>0)"Разведано: "+found
+                else "Нет зарядов или слишком далеко",
+                Toast.LENGTH_SHORT).show()
+            refresh();view.invalidate()
+        }
+        root.addView(view,LinearLayout.LayoutParams(-1,0,1f))
+        val scroll=HorizontalScrollView(this).apply{isHorizontalScrollBarEnabled=false}
+        val bar=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
+        fun add(t:String,cb:()->Unit){
+            bar.addView(action(t,cb),LinearLayout.LayoutParams(-2,px(54)).apply{
+                marginEnd=px(5)
+            })
+        }
+        add("⛏ Проходка"){view.mode=Mine2PreviewView.Mode.DIG;refresh()}
+        add("✋ Обзор"){view.mode=Mine2PreviewView.Mode.PAN;refresh()}
+        add("⌕ Разведка"){view.mode=Mine2PreviewView.Mode.SURVEY;refresh()}
+        add("Отмена задач"){
+            val n=world.cancelOrders()
+            Toast.makeText(this,"Снято задач: "+n,Toast.LENGTH_SHORT).show()
+            refresh();view.invalidate()
+        }
+        add("↓100 м"){view.moveDepth(20)}
+        add("↑100 м"){view.moveDepth(-20)}
+        add("К поверхности"){view.surface()}
+        add("Назад"){finish()}
+        scroll.addView(bar)
+        root.addView(scroll,LinearLayout.LayoutParams(-1,px(65)))
+        root.setOnApplyWindowInsetsListener{v,insets->
+            v.setPadding(0,insets.systemWindowInsetTop,0,insets.systemWindowInsetBottom)
+            insets
+        }
+        setContentView(root)
+        refresh()
+    }
+    private fun refresh(){
+        val label=when(view.mode){
+            Mine2PreviewView.Mode.DIG->"Выдели участок проходки"
+            Mine2PreviewView.Mode.PAN->"Перемещай карту одним пальцем"
+            Mine2PreviewView.Mode.SURVEY->"Нажми рядом с известной зоной"
+        }
+        status.text="Глубина "+(world.config.depthCells*world.config.metersPerCell)+
+            " м · Пройдено "+world.totalExcavated+
+            " · Заданий "+world.pendingCount()+
+            "\nРазведка "+world.surveysLeft+" · Пробная руда "+world.stockpile.values.sum()+
+            "\n"+(if(readOnly)"Файл прототипа повреждён: сохранение отключено"
+                else "ТЕСТ: пробная руда пока не поступает в экономику")+
+            "\n"+label
+    }
+    override fun onResume(){
+        super.onResume()
+        if(::world.isInitialized){
+            handler.removeCallbacks(timer)
+            handler.postDelayed(timer,500)
+        }
+    }
+    override fun onPause(){
+        handler.removeCallbacks(timer);save();super.onPause()
+    }
+    override fun onDestroy(){handler.removeCallbacks(timer);super.onDestroy()}
+}

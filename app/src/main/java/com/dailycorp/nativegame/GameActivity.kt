@@ -179,7 +179,7 @@ class GameActivity : Activity() {
             else -> true
         }
         val options=when(lot.kind){
-            BuildingKind.MINE -> if(purchased)arrayOf("Спуститься в шахту","Нанять шахтёра") else arrayOf("Купить шахту")
+            BuildingKind.MINE -> if(purchased)arrayOf("Шахта 2.0 · прототип","Шахта 1.0 · рабочая","Нанять шахтёра") else arrayOf("Купить шахту")
             BuildingKind.FACTORY -> if(purchased)arrayOf("Производство","Изменить рецепт") else arrayOf("Купить завод")
             BuildingKind.WAREHOUSE -> if(purchased)arrayOf("Посмотреть склад") else arrayOf("Купить склад")
             BuildingKind.MARKET -> arrayOf("Продать ресурсы")
@@ -190,7 +190,7 @@ class GameActivity : Activity() {
         AlertDialog.Builder(this).setTitle("${lot.kind.title} №${lot.id+1}").setItems(options){_,which ->
             when(lot.kind){
                 BuildingKind.MINE -> if(!purchased){message(if(game.purchaseMine(map.cityId,lot.id))"Шахта приобретена" else "Недостаточно средств")}
-                    else if(which==0)showMine(lot) else upgradeMine(lot)
+                    else when(which){0->showMine2(lot);1->showMine(lot);else->upgradeMine(lot)}
                 BuildingKind.FACTORY -> if(!purchased){message(if(game.purchaseFactory(map.cityId,lot.id))"Завод приобретён" else "Недостаточно средств")}
                     else if(which==0)showFactory(lot) else chooseRecipe(lot)
                 BuildingKind.WAREHOUSE -> if(!purchased){message(if(game.purchaseWarehouse(map.cityId,lot.id))"Склад приобретён" else "Недостаточно средств")}
@@ -205,6 +205,13 @@ class GameActivity : Activity() {
     }
     private fun showText(title:String,body:String){AlertDialog.Builder(this).setTitle(title).setMessage(body)
         .setPositiveButton("ОК",null).show()}
+    private fun showMine2(lot:Lot){
+        GameSession.engine=game
+        GameSession.cityId=map.cityId
+        GameSession.mineLotId=lot.id
+        startActivity(Intent(this,Mine2PreviewActivity::class.java)
+            .putExtra("cityId",map.cityId).putExtra("lotId",lot.id))
+    }
     private fun showMine(lot:Lot){
         GameSession.engine=game
         GameSession.cityId=map.cityId
