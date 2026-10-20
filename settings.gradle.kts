@@ -6,4 +6,4 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "DailyCorpNative"
-include(":app")
+include(":app",":minecore")

@@ -57,7 +57,7 @@ jobs:
           print("ART ATLAS PASSED: 132 unique tiles and essential asset categories")
           PY
       - name: Run mining, transport and research unit tests
-        run: gradle --no-daemon :app:testDebugUnitTest
+        run: gradle --no-daemon :minecore:test :app:testDebugUnitTest
       - name: Build new Kotlin Android APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Upload installable APK

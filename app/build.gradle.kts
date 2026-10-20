@@ -9,8 +9,8 @@ android {
         applicationId = "com.dailycorp.nativegame.rebuilt"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.5.0-alpha"
+        versionCode = 6
+        versionName = "0.6.0-alpha"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -21,5 +21,6 @@ android {
 }
 
 dependencies {
+    implementation(project(":minecore"))
     testImplementation("junit:junit:4.13.2")
 }
