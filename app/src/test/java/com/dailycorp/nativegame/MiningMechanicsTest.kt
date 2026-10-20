@@ -53,6 +53,47 @@ class MiningMechanicsTest {
         assertEquals(2,restored.mineFloor(1,id)!!.workers.size)
     }
 
+    @Test fun interpolatedPositionsMoveBetweenCellsWithoutTeleporting() {
+        val track=MotionTrack(3f,2f,1000L)
+        track.target(4f,2f,0L)
+        assertEquals(3f,track.position(0L).x,0.001f)
+        assertEquals(3.5f,track.position(500L).x,0.001f)
+        assertEquals(4f,track.position(1000L).x,0.001f)
+        assertFalse(track.animating(1000L))
+        track.target(5f,2f,1100L)
+        assertTrue(track.position(1500L).x>4f)
+        // A new tick during walking continues from the previous visible point.
+        val displayed=track.position(1600L).x
+        track.target(6f,2f,1600L)
+        assertEquals(displayed,track.position(1600L).x,0.001f)
+        assertEquals(6f,track.position(2700L).x,0.001f)
+    }
+
+    @Test fun researchTreeContainsEightBranchesPerEraAndBonusesStack() {
+        val game=GameEngine.newGame(2323L)
+        assertEquals(80,ScienceTree.nodes.size)
+        assertEquals(80,ScienceTree.nodes.map{it.id}.toSet().size)
+        for(era in 1..10){
+            assertEquals(8,ScienceTree.nodes.count{it.era==era})
+        }
+        game.state.science=99999
+        assertFalse(game.research("automation_1"))
+        assertTrue(game.research("mining_1"))
+        assertTrue(game.research("transport_1"))
+        assertTrue(game.research("geology_1"))
+        assertTrue(game.research("metallurgy_1"))
+        assertTrue(game.research("energy_1"))
+        assertTrue(game.research("automation_1"))
+        assertTrue(game.research("logistics_1"))
+        assertTrue(game.research("science_1"))
+        assertEquals(2,ScienceTree.drillBoost(game.state))
+        assertEquals(2,ScienceTree.cartBoost(game.state))
+        assertEquals(1,ScienceTree.geologyBoost(game.state))
+        assertEquals(2,ScienceTree.productionBoost(game.state))
+        assertEquals(1,ScienceTree.logisticsBoost(game.state))
+        assertEquals(3,ScienceTree.contractScienceBoost(game.state))
+    }
+
     @Test fun sequentialResearchAndEraGates() {
         val game=GameEngine.newGame(101L)
         game.state.science=15000
@@ -60,7 +101,7 @@ class MiningMechanicsTest {
         assertFalse(game.research("mining_2"))
         assertTrue(game.research("mining_1"))
         assertTrue(game.research("transport_1"))
-        assertTrue(ScienceTree.cartBoost(game.state))
+        assertTrue(ScienceTree.cartBoost(game.state)>0)
         for (era in 1..9) {
             if(era>1) {
                 assertTrue(game.research("mining_"+era))
