@@ -185,9 +185,15 @@ class Mine2PreviewActivity:Activity(){
             else{
                 val price=world.upgradePrice()
                 val supplies=game.company(cityId).storage
-                val requirements=if(world.shaftLevel>=3)
-                    mapOf("concrete" to 3,"construction_kit" to 1)
-                    else emptyMap()
+                val requirements=linkedMapOf<String,Int>()
+                if(world.shaftLevel>=3){
+                    requirements["concrete"]=3
+                    requirements["construction_kit"]=1
+                    // Advanced mine upgrades consume player-produced equipment.
+                    val technologyEra=minOf(game.state.era,world.shaftLevel-1)
+                    requirements["epoch_"+technologyEra+"_10"]=1
+                    requirements["epoch_"+technologyEra+"_6"]=1
+                }
                 val supplyText=if(requirements.isEmpty())"Материалы пока не требуются."
                     else requirements.entries.joinToString("\n"){
                         Catalog.name(it.key)+" ×"+it.value+
