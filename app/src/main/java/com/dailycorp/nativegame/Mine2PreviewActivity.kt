@@ -58,18 +58,8 @@ class Mine2PreviewActivity:Activity(){
         }
     }
     private fun syncDelivered(){
-        val mine=game.company(cityId).mines[lotId]?:return
         val totals=world.existingTransport()?.delivered?:return
-        val applied=mine.mine2AppliedDeliveries ?: mutableMapOf<String,Int>().also{
-            mine.mine2AppliedDeliveries=it
-        }
-        for((material,total) in totals){
-            val previous=applied[material]?:0
-            if(total>previous){
-                mine.loading[material]=(mine.loading[material]?:0)+(total-previous)
-                applied[material]=total
-            }
-        }
+        game.applyMine2Delivery(cityId,lotId,totals)
     }
     private fun save(){
         if(readOnly || !::world.isInitialized)return

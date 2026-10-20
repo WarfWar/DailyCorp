@@ -349,6 +349,27 @@ class GameEngine(val state: GameState) {
         return true
     }
     fun research(id:String):Boolean = ScienceTree.unlock(state,id)
+    /** Idempotent cumulative cargo handoff from Mine2's physical minecarts.
+     * A prior transfer can be replayed after an interrupted write without
+     * duplicating any resource in the mine's normal city loading inventory.
+     */
+    fun applyMine2Delivery(cityId:Int,lotId:Int,totals:Map<String,Int>):Int{
+        val mine=company(cityId).mines[lotId]?:return 0
+        val applied=mine.mine2AppliedDeliveries ?: mutableMapOf<String,Int>().also{
+            mine.mine2AppliedDeliveries=it
+        }
+        var credited=0
+        for((material,total) in totals) {
+            if(total<=0)continue
+            val prior=applied[material]?:0
+            if(total<=prior)continue
+            val delta=total-prior
+            mine.loading[material]=(mine.loading[material]?:0)+delta
+            applied[material]=total
+            credited+=delta
+        }
+        return credited
+    }
     fun mineFloor(cityId:Int,lotId:Int):UndergroundFloor? {
         val mine = company(cityId).mines[lotId] ?: return null
         return MineWorld.floor(mine,city(cityId).seed xor lotId.toLong())
