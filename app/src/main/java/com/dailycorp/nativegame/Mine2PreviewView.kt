@@ -207,7 +207,7 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
             if(moving||worker.mining)animating=true
             val pos=track.position(now)
             val cx=left+(pos.x+0.5f)*t
-            val cy=top+(pos.y+0.85f)*t
+            val cy=top+(pos.y+0.91f)*t
             if(cx+t<0 || cx-t>width || cy+t<0 || cy-t>height)continue
             val right=if(worker.mining && worker.target!=null){
                 worker.target!!.x>=worker.x

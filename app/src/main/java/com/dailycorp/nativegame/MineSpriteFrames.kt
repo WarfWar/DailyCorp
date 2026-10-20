@@ -52,8 +52,10 @@ class MineSpriteFrames(context:Context) {
         val clip=clips[name]?:return false
         val frame=(((nowMs/clip.durationMs).toInt()+offset) % clip.frames + clip.frames)%clip.frames
         val cart=name.startsWith("cart")
-        val width=if(cart)tile*1.60f else tile*1.15f
-        val height=if(cart)tile*1.19f else tile*1.43f
+        // A miner belongs INSIDE one tunnel tile, not across 1.5 rows.
+        // Keep frame aspect ratio (96:128 = 0.75), preserve feetY baseline.
+        val width=if(cart)tile*1.60f else tile*0.675f
+        val height=if(cart)tile*1.19f else tile*0.90f
         val source=Rect(frame*FRAME_W,clip.row*FRAME_H,
             (frame+1)*FRAME_W,(clip.row+1)*FRAME_H)
         val destination=RectF(x-width/2f,feetY-height,x+width/2f,feetY)
