@@ -79,4 +79,4 @@ jobs:
               --notes "Полностью нативный Kotlin Android клиент без Godot." --prerelease
           fi
           gh release upload "$TAG" DailyCorp-Native.apk --clobber
-          gh release edit "$TAG" --target "$GITHUB_SHA" --notes "Нативная сборка Kotlin из $GITHUB_SHA. Начальная версия с городами, шахтами, заводами, четырьмя маршрутами и контрактами."
+          echo "Published current APK directly: https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/DailyCorp-Native.apk"
