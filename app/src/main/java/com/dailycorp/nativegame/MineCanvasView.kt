@@ -78,7 +78,7 @@ class MineCanvasView(context:Context, private val game:GameEngine, val cityId:In
             val l=ox+x*t;val top=oy+y*t
             if(l+t<0f || l>width || top+t<0f || top>height)continue
             val block=floor.blocks[y][x]
-            val artKey=art.mineKey(block,y)
+            val artKey=art.mineKey(block,y+(u.activeFloor-1)*4)
             if(!art.draw(canvas,artKey,l,top,l+t+0.4f,top+t+0.4f)){
                 fill(colorFor(block,y))
                 canvas.drawRect(l,top,l+t+0.4f,top+t+0.4f,paint)
