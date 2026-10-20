@@ -213,6 +213,9 @@ class GameActivity : Activity() {
             .putExtra("cityId",map.cityId).putExtra("lotId",lot.id))
     }
     private fun showMine(lot:Lot){
+        // Explicitly selecting the reserve legacy mine re-enables its production.
+        game.company(map.cityId).mines[lot.id]?.mine2ProductionEnabled=false
+        GameSession.save(this)
         GameSession.engine=game
         GameSession.cityId=map.cityId
         GameSession.mineLotId=lot.id

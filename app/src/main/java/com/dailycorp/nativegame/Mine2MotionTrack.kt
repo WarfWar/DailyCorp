@@ -3,7 +3,7 @@ package com.dailycorp.nativegame
 /** Constant-speed interpolation for a half-second mining tick.
  * Unlike smoothstep, linear interpolation never brakes/restarts at each tile.
  */
-class Mine2MotionTrack(x:Float,y:Float,private val durationMs:Long=515L){
+class Mine2MotionTrack(x:Float,y:Float,private val durationMs:Long=500L){
     private var fromX=x
     private var fromY=y
     private var toX=x

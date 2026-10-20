@@ -52,6 +52,8 @@ class MineActivity : Activity() {
             } catch (_:Exception){GameEngine.newGame()}
         }
         GameSession.engine=engine
+        engine.company(cityId).mines[lotId]?.mine2ProductionEnabled=false
+        GameSession.save(this)
         val mine=engine.company(cityId).mines[lotId]
         if(mine==null){finish();return}
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.rgb(10,35,51))}

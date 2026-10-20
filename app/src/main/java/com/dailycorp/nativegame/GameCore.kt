@@ -30,7 +30,10 @@ data class Recipe(val output: String, val ingredients: Map<String, Int>, val sec
 data class MineState(val lotId: Int, val depth: Int, val ores: List<String>,
     val reserves: MutableMap<String, Int>, var workers: Int = 1,
     val loading: MutableMap<String, Int> = mutableMapOf(), var cooldown: Int = 0,
-    var interior: UndergroundMine? = null) : Serializable {
+    var interior: UndergroundMine? = null,
+    // New fields are optional in Java saves from 0.13 and earlier.
+    var mine2ProductionEnabled:Boolean = false,
+    var mine2AppliedDeliveries:MutableMap<String,Int>? = null) : Serializable {
     companion object { private const val serialVersionUID: Long = -9128487685651322306L }
 }
 
@@ -428,7 +431,8 @@ class GameEngine(val state: GameState) {
             for (city in state.cities) {
                 val c=company(city.id)
                 for(mine in c.mines.values){
-                    if(city.id==excludedMineCityId && mine.lotId==excludedMineLotId)continue
+                    if(mine.mine2ProductionEnabled ||
+                        (city.id==excludedMineCityId && mine.lotId==excludedMineLotId))continue
                     MineWorld.step(mine,city.seed xor mine.lotId.toLong(),
                         ScienceTree.drillBoost(state),ScienceTree.cartBoost(state),
                         ScienceTree.geologyBoost(state))
