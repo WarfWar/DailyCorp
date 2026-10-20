@@ -57,10 +57,6 @@ class GameArt(context: Context) {
         return true
     }
 
-    fun draw(canvas:Canvas,id:String,centerX:Float,centerY:Float,width:Float,height:Float):Boolean =
-        draw(canvas,id,centerX-width/2f,centerY-height/2f,
-            centerX+width/2f,centerY+height/2f)
-
     fun mineKey(block:MineBlock,depth:Int):String = when(block.terrain) {
         MineTerrain.BEDROCK -> "mine.abyss"
         MineTerrain.ROCK -> when {
@@ -82,10 +78,10 @@ class GameArt(context: Context) {
             "gold" -> "gold"
             else -> {
                 val index=material.removePrefix("ore_").substringBefore('_').toIntOrNull() ?: -1
-                listOf("bauxite","nickel","tungsten","limestone","lithium",
-                    "quartz","sulfur","uranium","platinum","silver",
-                    "cobalt","titanium","rare_earth","iridium","emerald",
-                    "ruby","sapphire","crystal","clay","petroleum")
+                listOf("bauxite","nickel","iron","silver","tungsten",
+                    "cobalt","titanium","lithium","coal","quartz",
+                    "sulfur","uranium","platinum","silver","iron",
+                    "rare_earth","tungsten","silver","quartz","rare_earth")
                     .getOrNull(index) ?: "stone"
             }
         }
