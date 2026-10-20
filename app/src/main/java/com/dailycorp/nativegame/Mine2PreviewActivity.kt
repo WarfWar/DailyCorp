@@ -40,7 +40,7 @@ class Mine2PreviewActivity:Activity(){
     private fun px(n:Int)=(n*resources.displayMetrics.density).toInt()
     private fun action(title:String,callback:()->Unit):Button=Button(this).apply{
         text=title;isAllCaps=false;textSize=12f;setTextColor(Color.WHITE)
-        backgroundTintList=ColorStateList.valueOf(Color.rgb(29,108,145))
+        backgroundTintList=ColorStateList.valueOf(Color.rgb(48,46,43))
         setOnClickListener{callback()}
     }
     private fun name()="mine2_v1_city_"+cityId+"_lot_"+lotId+".save"
@@ -86,18 +86,18 @@ class Mine2PreviewActivity:Activity(){
         world=load(config)
         val root=LinearLayout(this).apply{
             orientation=LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(9,32,47))
+            setBackgroundColor(Color.rgb(8,8,10))
         }
         val header=LinearLayout(this).apply{
             orientation=LinearLayout.VERTICAL
             setPadding(px(12),px(8),px(12),px(8))
         }
         header.addView(TextView(this).apply{
-            text="ШАХТА 2.0 · ГЕОЛОГИЯ"
-            textSize=20f;setTextColor(Color.WHITE)
+            text="ШАХТА 2.0 · ПОДЗЕМНЫЙ КОМПЛЕКС"
+            textSize=19f;setTextColor(Color.rgb(246,224,181))
         })
         status=TextView(this).apply{
-            textSize=12f;setTextColor(Color.rgb(196,222,230))
+            textSize=12f;setTextColor(Color.rgb(187,185,178))
             setPadding(0,px(8),0,0)
         }
         header.addView(status)
@@ -131,6 +131,7 @@ class Mine2PreviewActivity:Activity(){
                                 game.state.money-=result.charged
                                 GameSession.save(this)
                                 save()
+                                view.scanPulse(p)
                             }
                             Toast.makeText(this,
                                 if(result.successful)
@@ -160,8 +161,8 @@ class Mine2PreviewActivity:Activity(){
                 val price=450L+world.miners().size*200L
                 android.app.AlertDialog.Builder(this)
                     .setTitle("Нанять проходчика · "+price+" ₽")
-                    .setMessage("Шахтёры: "+world.miners().size+"/8\n"+
-                        "Рабочие прокладывают путь к доступной породе по готовым тоннелям.")
+                    .setMessage("Шахтёры: "+world.miners().size+"/"+world.crewLimit+
+                        "\nУлучшай шахтный комплекс, чтобы расширять штат.")
                     .setPositiveButton("Нанять"){_,_->
                         if(game.state.money<price){
                             Toast.makeText(this,"Недостаточно денег",Toast.LENGTH_SHORT).show()
@@ -175,6 +176,49 @@ class Mine2PreviewActivity:Activity(){
                         }
                         refresh();view.invalidate()
                     }.setNegativeButton("Отмена",null).show()
+            }
+        }
+        add("↑ Улучшить шахту"){
+            if(readOnly)Toast.makeText(this,"Сохранение недоступно",Toast.LENGTH_SHORT).show()
+            else if(!world.canUpgrade())
+                Toast.makeText(this,"Максимальный уровень шахты",Toast.LENGTH_SHORT).show()
+            else{
+                val price=world.upgradePrice()
+                val supplies=game.company(cityId).storage
+                val requirements=if(world.shaftLevel>=3)
+                    mapOf("concrete" to 3,"construction_kit" to 1)
+                    else emptyMap()
+                val supplyText=if(requirements.isEmpty())"Материалы пока не требуются."
+                    else requirements.entries.joinToString("\n"){
+                        Catalog.name(it.key)+" ×"+it.value+
+                            " (склад: "+(supplies[it.key]?:0)+")"
+                    }
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("Шахта: уровень "+world.shaftLevel+" → "+(world.shaftLevel+1))
+                    .setMessage("Цена: "+price+" ₽\nЛимит шахтёров: "+
+                        world.crewLimit+" → "+(world.crewLimit+4)+
+                        "\n"+supplyText)
+                    .setPositiveButton("Улучшить"){_,_->
+                        val enough=requirements.all{(item,count)->
+                            (supplies[item]?:0)>=count
+                        }
+                        when {
+                            game.state.money<price ->
+                                Toast.makeText(this,"Недостаточно денег",Toast.LENGTH_SHORT).show()
+                            !enough ->
+                                Toast.makeText(this,"Не хватает строительных материалов",Toast.LENGTH_LONG).show()
+                            world.upgradeShaft() -> {
+                                game.state.money-=price
+                                for((material,count) in requirements)
+                                    supplies[material]=supplies.getValue(material)-count
+                                GameSession.save(this)
+                                save()
+                                Toast.makeText(this,"Лимит шахтёров повышен до "+world.crewLimit,
+                                    Toast.LENGTH_LONG).show()
+                            }
+                        }
+                        refresh()
+                    }.setNegativeButton("Назад",null).show()
             }
         }
         add("Отмена задач"){
@@ -204,10 +248,11 @@ class Mine2PreviewActivity:Activity(){
         status.text="Глубина "+(world.config.depthCells*world.config.metersPerCell)+
             " м · Пройдено "+world.totalExcavated+
             " · Заданий "+world.pendingCount()+
-            "\nШахтёры "+world.miners().size+" · Разведок "+world.surveysPerformed+
+            "\nШахта ур."+world.shaftLevel+" · Проходчики "+world.miners().size+
+            "/"+world.crewLimit+" · Разведок "+world.surveysPerformed+
             " · Баланс "+game.state.money+" ₽"+
             "\nПробная руда "+world.stockpile.values.sum()+
-            " · Разведка: от 250 ₽, цена растёт"+
+            " · Разведка: от 450 ₽, радиус 8 кл."+
             "\n"+(if(readOnly)"Ошибка сохранения: действия отключены"
                 else "ТЕСТ: пробная руда пока не поступает в экономику")+
             "\n"+label
