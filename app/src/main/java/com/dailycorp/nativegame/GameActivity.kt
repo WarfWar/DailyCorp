@@ -47,9 +47,19 @@ class GameActivity : Activity() {
         game=loadGame()
         GameSession.engine=game
         buildUi()
-        handler.postDelayed(uiTick,1000)
     }
-    override fun onPause(){super.onPause();save()}
+    override fun onResume(){
+        super.onResume()
+        if(::game.isInitialized) {
+            handler.removeCallbacks(uiTick)
+            handler.postDelayed(uiTick,1000)
+        }
+    }
+    override fun onPause(){
+        handler.removeCallbacks(uiTick)
+        super.onPause()
+        save()
+    }
     override fun onDestroy(){handler.removeCallbacks(uiTick);save();super.onDestroy()}
     private fun loadGame():GameEngine = try {
         ObjectInputStream(openFileInput("dailycorp-native-v1.save")).use { stream ->
