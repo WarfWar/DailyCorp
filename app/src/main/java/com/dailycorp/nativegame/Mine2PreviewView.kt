@@ -19,7 +19,14 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context){
     var onSurvey:((CellPos)->Unit)?=null
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val art=GameArt(context)
-    private val minerTracks=mutableMapOf<Int,MotionTrack>()
+    private val minerTracks=mutableMapOf<Int,Mine2MotionTrack>()
+    private var scanAt:CellPos?=null
+    private var scanStarted=0L
+    fun scanPulse(cell:CellPos){
+        scanAt=cell
+        scanStarted=android.os.SystemClock.uptimeMillis()
+        invalidate()
+    }
     private val unit=33f*resources.displayMetrics.density
     private var zoom=1f
     private var panX=0f
@@ -50,14 +57,14 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context){
     fun surface(){panX=0f;panY=0f;invalidate()}
     private fun fill(color:Int){paint.color=color;paint.style=Paint.Style.FILL;paint.strokeWidth=1f}
     private fun color(c:RockCell):Int=when(c.kind){
-        RockKind.SOIL->Color.rgb(128,86,58)
-        RockKind.ROCK->Color.rgb(105,104,110)
-        RockKind.HARD_ROCK->Color.rgb(78,83,98)
-        RockKind.DEEP_ROCK->Color.rgb(46,54,72)
-        RockKind.BEDROCK->Color.rgb(18,26,37)
-        RockKind.ORE->Color.rgb(140,105,66)
-        RockKind.TUNNEL->Color.rgb(22,41,52)
-        RockKind.SHAFT->Color.rgb(24,49,66)
+        RockKind.SOIL->Color.rgb(62,52,45)
+        RockKind.ROCK->Color.rgb(55,55,57)
+        RockKind.HARD_ROCK->Color.rgb(43,43,48)
+        RockKind.DEEP_ROCK->Color.rgb(30,29,34)
+        RockKind.BEDROCK->Color.rgb(12,12,14)
+        RockKind.ORE->Color.rgb(72,58,42)
+        RockKind.TUNNEL->Color.rgb(16,16,18)
+        RockKind.SHAFT->Color.rgb(24,24,26)
     }
     private fun asset(c:RockCell):String=when(c.kind){
         RockKind.SOIL->"mine.soil"
@@ -71,25 +78,59 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context){
             "iron"->"mine.iron"
             "copper"->"mine.copper"
             "gold"->"mine.gold"
+            "clay","sand"->"mine.soil"
+            "gravel","granite"->"mine.stone"
+            "salt"->"mine.quartz"
+            "sulfur"->"mine.gold"
+            "shale"->"mine.deep_stone"
             else->"mine.quartz"
         }
     }
     override fun onDraw(canvas:Canvas){
-        canvas.drawColor(Color.rgb(9,24,37))
+        canvas.drawColor(Color.rgb(2,2,3))
         val t=tile();val left=ox();val top=oy()
         val x0=max(0,floor(-left/t).toInt()-1)
         val x1=min(world.config.width-1,floor((width-left)/t).toInt()+1)
         val y0=max(0,floor(-top/t).toInt()-1)
         val y1=min(world.config.depthCells-1,floor((height-top)/t).toInt()+1)
         if(x0>x1||y0>y1)return
+        // Explicit world boundaries: walls on x=0 and x=width-1.
+        val wallL=left+t
+        val wallR=left+(world.config.width-1)*t
         for(y in y0..y1){
             for(x in x0..x1){
                 val c=world.cell(x,y)?:continue
                 val l=left+x*t;val p=top+y*t
-                fill(if(c.explored)color(c) else Color.rgb(11,25,39))
+                fill(if(c.explored)color(c) else Color.rgb(6,6,8))
                 canvas.drawRect(l,p,l+t+0.6f,p+t+0.6f,paint)
+                if(x==0 || x==world.config.width-1){
+                    fill(Color.rgb(105,83,51))
+                    canvas.drawRect(l+2,p+2,l+t-2,p+t-2,paint)
+                    fill(Color.rgb(35,31,29))
+                    canvas.drawRect(l+7,p+5,l+t-7,p+t-5,paint)
+                    paint.color=Color.rgb(218,161,65)
+                    paint.strokeWidth=max(1.5f,t*0.035f)
+                    canvas.drawLine(l+3,p+3,l+t-3,p+t-3,paint)
+                    continue
+                }
                 if(!c.explored)continue
                 if(zoom>0.53f)art.draw(canvas,asset(c),l,p,l+t+0.5f,p+t+0.5f)
+                // Dark rock lighting and a deliberately darker scanned zone.
+                fill(Color.argb(if(world.isSurveyDim(x,y))155 else 65,0,0,0))
+                canvas.drawRect(l,p,l+t+0.5f,p+t+0.5f,paint)
+                if(c.resource!=null && zoom>0.73f && t>24f){
+                    val sign=when(c.resource){
+                        "clay"->"Гл";"sand"->"Пс";"gravel"->"Гр"
+                        "granite"->"Гн";"salt"->"Сл";"sulfur"->"Sr"
+                        "shale"->"Сн"
+                        else->""
+                    }
+                    if(sign.isNotEmpty()){
+                        fill(Color.rgb(234,207,151))
+                        paint.textSize=t*0.19f
+                        canvas.drawText(sign,l+t*0.08f,p+t*0.83f,paint)
+                    }
+                }
                 if(c.ordered){
                     fill(Color.argb(115,250,182,56))
                     canvas.drawRect(l+2,p+2,l+t-2,p+t-2,paint)
@@ -105,7 +146,7 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context){
             }
             if(y%10==0){
                 val py=top+y*t
-                fill(Color.argb(190,9,30,46))
+                fill(Color.argb(220,13,13,15))
                 canvas.drawRoundRect(RectF(4f,py,100f*resources.displayMetrics.density,
                     py+22f*resources.displayMetrics.density),4f,4f,paint)
                 fill(Color.WHITE);paint.textSize=12f*resources.displayMetrics.scaledDensity
@@ -119,10 +160,10 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context){
         minerTracks.keys.retainAll(world.miners().map{it.id}.toSet())
         for(worker in world.miners()){
             val track=minerTracks.getOrPut(worker.id){
-                MotionTrack(worker.x.toFloat(),worker.y.toFloat(),470L)
+                Mine2MotionTrack(worker.x.toFloat(),worker.y.toFloat(),515L)
             }
             track.target(worker.x.toFloat(),worker.y.toFloat(),now)
-            val moving=track.animating(now)
+            val moving=track.moving(now)
             if(moving)animating=true
             val position=track.position(now)
             val cx=left+(position.x+0.5f)*t
@@ -153,6 +194,46 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context){
                 canvas.drawText(worker.id.toString(),cx-t*0.09f,cy+t*0.14f,paint)
             }
         }
+        // Survey ring expands over a larger 8-cell radius with a subtle glow.
+        scanAt?.let {center->
+            val age=now-scanStarted
+            if(age in 0..1400L){
+                val fraction=(age.toFloat()/1400f).coerceIn(0f,1f)
+                val cx=left+(center.x+0.5f)*t
+                val cy=top+(center.y+0.5f)*t
+                paint.style=Paint.Style.STROKE
+                paint.strokeWidth=max(2f,t*0.07f)
+                paint.color=Color.argb(((1f-fraction)*160).toInt().coerceIn(0,255),
+                    232,174,67)
+                canvas.drawCircle(cx,cy,(1f+8f*fraction)*t,paint)
+                paint.style=Paint.Style.FILL
+                animating=true
+            }else if(age>1400L)scanAt=null
+        }
+        // Boundaries remain legible even when zoomed into the middle of the mine.
+        fill(Color.argb(200,8,8,9))
+        val density=resources.displayMetrics.density
+        val sideTitleSize=10f*resources.displayMetrics.scaledDensity
+        paint.textSize=sideTitleSize
+        if(wallL in 0f..width.toFloat()){
+            paint.color=Color.rgb(217,166,89)
+            canvas.drawRect(wallL-1.5f,0f,wallL+1.5f,height.toFloat(),paint)
+        }
+        if(wallR in 0f..width.toFloat()){
+            paint.color=Color.rgb(217,166,89)
+            canvas.drawRect(wallR-1.5f,0f,wallR+1.5f,height.toFloat(),paint)
+        }
+        val leftCells=max(0,((width*0.5f-left)/t).toInt())
+        val rightCells=max(0,world.config.width-leftCells-1)
+        fill(Color.argb(205,11,11,12))
+        canvas.drawRoundRect(RectF(4*density,6*density,width-4*density,
+            29*density),4*density,4*density,paint)
+        paint.color=Color.rgb(212,174,110)
+        paint.textSize=sideTitleSize
+        canvas.drawText("◀ Граница: $leftCells кл.",10*density,22*density,paint)
+        val labelRight="Граница: $rightCells кл. ▶"
+        canvas.drawText(labelRight,width-10*density-paint.measureText(labelRight),
+            22*density,paint)
         if(animating && isAttachedToWindow)postInvalidateDelayed(33L)
         if(mode==Mode.DIG && down!=null && current!=null){
             val a=down!!;val b=current!!
