@@ -77,17 +77,47 @@ object Catalog {
     private val families = listOf("Боксит", "Никель", "Цинк", "Свинец", "Вольфрам", "Кобальт",
         "Титан", "Литий", "Графит", "Кварц", "Сера", "Уран", "Платина", "Серебро",
         "Марганец", "Хром", "Молибден", "Олово", "Кремний", "Редкоземельный концентрат")
-    val materials: List<Material> = base + families.flatMapIndexed { i, family ->
+    val basicMinerals = listOf(
+        Material("clay","Глина",1,9),
+        Material("sand","Песок",1,8),
+        Material("gravel","Гравий",1,12),
+        Material("granite","Гранит",1,23),
+        Material("salt","Соль",1,20),
+        Material("sulfur","Сера",2,38),
+        Material("shale","Сланец",1,15)
+    )
+    val manufactured = listOf(
+        Material("brick","Кирпич",1,70),
+        Material("glass","Стекло",2,110),
+        Material("cement","Цемент",2,135),
+        Material("concrete","Бетон",2,220),
+        Material("ceramics","Керамика",3,260),
+        Material("chemicals","Химикаты",3,330),
+        Material("alloy","Сплав",4,450),
+        Material("machine_parts","Промышленные детали",4,710),
+        Material("construction_kit","Строительный комплект",3,850)
+    )
+    val materials: List<Material> = base + basicMinerals + manufactured + families.flatMapIndexed { i, family ->
         (1..12).map { grade ->
             Material("ore_${i}_$grade", "$family · сорт $grade", 1 + (grade-1)/2, 35 + i*9 + grade*13)
         }
     }
     val byId = materials.associateBy { it.id }
-    val recipes: Map<String, Recipe> = mapOf(
-        "steel" to Recipe("steel", mapOf("iron" to 2, "coal" to 1), 12),
-        "wire" to Recipe("wire", mapOf("copper" to 2), 10),
-        "parts" to Recipe("parts", mapOf("steel" to 2, "wire" to 1), 17),
-        "electronics" to Recipe("electronics", mapOf("gold" to 1, "wire" to 2), 22)
+    val recipes: Map<String, Recipe> = linkedMapOf(
+        "brick" to Recipe("brick", mapOf("clay" to 4,"coal" to 1), 14),
+        "glass" to Recipe("glass", mapOf("sand" to 5,"coal" to 2), 19),
+        "cement" to Recipe("cement", mapOf("granite" to 2,"clay" to 3,"coal" to 2), 21),
+        "concrete" to Recipe("concrete", mapOf("cement" to 2,"sand" to 4,"gravel" to 4), 24),
+        "steel" to Recipe("steel", mapOf("iron" to 3, "coal" to 2), 18),
+        "wire" to Recipe("wire", mapOf("copper" to 3), 14),
+        "ceramics" to Recipe("ceramics",mapOf("clay" to 4,"sand" to 2,"salt" to 1), 22),
+        "chemicals" to Recipe("chemicals",mapOf("sulfur" to 3,"salt" to 2,"coal" to 1), 28),
+        "parts" to Recipe("parts", mapOf("steel" to 3, "wire" to 2,"glass" to 1), 28),
+        "alloy" to Recipe("alloy",mapOf("steel" to 2,"sulfur" to 1,"granite" to 2), 33),
+        "machine_parts" to Recipe("machine_parts",mapOf("alloy" to 2,"parts" to 2), 38),
+        "electronics" to Recipe("electronics", mapOf("gold" to 2, "wire" to 3,"glass" to 1), 32),
+        "construction_kit" to Recipe("construction_kit", mapOf("brick" to 3,
+            "concrete" to 2,"steel" to 2,"glass" to 1), 44)
     )
     fun name(id: String) = byId[id]?.name ?: id
 }
@@ -196,12 +226,16 @@ class GameEngine(val state: GameState) {
     fun purchaseMine(cityId: Int, lotId: Int): Boolean {
         val l = lot(cityId,lotId) ?: return false
         if (l.kind != BuildingKind.MINE || company(cityId).mines.containsKey(lotId)) return false
-        val price = 300L + lotId*65L
+        val price = 450L + lotId*85L
         if (state.money < price) return false
         val random = Random(city(cityId).seed xor (lotId.toLong()*9973))
         val depth = 6 + random.nextInt(75)
-        val mineralIds = (listOf("coal", "iron", "copper", "gold") + Catalog.materials.drop(8)
-            .filter { it.era <= max(state.era,2) }.map { it.id }.shuffled(kotlin.random.Random(random.nextInt())).take(4)).distinct()
+        val randomOres=Catalog.materials.asSequence().filter { it.id.startsWith("ore_") &&
+            it.era <= max(state.era,2) }.map {it.id}.toList()
+        val sampledBasics=Catalog.basicMinerals.map{it.id}
+            .shuffled(kotlin.random.Random(random.nextInt())).take(4)
+        val mineralIds=(listOf("coal","iron","copper","gold") + sampledBasics +
+            randomOres.shuffled(kotlin.random.Random(random.nextInt())).take(4)).distinct()
         val reserves = mineralIds.associateWith { 15 + random.nextInt(26) * depth }.toMutableMap()
         company(cityId).mines[lotId] = MineState(lotId,depth,mineralIds,reserves)
         state.money -= price
@@ -209,14 +243,14 @@ class GameEngine(val state: GameState) {
     }
     fun purchaseFactory(cityId: Int, lotId: Int): Boolean {
         val l=lot(cityId,lotId) ?: return false
-        if (l.kind!=BuildingKind.FACTORY || company(cityId).factories.containsKey(lotId) || state.money<950) return false
-        state.money-=950; company(cityId).factories[lotId]=FactoryState(lotId)
+        if (l.kind!=BuildingKind.FACTORY || company(cityId).factories.containsKey(lotId) || state.money<1250) return false
+        state.money-=1250; company(cityId).factories[lotId]=FactoryState(lotId)
         return true
     }
     fun purchaseWarehouse(cityId: Int, lotId: Int): Boolean {
         val l=lot(cityId,lotId) ?: return false
-        if (l.kind!=BuildingKind.WAREHOUSE || lotId in company(cityId).warehouses || state.money<500) return false
-        state.money-=500; company(cityId).warehouses.add(lotId)
+        if (l.kind!=BuildingKind.WAREHOUSE || lotId in company(cityId).warehouses || state.money<700) return false
+        state.money-=700; company(cityId).warehouses.add(lotId)
         return true
     }
     fun setRecipe(cityId: Int, lotId: Int, recipe: String): Boolean {
