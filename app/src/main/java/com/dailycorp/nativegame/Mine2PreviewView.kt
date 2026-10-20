@@ -19,6 +19,7 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context){
     var onSurvey:((CellPos)->Unit)?=null
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val art=GameArt(context)
+    private val minerTracks=mutableMapOf<Int,MotionTrack>()
     private val unit=33f*resources.displayMetrics.density
     private var zoom=1f
     private var panX=0f
@@ -113,6 +114,46 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context){
                     py+16f*resources.displayMetrics.density,paint)
             }
         }
+        val now=android.os.SystemClock.uptimeMillis()
+        var animating=false
+        minerTracks.keys.retainAll(world.miners().map{it.id}.toSet())
+        for(worker in world.miners()){
+            val track=minerTracks.getOrPut(worker.id){
+                MotionTrack(worker.x.toFloat(),worker.y.toFloat(),470L)
+            }
+            track.target(worker.x.toFloat(),worker.y.toFloat(),now)
+            val moving=track.animating(now)
+            if(moving)animating=true
+            val position=track.position(now)
+            val cx=left+(position.x+0.5f)*t
+            val cy=top+(position.y+0.45f)*t
+            if(cx+t<0f || cx-t>width || cy+t<0f || cy-t>height)continue
+            val phase=(now%500L).toFloat()*(2.0*kotlin.math.PI).toFloat()/500f
+            val bob=if(moving)kotlin.math.abs(kotlin.math.sin(phase))*t*0.05f else 0f
+            fill(Color.argb(125,4,11,19))
+            canvas.drawOval(RectF(cx-t*0.18f,cy+t*0.21f,cx+t*0.18f,cy+t*0.29f),paint)
+            fill(Color.rgb(60,147,182))
+            canvas.drawRoundRect(RectF(cx-t*0.12f,cy-bob,cx+t*0.12f,
+                cy+t*0.19f-bob),t*0.04f,t*0.04f,paint)
+            fill(Color.rgb(249,203,139))
+            canvas.drawCircle(cx,cy-t*0.10f-bob,t*0.13f,paint)
+            fill(Color.rgb(246,196,61))
+            canvas.drawRect(cx-t*0.15f,cy-t*0.24f-bob,
+                cx+t*0.15f,cy-t*0.16f-bob,paint)
+            if(worker.mining){
+                animating=true
+                paint.color=Color.rgb(212,222,220)
+                paint.strokeWidth=t*0.045f
+                val arm=kotlin.math.sin(phase)*t*0.11f
+                canvas.drawLine(cx+t*0.10f,cy,cx+t*0.30f,
+                    cy-t*0.18f+arm,paint)
+            }
+            if(t>24f){
+                fill(Color.WHITE);paint.textSize=t*0.19f
+                canvas.drawText(worker.id.toString(),cx-t*0.09f,cy+t*0.14f,paint)
+            }
+        }
+        if(animating && isAttachedToWindow)postInvalidateDelayed(33L)
         if(mode==Mode.DIG && down!=null && current!=null){
             val a=down!!;val b=current!!
             val l=left+min(a.x,b.x)*t;val p=top+min(a.y,b.y)*t

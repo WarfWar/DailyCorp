@@ -29,7 +29,7 @@ class Mine2PreviewActivity:Activity(){
             if(::world.isInitialized){
                 world.step()
                 steps++
-                if(steps%2==0)game.tick()
+                if(steps%2==0)game.tick(excludedMineCityId=cityId,excludedMineLotId=lotId)
                 if(steps%20==0)save()
                 refresh()
                 view.invalidate()
@@ -111,11 +111,36 @@ class Mine2PreviewActivity:Activity(){
             refresh();view.invalidate()
         }
         view.onSurvey={p->
-            val found=world.survey(p.x,p.y)
-            Toast.makeText(this,if(found>0)"Разведано: "+found
-                else "Нет зарядов или слишком далеко",
-                Toast.LENGTH_SHORT).show()
-            refresh();view.invalidate()
+            if(readOnly){
+                Toast.makeText(this,"Сохранение недоступно: разведка отключена",
+                    Toast.LENGTH_LONG).show()
+            }else{
+                val quote=world.surveyQuote(p.x,p.y)
+                if(!quote.valid){
+                    Toast.makeText(this,quote.reason,Toast.LENGTH_SHORT).show()
+                }else{
+                    android.app.AlertDialog.Builder(this)
+                        .setTitle("Геологоразведка · "+quote.price+" ₽")
+                        .setMessage("Глубина: "+(p.y*world.config.metersPerCell)+
+                            " м\nПримерно "+quote.newCells+" новых клеток."+
+                            "\nВаш баланс: "+game.state.money+" ₽."+
+                            "\nОплата только за успешное сканирование.")
+                        .setPositiveButton("Разведать"){_,_->
+                            val result=world.surveyPaid(p.x,p.y,game.state.money)
+                            if(result.successful){
+                                game.state.money-=result.charged
+                                GameSession.save(this)
+                                save()
+                            }
+                            Toast.makeText(this,
+                                if(result.successful)
+                                    "Разведано "+result.cellsRevealed+" клеток · −"+result.charged+" ₽"
+                                else result.reason,Toast.LENGTH_LONG).show()
+                            refresh();view.invalidate()
+                        }
+                        .setNegativeButton("Отмена",null).show()
+                }
+            }
         }
         root.addView(view,LinearLayout.LayoutParams(-1,0,1f))
         val scroll=HorizontalScrollView(this).apply{isHorizontalScrollBarEnabled=false}
@@ -127,7 +152,31 @@ class Mine2PreviewActivity:Activity(){
         }
         add("⛏ Проходка"){view.mode=Mine2PreviewView.Mode.DIG;refresh()}
         add("✋ Обзор"){view.mode=Mine2PreviewView.Mode.PAN;refresh()}
-        add("⌕ Разведка"){view.mode=Mine2PreviewView.Mode.SURVEY;refresh()}
+        add("⌕ Разведка ₽"){view.mode=Mine2PreviewView.Mode.SURVEY;refresh()}
+        add("＋ Шахтёр"){
+            if(readOnly){
+                Toast.makeText(this,"Сохранение недоступно",Toast.LENGTH_SHORT).show()
+            }else{
+                val price=450L+world.miners().size*200L
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("Нанять проходчика · "+price+" ₽")
+                    .setMessage("Шахтёры: "+world.miners().size+"/8\n"+
+                        "Рабочие прокладывают путь к доступной породе по готовым тоннелям.")
+                    .setPositiveButton("Нанять"){_,_->
+                        if(game.state.money<price){
+                            Toast.makeText(this,"Недостаточно денег",Toast.LENGTH_SHORT).show()
+                        }else if(world.hireMiner()){
+                            game.state.money-=price
+                            GameSession.save(this)
+                            save()
+                            Toast.makeText(this,"Шахтёр нанят",Toast.LENGTH_SHORT).show()
+                        }else{
+                            Toast.makeText(this,"Достигнут лимит",Toast.LENGTH_SHORT).show()
+                        }
+                        refresh();view.invalidate()
+                    }.setNegativeButton("Отмена",null).show()
+            }
+        }
         add("Отмена задач"){
             val n=world.cancelOrders()
             Toast.makeText(this,"Снято задач: "+n,Toast.LENGTH_SHORT).show()
@@ -155,8 +204,11 @@ class Mine2PreviewActivity:Activity(){
         status.text="Глубина "+(world.config.depthCells*world.config.metersPerCell)+
             " м · Пройдено "+world.totalExcavated+
             " · Заданий "+world.pendingCount()+
-            "\nРазведка "+world.surveysLeft+" · Пробная руда "+world.stockpile.values.sum()+
-            "\n"+(if(readOnly)"Файл прототипа повреждён: сохранение отключено"
+            "\nШахтёры "+world.miners().size+" · Разведок "+world.surveysPerformed+
+            " · Баланс "+game.state.money+" ₽"+
+            "\nПробная руда "+world.stockpile.values.sum()+
+            " · Разведка: от 250 ₽, цена растёт"+
+            "\n"+(if(readOnly)"Ошибка сохранения: действия отключены"
                 else "ТЕСТ: пробная руда пока не поступает в экономику")+
             "\n"+label
     }

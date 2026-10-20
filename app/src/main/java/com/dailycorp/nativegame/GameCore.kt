@@ -344,12 +344,13 @@ class GameEngine(val state: GameState) {
         return if(route.mode==RouteType.MINE_FACTORY || route.mode==RouteType.MINE_WAREHOUSE)
             c.mines.getValue(route.sourceLot).loading else c.storage
     }
-    fun tick(seconds:Int=1) {
+    fun tick(seconds:Int=1,excludedMineCityId:Int=-1,excludedMineLotId:Int=-1) {
         repeat(seconds.coerceIn(0,1000)) {
             state.gameSeconds++
             for (city in state.cities) {
                 val c=company(city.id)
                 for(mine in c.mines.values){
+                    if(city.id==excludedMineCityId && mine.lotId==excludedMineLotId)continue
                     MineWorld.step(mine,city.seed xor mine.lotId.toLong(),
                         ScienceTree.drillBoost(state),ScienceTree.cartBoost(state),
                         ScienceTree.geologyBoost(state))
