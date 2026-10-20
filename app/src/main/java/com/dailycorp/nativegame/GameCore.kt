@@ -34,7 +34,7 @@ data class MineState(val lotId: Int, val depth: Int, val ores: List<String>,
     companion object { private const val serialVersionUID: Long = -9128487685651322306L }
 }
 
-data class FactoryState(val lotId: Int, var recipeId: String = "steel",
+data class FactoryState(val lotId: Int, var recipeId: String = "brick",
     val inputs: MutableMap<String, Int> = mutableMapOf(), var progress: Int = 0) : Serializable
 
 data class CityCompany(val mines: MutableMap<Int, MineState> = mutableMapOf(),
@@ -101,7 +101,7 @@ object Catalog {
         (1..12).map { grade ->
             Material("ore_${i}_$grade", "$family · сорт $grade", 1 + (grade-1)/2, 35 + i*9 + grade*13)
         }
-    }
+    } + ProductionExpansion.extraMaterials
     val byId = materials.associateBy { it.id }
     val recipes: Map<String, Recipe> = linkedMapOf(
         "brick" to Recipe("brick", mapOf("clay" to 4,"coal" to 1), 14),
@@ -118,7 +118,50 @@ object Catalog {
         "electronics" to Recipe("electronics", mapOf("gold" to 2, "wire" to 3,"glass" to 1), 32),
         "construction_kit" to Recipe("construction_kit", mapOf("brick" to 3,
             "concrete" to 2,"steel" to 2,"glass" to 1), 44)
-    )
+    ) + ProductionExpansion.recipes
+
+    private fun oreFamilyKey(canonical:String):String? {
+        val parts=canonical.split("_")
+        if(parts.size!=3 || parts[0]!="ore" || parts[2]!="1")return null
+        val family=parts[1].toIntOrNull()?:return null
+        if(family !in 0..19)return null
+        return "ore_"+family+"_"
+    }
+    fun acceptsIngredient(expected:String,actual:String):Boolean {
+        if(expected==actual)return true
+        val prefix=oreFamilyKey(expected)?:return false
+        if(!actual.startsWith(prefix))return false
+        return actual.removePrefix(prefix).toIntOrNull() in 1..12
+    }
+    fun accepts(recipe:Recipe,actual:String):Boolean =
+        recipe.ingredients.keys.any{acceptsIngredient(it,actual)}
+    fun available(inputs:Map<String,Int>,required:String):Int {
+        if(oreFamilyKey(required)==null)return inputs[required]?:0
+        return inputs.entries.sumOf{(item,amount)->
+            if(acceptsIngredient(required,item))amount else 0
+        }
+    }
+    fun canProduce(recipe:Recipe,inputs:Map<String,Int>):Boolean =
+        recipe.ingredients.all{(item,amount)->available(inputs,item)>=amount}
+    fun consumeIngredients(recipe:Recipe,inputs:MutableMap<String,Int>):Boolean {
+        if(!canProduce(recipe,inputs))return false
+        for((item,count) in recipe.ingredients){
+            var left=count
+            val variants=inputs.keys.filter{acceptsIngredient(item,it)}.sorted()
+            for(variant in variants){
+                if(left==0)break
+                val take=min(left,inputs[variant]?:0)
+                if(take>0){
+                    inputs[variant]=inputs.getValue(variant)-take
+                    left-=take
+                }
+            }
+            check(left==0){"Recipe ingredient disappeared during transaction"}
+        }
+        return true
+    }
+    fun ingredientName(id:String):String =
+        if(oreFamilyKey(id)!=null)name(id).substringBefore(" · сорт")+" (любой сорт)" else name(id)
     fun name(id: String) = byId[id]?.name ?: id
 }
 
@@ -255,7 +298,8 @@ class GameEngine(val state: GameState) {
     }
     fun setRecipe(cityId: Int, lotId: Int, recipe: String): Boolean {
         val factory=company(cityId).factories[lotId] ?: return false
-        if (!Catalog.recipes.containsKey(recipe)) return false
+        if (!Catalog.recipes.containsKey(recipe) ||
+            (Catalog.byId[recipe]?.era?:Int.MAX_VALUE)>state.era) return false
         factory.recipeId=recipe;factory.progress=0;return true
     }
     fun hireTruck(): Boolean {
@@ -272,13 +316,13 @@ class GameEngine(val state: GameState) {
             RouteType.MINE_FACTORY -> src.kind==BuildingKind.MINE && src.id in c.mines &&
                 dst?.kind==BuildingKind.FACTORY && dst.id in c.factories &&
                 c.mines.getValue(src.id).ores.contains(material) &&
-                Catalog.recipes[c.factories.getValue(dst.id).recipeId]?.ingredients?.containsKey(material)==true
+                Catalog.recipes[c.factories.getValue(dst.id).recipeId]?.let{Catalog.accepts(it,material)}==true
             RouteType.MINE_WAREHOUSE -> src.kind==BuildingKind.MINE && src.id in c.mines &&
                 dst?.kind==BuildingKind.WAREHOUSE && dst.id in c.warehouses &&
                 c.mines.getValue(src.id).ores.contains(material)
             RouteType.WAREHOUSE_FACTORY -> src.kind==BuildingKind.WAREHOUSE && src.id in c.warehouses &&
                 dst?.kind==BuildingKind.FACTORY && dst.id in c.factories &&
-                Catalog.recipes[c.factories.getValue(dst.id).recipeId]?.ingredients?.containsKey(material)==true
+                Catalog.recipes[c.factories.getValue(dst.id).recipeId]?.let{Catalog.accepts(it,material)}==true
             RouteType.WAREHOUSE_CONTRACT -> src.kind==BuildingKind.WAREHOUSE && src.id in c.warehouses &&
                 state.contracts.any { it.id==route.targetId && it.cityId==route.cityId &&
                     it.material==material && !it.complete }
@@ -391,10 +435,10 @@ class GameEngine(val state: GameState) {
                 }
                 for(factory in c.factories.values){
                     val recipe=Catalog.recipes[factory.recipeId]?:continue
-                    if(recipe.ingredients.any{(item,amount)->(factory.inputs[item]?:0)<amount}){factory.progress=0;continue}
+                    if(!Catalog.canProduce(recipe,factory.inputs)){factory.progress=0;continue}
                     factory.progress+=1+ScienceTree.productionBoost(state)
                     if(factory.progress>=recipe.seconds){
-                        for((item,amount) in recipe.ingredients)factory.inputs[item]=factory.inputs.getValue(item)-amount
+                        if(!Catalog.consumeIngredients(recipe,factory.inputs)){factory.progress=0;continue}
                         c.storage[recipe.output]=(c.storage[recipe.output]?:0)+1
                         factory.progress=0
                     }
