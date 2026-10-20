@@ -54,8 +54,10 @@ class MineSpriteFrames(context:Context) {
         val cart=name.startsWith("cart")
         // A miner belongs INSIDE one tunnel tile, not across 1.5 rows.
         // Keep frame aspect ratio (96:128 = 0.75), preserve feetY baseline.
-        val width=if(cart)tile*1.60f else tile*0.675f
-        val height=if(cart)tile*1.19f else tile*0.90f
+        // Carts should be visually contained in one tile, like miners.
+        // Reduce both axes by the same ratio: keep the original art proportions.
+        val width=if(cart)tile*0.98f else tile*0.675f
+        val height=if(cart)tile*0.73f else tile*0.90f
         val source=Rect(frame*FRAME_W,clip.row*FRAME_H,
             (frame+1)*FRAME_W,(clip.row+1)*FRAME_H)
         val destination=RectF(x-width/2f,feetY-height,x+width/2f,feetY)

@@ -19,7 +19,6 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
     var mode=Mode.NORMAL
     var onPlan:((CellPos,CellPos)->Unit)?=null
     var onSurvey:((CellPos)->Unit)?=null
-    var onSelected:((CellPos,Int)->Unit)?=null
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val art=GameArt(context)
     private val blocks=MineBlockAtlas(context)
@@ -27,7 +26,6 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
     private val tracks=mutableMapOf<Int,Mine2MotionTrack>()
     private val facing=mutableMapOf<Int,Boolean>()
     private val previousX=mutableMapOf<Int,Int>()
-    private var selected:CellPos?=null
     private var scanAt:CellPos?=null
     private var scanStarted=0L
     fun scanPulse(cell:CellPos){
@@ -232,13 +230,6 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
                 canvas.drawText(worker.id.toString(),cx-t*0.08f,cy-t*0.15f,paint)
             }
         }
-        selected?.let{p->
-            val l=left+p.x*t;val y=top+p.y*t
-            paint.color=Color.rgb(118,225,241)
-            paint.strokeWidth=max(2f,t*0.07f);paint.style=Paint.Style.STROKE
-            canvas.drawRoundRect(RectF(l+1,y+1,l+t-1,y+t-1),3f,3f,paint)
-            paint.style=Paint.Style.FILL
-        }
         scanAt?.let{p->
             val age=now-scanStarted
             if(age in 0..1300L){
@@ -303,15 +294,8 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
                     }else{
                         val c=world.cell(p.x,p.y)
                         if(c?.explored==true && !c.passable && c.kind!=RockKind.BEDROCK){
-                            if(selected==p){
-                                onPlan?.invoke(p,p)
-                                selected=null
-                            }else{
-                                selected=p
-                                onSelected?.invoke(p,c.deposit)
-                            }
-                        }else{
-                            selected=null
+                            // One tap toggles the dig order. A drag remains a pan.
+                            onPlan?.invoke(p,p)
                         }
                     }
                 }

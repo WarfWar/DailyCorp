@@ -112,13 +112,6 @@ class Mine2PreviewActivity:Activity(){
                 else "Задание снято",Toast.LENGTH_SHORT).show()
             refresh();view.invalidate()
         }
-        view.onSelected={p,count->
-            val cell=world.cell(p.x,p.y)
-            Toast.makeText(this,
-                (cell?.resource?.let{Catalog.name(it)}?:"Порода")+
-                " · "+count+" ед. · нажми на клетку ещё раз",
-                Toast.LENGTH_SHORT).show()
-        }
         view.onSurvey={p->
             // Panning is always enabled. A paid scan is a one-shot tool.
             view.resetScanner()
@@ -260,7 +253,7 @@ class Mine2PreviewActivity:Activity(){
     private fun refresh(){
         val label=if(view.mode==Mine2PreviewView.Mode.SURVEY)
             "Разведка: нажми на точку сканирования; обзор работает постоянно"
-            else "Проведи пальцем — обзор; 2 нажатия на породу — назначить/отменить добычу"
+            else "Проведи пальцем — обзор; нажми на породу — назначить/отменить добычу"
         status.text="Глубина "+(world.config.depthCells*world.config.metersPerCell)+
             " м · Пройдено "+world.totalExcavated+
             " · Заданий "+world.pendingCount()+
