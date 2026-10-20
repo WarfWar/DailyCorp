@@ -129,7 +129,7 @@ object MineWorld {
         return result
     }
 
-    fun step(mine: MineState, seed: Long, fasterDrills: Boolean = false, fasterCarts: Boolean = false) {
+    fun step(mine: MineState, seed: Long, drillBonus: Int = 0, cartBonus: Int = 0, geologyBonus: Int = 0) {
         val floor = floor(mine, seed)
         val underground = interior(mine)
         for (worker in floor.workers) {
@@ -156,11 +156,11 @@ object MineWorld {
             }
             val rock = floor.block(target.x, target.y) ?: continue
             worker.striking = true
-            rock.hardness -= underground.drillLevel + if (fasterDrills) 1 else 0
+            rock.hardness -= underground.drillLevel + drillBonus
             if (rock.hardness > 0) continue
             if (rock.terrain == MineTerrain.ORE && rock.amount > 0) {
                 val left = mine.reserves[rock.material] ?: 0
-                val mined = min(left, rock.amount)
+                val mined = min(left, rock.amount + geologyBonus)
                 if (mined > 0) {
                     mine.reserves[rock.material] = left - mined
                     floor.piles.add(MinePile(target.x, target.y, rock.material, mined))
@@ -196,14 +196,14 @@ object MineWorld {
                     if (bestPath.size > 1) {
                         cart.x = bestPath[1].x; cart.y = bestPath[1].y
                     } else {
-                        val carried = min(best.amount, 3 + underground.cartLevel * 2)
+                        val carried = min(best.amount, 3 + underground.cartLevel * 2 + cartBonus)
                         best.amount -= carried
                         cart.amount = carried; cart.cargo = best.material
                         if (best.amount <= 0) floor.piles.remove(best)
                     }
                 }
             }
-            if (!fasterCarts && underground.cartLevel < 2) cart.delay = 1
+            if (cartBonus == 0 && underground.cartLevel < 2) cart.delay = 1
         }
     }
 }
