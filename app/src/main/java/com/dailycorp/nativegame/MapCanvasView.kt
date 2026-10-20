@@ -129,53 +129,50 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         if(continentMode)drawContinent(canvas) else drawCity(canvas)
     }
     private fun drawContinent(canvas:Canvas){
-        val cx=width/2f+panX;val cy=height/2f+panY
-        val unit=resources.displayMetrics.density*zoom
-        val rx=min(width,height)*0.45f*zoom
-        val ry=rx*0.67f
-        // Entire continent: several inset organic coast bands, independent of tile renderer.
-        diamond(canvas,cx,cy,rx*1.1f,ry*1.13f,Color.rgb(47,143,175))
-        diamond(canvas,cx,cy,rx,ry,Color.rgb(112,169,116))
-        diamond(canvas,cx-rx*0.07f,cy-ry*0.03f,rx*0.81f,ry*0.82f,Color.rgb(137,190,119))
-        diamond(canvas,cx+rx*0.13f,cy+ry*0.04f,rx*0.48f,ry*0.40f,Color.rgb(167,191,126))
-        // Illustrated continent patches from the supplied biome atlas.
-        val scenery=listOf("continent.forest","continent.lake","continent.mountains",
-            "continent.river_curve","continent.swamp","continent.beach",
-            "continent.meadow","continent.highway","continent.industrial_edge",
-            "continent.volcano","continent.snow","continent.rocky_coast",
-            "continent.port","continent.river_bridge","continent.trainline")
-        for(i in scenery.indices){
-            val col=i%5
-            val row=i/5
-            val tx=cx+(col-2f)*rx*0.38f
-            val ty=cy+(row-1f)*ry*0.66f
-            val tw=rx*0.40f; val th=ry*0.72f
-            if(onScreen(tx,ty,tw))art.draw(canvas,scenery[i],tx,ty,tw,th)
+        val rect=worldRect()
+        val tw=rect.width()/96f
+        val th=rect.height()/72f
+        val seed=engine.state.seed
+        // One procedural map. No disconnected collage of example biomes.
+        for(y in 0 until 72)for(x in 0 until 96){
+            fill(biomeColor(BiomeGenerator.world(seed,x,y),x,y,seed))
+            val sx=rect.left+x*tw;val sy=rect.top+y*th
+            canvas.drawRect(sx,sy,sx+tw+0.55f,sy+th+0.55f,paint)
         }
+        // Biome silhouettes are sparse and only placed inside their native regions.
+        for(y in 4 until 68 step 4)for(x in 4 until 92 step 4){
+            val biome=BiomeGenerator.world(seed,x,y)
+            if(biome !in listOf(Biome.FOREST,Biome.MOUNTAINS,Biome.SNOW,Biome.DESERT))
+                continue
+            if(BiomeGenerator.world(seed,x+2,y)!=biome)continue
+            val px=rect.left+(x+0.5f)*tw
+            val py=rect.top+(y+0.5f)*th
+            biomeAccent(canvas,biome,x,y,px,py,tw*2.4f,th*2.4f)
+        }
+        val d=resources.displayMetrics.density
         for(city in engine.state.cities){
             val (x,y)=cityPin(city.id)
-            if(!onScreen(x,y,25f))continue
-            val active=city.id==cityId
-            fill(if(active)Color.rgb(255,190,90) else Color.WHITE)
-            canvas.drawCircle(x,y,(if(active)6.5f else 4.5f)*unit,paint)
-            if(active || city.id%8==0){
-                val title=city.name
-                fill(Color.argb(225,14,49,67))
-                canvas.drawRoundRect(RectF(x+7*unit,y-10*unit,x+(if(active)99 else 88)*unit,y+6*unit),5*unit,5*unit,paint)
-                text(canvas,title,x+12*unit,y+2*unit,10f,Color.WHITE,active)
+            if(!onScreen(x,y,35f))continue
+            val selected=city.id==cityId
+            fill(if(selected)Color.rgb(255,190,90) else Color.WHITE)
+            canvas.drawCircle(x,y,(if(selected)6f else 4f)*d,paint)
+            if(selected || city.id%8==0){
+                fill(Color.argb(218,11,41,56))
+                canvas.drawRoundRect(RectF(x+8*d,y-12*d,x+100*d,y+6*d),4*d,4*d,paint)
+                text(canvas,city.name,x+13*d,y+2*d,10f,Color.WHITE,selected)
             }
         }
-        text(canvas,"КОНТИНЕНТ  ·  ${engine.state.cities.size} ГОРОДОВ",16*resources.displayMetrics.density,31*resources.displayMetrics.density,14f,Color.WHITE,true)
-        text(canvas,"Коснись города или увеличь карту двумя пальцами",16*resources.displayMetrics.density,height-16*resources.displayMetrics.density,11f,Color.WHITE)
+        fill(Color.argb(235,7,34,49))
+        canvas.drawRoundRect(RectF(8*d,8*d,width-8*d,57*d),10*d,10*d,paint)
+        text(canvas,"КОНТИНЕНТ · 48 ГОРОДОВ",18*d,29*d,15f,Color.WHITE,true)
+        text(canvas,"Леса · горы · реки · озёра · побережье",18*d,47*d,
+            11f,Color.rgb(198,223,232))
     }
     private fun cityPin(id:Int):Pair<Float,Float>{
-        val unit=resources.displayMetrics.density*zoom
-        val row=(id-1)/8
-        val col=(id-1)%8
-        val jitterX=((id*83)%9-4)*1.5f
-        val jitterY=((id*67)%9-4)*1.2f
-        return Pair(width/2f+panX+(col-3.5f)*38f*unit+jitterX*unit,
-            height/2f+panY+(row-2.5f)*34f*unit+jitterY*unit)
+        val cell=cityWorldPoint(id)
+        val r=worldRect()
+        return Pair(r.left+(cell.x+0.5f)*r.width()/96f,
+            r.top+(cell.y+0.5f)*r.height()/72f)
     }
     private fun drawCity(canvas:Canvas){
         val d=resources.displayMetrics.density
