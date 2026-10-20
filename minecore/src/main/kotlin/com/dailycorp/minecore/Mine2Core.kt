@@ -351,6 +351,10 @@ class Mine2World(val config:Mine2Config):Serializable {
         }
         return null
     }
+    /** Hardness for every subsequent unit (not for an entire cell). */
+    fun oreWorkPerUnit(grade:Int,depthCell:Int):Int =
+        (6 + grade*2 + depthCell/22).coerceAtMost(90)
+
     fun step(drillPower:Int=2):Mine2StepResult {
         timeTicks++
         var minedMaterial:String?=null
@@ -382,18 +386,28 @@ class Mine2World(val config:Mine2Config):Serializable {
             }
             worker.mining=true
             val block=position(target)?:continue
+            // Each finished drilling cycle extracts at most ONE resource unit.
+            // A 15-unit vein therefore lasts roughly 15 times longer than a 1-unit vein.
             block.hardness-=drillPower.coerceAtLeast(1)
             if(block.hardness>0)continue
             val material=block.resource
-            val amount=if(material==null)0 else block.deposit
-            if(material!=null && amount>0){
-                stockpile[material]=(stockpile[material]?:0)+amount
+            if(block.kind==RockKind.ORE && material!=null && block.deposit>0){
+                block.deposit--
+                stockpile[material]=(stockpile[material]?:0)+1
                 minedMaterial=material
-                minedAmount+=amount
+                minedAmount++
+                if(block.deposit>0){
+                    // Persist drill progress in the existing hardness field; this
+                    // avoids changing Java serialization IDs on existing saves.
+                    block.hardness=oreWorkPerUnit(block.grade,target.y)
+                    // Preserve the dig order until the deposit is exhausted.
+                    continue
+                }
             }
             block.kind=RockKind.TUNNEL
             block.ordered=false
             block.deposit=0
+            block.hardness=0
             excavated=true
             totalExcavated++
             reveal(target.x,target.y,2)
