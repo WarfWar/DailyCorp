@@ -115,4 +115,54 @@ class Mine2WorldTest {
         assertEquals(queued,world.cancelOrders())
         assertEquals(0,world.pendingCount())
     }
+    @Test fun oreVeinsKeepConnectedShapesButIndividualCellQuantitiesDiffer(){
+        val generated=Mine2World.create(Mine2Config(983311L,40,168))
+        val kinds=mutableMapOf<String,MutableSet<Int>>()
+        for(y in 5 until 160)for(x in 1..38){
+            val c=generated.cell(x,y)!!
+            if(c.resource!=null && c.kind==RockKind.ORE)
+                kinds.getOrPut(c.resource!!){mutableSetOf()}.add(c.deposit)
+        }
+        assertTrue("Each deposit must vary, even within a vein",
+            kinds.values.any { it.size>=4 })
+        assertTrue("Geology must contain different raw materials",kinds.size>=4)
+        assertTrue(kinds.values.flatten().all {it>0})
+        val replay=Mine2World.create(Mine2Config(983311L,40,168))
+        for(y in 0 until 168)for(x in 0 until 40)
+            assertEquals(generated.cell(x,y)!!.deposit,replay.cell(x,y)!!.deposit)
+    }
+    @Test fun enlargedSurveyCreatesDarkenedPartiallyExploredRegion(){
+        val world=Mine2World.create(config)
+        val x=config.width/2+6
+        val y=8
+        val offer=world.surveyQuote(x,y)
+        assertTrue(offer.valid)
+        assertTrue("Larger radius should reveal substantial area",offer.newCells>45)
+        assertEquals(450L+(y*5/25)*20L,offer.price)
+        val scan=world.surveyPaid(x,y,offer.price)
+        assertTrue(scan.successful)
+        assertTrue(world.isSurveyDim(x+7,y))
+        world.reveal(x+7,y,2)
+        assertFalse(world.isSurveyDim(x+7,y))
+        assertFalse(world.surveyPaid(x,y,999999L).successful)
+    }
+    @Test fun upgradingMineRaisesLimitAndSurvivesSave(){
+        val world=Mine2World.create(config)
+        assertEquals(8,world.crewLimit)
+        assertEquals(1,world.shaftLevel)
+        assertEquals(1300L,world.upgradePrice())
+        repeat(7){assertTrue(world.hireMiner())}
+        assertFalse(world.hireMiner())
+        assertTrue(world.upgradeShaft())
+        assertEquals(12,world.crewLimit)
+        repeat(4){assertTrue(world.hireMiner())}
+        assertFalse(world.hireMiner())
+        val output=ByteArrayOutputStream()
+        ObjectOutputStream(output).use{it.writeObject(world)}
+        val restored=ObjectInputStream(ByteArrayInputStream(output.toByteArray()))
+            .use{it.readObject() as Mine2World}
+        assertEquals(12,restored.crewLimit)
+        assertEquals(12,restored.miners().size)
+    }
+
 }

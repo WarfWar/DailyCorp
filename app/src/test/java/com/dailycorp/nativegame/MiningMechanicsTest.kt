@@ -112,4 +112,35 @@ class MiningMechanicsTest {
         assertEquals(10,game.state.era)
         assertFalse(game.buyEra())
     }
+    @Test fun continuousMovementDoesNotPauseAtIntermediateCell(){
+        val track=Mine2MotionTrack(2f,4f,510L)
+        track.target(3f,4f,1000L)
+        val a=track.position(1125L).x
+        val b=track.position(1250L).x
+        val c=track.position(1375L).x
+        assertTrue(a>2f)
+        assertEquals(b-a,c-b,0.001f)
+        val mid=track.position(1500L).x
+        track.target(4f,4f,1500L)
+        assertEquals(mid,track.position(1500L).x,0.001f)
+        assertTrue(track.position(1600L).x>mid)
+    }
+    @Test fun expandedIndustrialRecipesAreCompleteAndMoreResourceIntensive(){
+        val raw=Catalog.basicMinerals.map{it.id}.toSet()
+        assertEquals(setOf("clay","sand","gravel","granite","salt","sulfur","shale"),raw)
+        for(recipe in Catalog.recipes.values){
+            assertTrue(recipe.output in Catalog.byId)
+            assertTrue(recipe.ingredients.isNotEmpty())
+            for(material in recipe.ingredients.keys)assertTrue(material in Catalog.byId)
+        }
+        assertTrue((Catalog.recipes["steel"]?.ingredients?.get("iron")?:0)>=3)
+        assertTrue(Catalog.recipes.containsKey("construction_kit"))
+        assertTrue(Catalog.recipes.containsKey("concrete"))
+        val game=GameEngine.newGame(20261020L)
+        val mine=game.city(1).lots.first{it.kind==BuildingKind.MINE}
+        assertTrue(game.purchaseMine(1,mine.id))
+        val ores=game.company(1).mines.getValue(mine.id).ores
+        assertTrue(ores.any{it in raw})
+    }
+
 }
