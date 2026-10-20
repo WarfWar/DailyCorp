@@ -15,15 +15,17 @@ import kotlin.math.*
  * The only temporary tool is the paid scouting scanner.
  */
 class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
-    enum class Mode { NORMAL, SURVEY }
+    enum class Mode { NORMAL, SURVEY, RAIL }
     var mode=Mode.NORMAL
     var onPlan:((CellPos,CellPos)->Unit)?=null
     var onSurvey:((CellPos)->Unit)?=null
+    var onRail:((CellPos)->Unit)?=null
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val art=GameArt(context)
     private val blocks=MineBlockAtlas(context)
     private val sprites=MineSpriteFrames(context)
     private val tracks=mutableMapOf<Int,Mine2MotionTrack>()
+    private val cartTracks=mutableMapOf<Int,Mine2MotionTrack>()
     private val facing=mutableMapOf<Int,Boolean>()
     private val previousX=mutableMapOf<Int,Int>()
     private var scanAt:CellPos?=null
@@ -190,6 +192,47 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
                     py+16f*resources.displayMetrics.density,paint)
             }
         }
+        // Rail infrastructure is overlaid on excavated passages, never on ore.
+        world.existingTransport()?.let{transport->
+            for(p in transport.rails){
+                if(p.x !in x0..x1 || p.y !in y0..y1)continue
+                val cell=world.cell(p.x,p.y)?:continue
+                if(!cell.passable)continue
+                val l=left+p.x*t;val topY=top+p.y*t
+                fill(Color.rgb(126,102,68))
+                val horizontal=transport.railAt(CellPos(p.x-1,p.y)) ||
+                    transport.railAt(CellPos(p.x+1,p.y))
+                if(horizontal){
+                    canvas.drawRect(l+t*0.05f,topY+t*0.73f,
+                        l+t*0.95f,topY+t*0.79f,paint)
+                    canvas.drawRect(l+t*0.05f,topY+t*0.91f,
+                        l+t*0.95f,topY+t*0.97f,paint)
+                    for(i in 1..3){
+                        val x=l+i*t/4f
+                        fill(Color.rgb(169,142,96))
+                        canvas.drawRect(x-t*0.028f,topY+t*0.71f,
+                            x+t*0.028f,topY+t*0.99f,paint)
+                    }
+                }else{
+                    canvas.drawRect(l+t*0.27f,topY,
+                        l+t*0.32f,topY+t,paint)
+                    canvas.drawRect(l+t*0.68f,topY,
+                        l+t*0.73f,topY+t,paint)
+                }
+            }
+            for((p,materials) in transport.piles){
+                if(p.x !in x0..x1 || p.y !in y0..y1)continue
+                val amount=materials.values.sum()
+                if(amount<=0)continue
+                val l=left+p.x*t;val y=top+p.y*t
+                fill(Color.rgb(180,122,67))
+                canvas.drawOval(RectF(l+t*0.22f,y+t*0.62f,
+                    l+t*0.78f,y+t*0.90f),paint)
+                fill(Color.rgb(254,222,149))
+                paint.textSize=max(9f*resources.displayMetrics.scaledDensity,t*0.23f)
+                canvas.drawText(amount.toString(),l+t*0.36f,y+t*0.59f,paint)
+            }
+        }
         val now=android.os.SystemClock.uptimeMillis()
         var animating=false
         tracks.keys.retainAll(world.miners().map{it.id}.toSet())
@@ -228,6 +271,35 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
             if(t>24f){
                 fill(Color.WHITE);paint.textSize=t*0.19f
                 canvas.drawText(worker.id.toString(),cx-t*0.08f,cy-t*0.15f,paint)
+            }
+        }
+        world.existingTransport()?.let{transport->
+            cartTracks.keys.retainAll(transport.carts.map{it.id}.toSet())
+            for(cart in transport.carts){
+                val track=cartTracks.getOrPut(cart.id){
+                    Mine2MotionTrack(cart.x.toFloat(),cart.y.toFloat(),500L)
+                }
+                track.target(cart.x.toFloat(),cart.y.toFloat(),now)
+                val moving=track.moving(now)
+                if(moving)animating=true
+                val pos=track.position(now)
+                val x=left+(pos.x+0.5f)*t
+                val feet=top+(pos.y+0.96f)*t
+                if(x+t<0 || x-t>width || feet+t<0 || feet-t>height)continue
+                val name=when{
+                    moving && cart.amount>0 -> "cart_move_loaded"
+                    moving -> "cart_move_empty"
+                    cart.amount>0 -> "cart_idle_loaded"
+                    else -> "cart_idle_empty"
+                }
+                if(!sprites.draw(canvas,name,x,feet,t,now,cart.id)){
+                    fill(Color.rgb(194,124,67))
+                    canvas.drawRoundRect(RectF(x-t*0.37f,feet-t*0.57f,
+                        x+t*0.37f,feet-t*0.22f),t*0.06f,t*0.06f,paint)
+                    fill(Color.rgb(51,53,56))
+                    canvas.drawCircle(x-t*0.24f,feet-t*0.17f,t*0.075f,paint)
+                    canvas.drawCircle(x+t*0.24f,feet-t*0.17f,t*0.075f,paint)
+                }
             }
         }
         scanAt?.let{p->
@@ -291,6 +363,8 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
                     val p=cellAt(e.x,e.y)
                     if(mode==Mode.SURVEY){
                         onSurvey?.invoke(p)
+                    }else if(mode==Mode.RAIL){
+                        onRail?.invoke(p)
                     }else{
                         val c=world.cell(p.x,p.y)
                         if(c?.explored==true && !c.passable && c.kind!=RockKind.BEDROCK){
