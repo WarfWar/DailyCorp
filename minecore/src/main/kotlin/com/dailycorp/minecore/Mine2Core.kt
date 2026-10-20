@@ -110,13 +110,14 @@ object Mine2Geology {
                         RockCell(RockKind.TUNNEL,hardness=0)
                     else -> {
                         val ore=oreAt(config,x,y)
+                        val baseMaterial=if(ore==null)basicAt(config,x,y)else null
                         if(ore!=null){
                             RockCell(RockKind.ORE,ore.first,
                                 deposit=resourceAmount(config,x,y,ore.second),
                                 grade=ore.second,
                                 hardness=2+ore.second+y/35)
-                        }else if(basicAt(config,x,y)!=null){
-                            val material=basicAt(config,x,y)!!
+                        }else if(baseMaterial!=null){
+                            val material=baseMaterial
                             val grade=(1+y/60).coerceIn(1,4)
                             RockCell(RockKind.ORE,material,
                                 deposit=resourceAmount(config,x,y,grade),
