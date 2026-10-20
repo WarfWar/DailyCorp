@@ -112,6 +112,11 @@ class GameActivity : Activity() {
         }
         scroll.addView(actions)
         root.addView(scroll,LinearLayout.LayoutParams(-1,density(62)))
+        // Android 15+ draws behind status/navigation bars unless insets are applied.
+        root.setOnApplyWindowInsetsListener{view,insets->
+            view.setPadding(0,insets.systemWindowInsetTop,0,insets.systemWindowInsetBottom)
+            insets
+        }
         setContentView(root)
         updateActions();refresh()
     }
