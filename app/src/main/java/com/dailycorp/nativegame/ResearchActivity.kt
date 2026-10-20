@@ -115,6 +115,10 @@ class ResearchActivity : Activity() {
         footer.addView(button("← К городу"){finish()},
             LinearLayout.LayoutParams(0,px(57),1f))
         shell.addView(footer)
+        shell.setOnApplyWindowInsetsListener{view,insets->
+            view.setPadding(0,insets.systemWindowInsetTop,0,insets.systemWindowInsetBottom)
+            insets
+        }
         setContentView(shell)
         renderTree()
     }
