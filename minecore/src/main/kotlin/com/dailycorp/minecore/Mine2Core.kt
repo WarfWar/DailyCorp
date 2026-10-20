@@ -120,15 +120,39 @@ data class Mine2StepResult(
     val minedMaterial:String?=null,
     val amount:Int=0,
     val remainingOrders:Int=0,
+    val reason:String="",
+    val minersMoved:Int=0
+)
+data class Mine2Miner(
+    val id:Int,
+    var x:Int,
+    var y:Int,
+    var mining:Boolean=false,
+    var target:CellPos?=null
+):Serializable
+
+data class SurveyQuote(
+    val x:Int,
+    val y:Int,
+    val price:Long,
+    val newCells:Int,
+    val valid:Boolean,
+    val reason:String
+)
+data class SurveyResult(
+    val successful:Boolean,
+    val charged:Long=0L,
+    val cellsRevealed:Int=0,
     val reason:String=""
 )
 
-/** Stage 1: no worker teleportation or city-economy integration.
- * A single abstract passage crew excavates only a reachable ordered frontier.
+/** Mine 2.0 independent sandbox. Serializable UID kept for 0.6.0 saves.
+ * Old snapshots deserialize minersV2=null, which is lazily migrated.
  */
 class Mine2World(val config:Mine2Config):Serializable {
     companion object {
         private const val serialVersionUID=1L
+        private val steps=listOf(CellPos(-1,0),CellPos(1,0),CellPos(0,-1),CellPos(0,1))
         fun create(config:Mine2Config):Mine2World=Mine2World(config).apply {
             val entry=config.width/2
             reveal(entry,3,4)
@@ -139,11 +163,28 @@ class Mine2World(val config:Mine2Config):Serializable {
     val stockpile:MutableMap<String,Int> = mutableMapOf()
     var totalExcavated=0
         private set
+    // Kept for compatibility with already issued v0.6 snapshots. No free scans.
     var surveysLeft=4
         private set
+    var surveysPerformed=0
+        private set
+    private var minersV2:MutableList<Mine2Miner>?=null
     var timeTicks=0L
         private set
 
+    fun miners():List<Mine2Miner> {
+        if(minersV2==null)minersV2=mutableListOf(
+            Mine2Miner(1,config.width/2,3)
+        )
+        return minersV2!!
+    }
+    fun hireMiner():Boolean {
+        val workers=miners()
+        if(workers.size>=8)return false
+        val id=(workers.maxOfOrNull{it.id}?:0)+1
+        minersV2!!.add(Mine2Miner(id,config.width/2,3))
+        return true
+    }
     fun cell(x:Int,y:Int):RockCell? {
         if(x !in 0 until config.width || y !in 0 until config.depthCells)return null
         val index=y/Mine2Geology.CHUNK_ROWS
@@ -162,18 +203,44 @@ class Mine2World(val config:Mine2Config):Serializable {
             }
         return newly
     }
-    fun survey(x:Int,y:Int):Int {
-        if(surveysLeft<=0 || cell(x,y)==null)return 0
-        // Must start near known terrain; can't uncover every deep deposit for free.
+    /** The first survey costs 250 ₽. Each successive one costs 75 ₽
+     * more; every 25 m of depth adds 20 ₽. No scanned or invalid cell is billed.
+     */
+    fun surveyQuote(x:Int,y:Int):SurveyQuote {
+        if(cell(x,y)==null)return SurveyQuote(x,y,0,0,false,"Вне шахты")
         var nearKnown=false
         for(yy in max(0,y-8)..min(config.depthCells-1,y+8))
             for(xx in max(0,x-8)..min(config.width-1,x+8)){
-                if((xx-x)*(xx-x)+(yy-y)*(yy-y)<=64 &&
-                    cell(xx,yy)?.explored==true)nearKnown=true
+                val dx=xx-x;val dy=yy-y
+                if(dx*dx+dy*dy<=64 && cell(xx,yy)?.explored==true)
+                    nearKnown=true
             }
-        if(!nearKnown)return 0
-        surveysLeft--
-        return reveal(x,y,5)
+        if(!nearKnown)return SurveyQuote(x,y,0,0,false,
+            "Сначала разведай прилегающую область")
+        var newCells=0
+        for(py in max(0,y-5)..min(config.depthCells-1,y+5))
+            for(px in max(0,x-5)..min(config.width-1,x+5)){
+                val dx=px-x;val dy=py-y
+                if(dx*dx+dy*dy<=25 && cell(px,py)?.explored==false)newCells++
+            }
+        if(newCells==0)return SurveyQuote(x,y,0,0,false,
+            "Здесь уже всё исследовано")
+        val depthMeters=y.toLong()*config.metersPerCell
+        val price=250L+(depthMeters/25L)*20L+surveysPerformed.toLong()*75L
+        return SurveyQuote(x,y,price,newCells,true,"Готово к разведке")
+    }
+    /** Validates balance in the core, not just Android button logic.
+     * The app deducts charged from GameState.money and saves immediately.
+     */
+    fun surveyPaid(x:Int,y:Int,availableMoney:Long):SurveyResult {
+        val quote=surveyQuote(x,y)
+        if(!quote.valid)return SurveyResult(false,reason=quote.reason)
+        if(availableMoney<quote.price)return SurveyResult(false,reason="Не хватает денег")
+        val count=reveal(x,y,5)
+        if(count<=0)return SurveyResult(false,reason="Участок уже известен")
+        surveysPerformed++
+        surveysLeft=max(0,4-surveysPerformed)
+        return SurveyResult(true,quote.price,count,"Разведка завершена")
     }
     fun orderArea(a:CellPos,b:CellPos):Int {
         var count=0
@@ -182,7 +249,6 @@ class Mine2World(val config:Mine2Config):Serializable {
         val minY=max(3,min(a.y,b.y))
         val maxY=min(config.depthCells-2,max(a.y,b.y))
         if(minX>maxX || minY>maxY)return 0
-        // Limits mobile touch mistakes and runaway task queues.
         if((maxX-minX+1).toLong()*(maxY-minY+1)>300)return 0
         for(y in minY..maxY)for(x in minX..maxX){
             val c=cell(x,y)?:continue
@@ -204,52 +270,87 @@ class Mine2World(val config:Mine2Config):Serializable {
     fun pendingCount():Int=chunks.values.sumOf{
         it.cells.sumOf{row->row.count{c->c.ordered}}
     }
-
-    private fun reachable():Set<CellPos> {
+    private fun position(p:CellPos):RockCell?=cell(p.x,p.y)
+    /** BFS only through open connected tunnels. The last passable cell
+     * is a worksite adjacent to an ordered rock, so miners never dig through walls.
+     */
+    private fun nearestWork(worker:Mine2Miner,reserved:Set<CellPos>):
+        Triple<CellPos,CellPos,Map<CellPos,CellPos>>? {
+        val start=CellPos(worker.x,worker.y)
+        if(position(start)?.passable!=true)return null
         val queue=java.util.ArrayDeque<CellPos>()
-        val entrance=CellPos(config.width/2,3)
-        val visited=mutableSetOf(entrance)
-        queue.add(entrance)
+        val parent=hashMapOf(start to start)
+        queue.add(start)
         while(queue.isNotEmpty()){
-            val p=queue.removeFirst()
-            for(q in listOf(CellPos(p.x+1,p.y),CellPos(p.x-1,p.y),
-                CellPos(p.x,p.y+1),CellPos(p.x,p.y-1))){
-                if(q in visited || cell(q.x,q.y)?.passable!=true)continue
-                visited.add(q);queue.addLast(q)
+            val at=queue.removeFirst()
+            for(d in steps){
+                val next=CellPos(at.x+d.x,at.y+d.y)
+                val block=position(next)?:continue
+                if(block.ordered && !block.passable && block.kind!=RockKind.BEDROCK &&
+                    next !in reserved) {
+                    return Triple(at,next,parent)
+                }
             }
-        }
-        return visited
-    }
-    fun step(drillPower:Int=2):Mine2StepResult {
-        timeTicks++
-        val active=reachable()
-        var choice:CellPos?=null
-        for(pos in active){
-            for(q in listOf(CellPos(pos.x+1,pos.y),CellPos(pos.x-1,pos.y),
-                CellPos(pos.x,pos.y+1),CellPos(pos.x,pos.y-1))){
-                val c=cell(q.x,q.y)
-                if(c?.ordered==true && !c.passable && c.kind!=RockKind.BEDROCK){
-                    if(choice==null || q.y<choice.y ||
-                        (q.y==choice.y && q.x<choice.x))choice=q
+            for(d in steps) {
+                val next=CellPos(at.x+d.x,at.y+d.y)
+                if(next !in parent && position(next)?.passable==true){
+                    parent[next]=at
+                    queue.addLast(next)
                 }
             }
         }
-        if(choice==null)return Mine2StepResult(false,remainingOrders=pendingCount(),
-            reason=if(pendingCount()==0)"Нет заданий" else "Нет доступного фронта")
-        val target=cell(choice.x,choice.y)!!
-        target.hardness-=drillPower.coerceAtLeast(1)
-        if(target.hardness>0) return Mine2StepResult(false,
-            remainingOrders=pendingCount(),reason="Проходка")
-        val material=target.resource
-        val mined=if(material==null)0 else target.deposit
-        if(material!=null && mined>0){
-            stockpile[material]=(stockpile[material]?:0)+mined
+        return null
+    }
+    fun step(drillPower:Int=2):Mine2StepResult {
+        timeTicks++
+        var minedMaterial:String?=null
+        var minedAmount=0
+        var excavated=false
+        var moved=0
+        val reserved=mutableSetOf<CellPos>()
+        for(worker in miners()) {
+            worker.mining=false
+            worker.target=null
+            val work=nearestWork(worker,reserved)?:continue
+            val stand=work.first
+            val target=work.second
+            reserved.add(target)
+            worker.target=target
+            val current=CellPos(worker.x,worker.y)
+            if(current!=stand){
+                // Backtrack the BFS path to the first adjacent open tile.
+                var hop=stand
+                while(work.third[hop]!=current && work.third[hop]!=hop){
+                    hop=work.third[hop]?:break
+                }
+                if(position(hop)?.passable==true && hop!=current){
+                    worker.x=hop.x
+                    worker.y=hop.y
+                    moved++
+                }
+                continue
+            }
+            worker.mining=true
+            val block=position(target)?:continue
+            block.hardness-=drillPower.coerceAtLeast(1)
+            if(block.hardness>0)continue
+            val material=block.resource
+            val amount=if(material==null)0 else block.deposit
+            if(material!=null && amount>0){
+                stockpile[material]=(stockpile[material]?:0)+amount
+                minedMaterial=material
+                minedAmount+=amount
+            }
+            block.kind=RockKind.TUNNEL
+            block.ordered=false
+            block.deposit=0
+            excavated=true
+            totalExcavated++
+            reveal(target.x,target.y,2)
         }
-        target.kind=RockKind.TUNNEL
-        target.ordered=false
-        target.deposit=0
-        totalExcavated++
-        reveal(choice.x,choice.y,2)
-        return Mine2StepResult(true,material,mined,pendingCount(),"Проход проложен")
+        return Mine2StepResult(excavated,minedMaterial,minedAmount,pendingCount(),
+            if(excavated)"Проходка завершена" else if(moved>0)"Шахтёры перемещаются"
+                else if(pendingCount()==0)"Нет заданий" else "Проходка или ожидание доступа",
+            moved)
     }
 }
