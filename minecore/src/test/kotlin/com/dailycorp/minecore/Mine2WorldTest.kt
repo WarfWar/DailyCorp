@@ -38,12 +38,59 @@ class Mine2WorldTest {
         assertEquals(0,world.pendingCount())
         assertTrue(world.totalExcavated>=1)
     }
-    @Test fun surveyConsumesLimitedChargesAndRequiresAReachableKnownArea(){
+    @Test fun surveyingCostsMoneyWithoutBillingFailuresOrRepeats(){
         val world=Mine2World.create(config)
-        assertEquals(0,world.survey(3,125))
-        assertEquals(4,world.surveysLeft)
-        assertTrue(world.survey(config.width/2+5,8)>0)
-        assertEquals(3,world.surveysLeft)
+        val invalid=world.surveyPaid(3,125,999999L)
+        assertFalse(invalid.successful)
+        assertEquals(0L,invalid.charged)
+        assertEquals(0,world.surveysPerformed)
+        val x=config.width/2+5
+        val y=8
+        val quote=world.surveyQuote(x,y)
+        assertTrue(quote.valid)
+        assertTrue(quote.price>=250L)
+        assertFalse(world.surveyPaid(x,y,quote.price-1).successful)
+        assertEquals(0,world.surveysPerformed)
+        val paid=world.surveyPaid(x,y,quote.price)
+        assertTrue(paid.successful)
+        assertEquals(quote.price,paid.charged)
+        assertTrue(paid.cellsRevealed>0)
+        assertEquals(1,world.surveysPerformed)
+        val duplicate=world.surveyPaid(x,y,100000L)
+        assertFalse(duplicate.successful)
+        assertEquals(0L,duplicate.charged)
+        assertEquals(1,world.surveysPerformed)
+        val next=world.surveyQuote(x+4,y+2)
+        assertTrue(next.valid)
+        assertTrue(next.price>quote.price)
+    }
+    @Test fun minersTravelOpenCorridorsRatherThanTeleportThroughRock(){
+        val world=Mine2World.create(config)
+        val center=config.width/2
+        val target=CellPos(center+4,4)
+        assertEquals(1,world.orderArea(target,target))
+        val first=world.step()
+        assertEquals(1,first.minersMoved)
+        assertEquals(center+1,world.miners().first().x)
+        assertEquals(0,world.totalExcavated)
+        repeat(35){world.step()}
+        assertEquals(RockKind.TUNNEL,world.cell(target.x,target.y)!!.kind)
+        assertTrue(world.totalExcavated>=1)
+        assertTrue(world.hireMiner())
+        assertEquals(2,world.miners().size)
+    }
+    @Test fun paidSurveysAndMinersSurviveSaveReload(){
+        val world=Mine2World.create(config)
+        assertTrue(world.surveyPaid(config.width/2+5,8,10000L).successful)
+        assertTrue(world.hireMiner())
+        val expectedPrice=world.surveyQuote(config.width/2+9,10).price
+        val bytes=ByteArrayOutputStream()
+        ObjectOutputStream(bytes).use{it.writeObject(world)}
+        val loaded=ObjectInputStream(ByteArrayInputStream(bytes.toByteArray()))
+            .use{it.readObject() as Mine2World}
+        assertEquals(1,loaded.surveysPerformed)
+        assertEquals(2,loaded.miners().size)
+        assertEquals(expectedPrice,loaded.surveyQuote(config.width/2+9,10).price)
     }
     @Test fun saveRestoresOrdersExcavationsAndLocalStockpile(){
         val world=Mine2World.create(config)
