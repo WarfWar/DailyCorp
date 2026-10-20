@@ -310,6 +310,12 @@ class Mine2World(val config:Mine2Config):Serializable {
         }
         return count
     }
+    fun toggleCellOrder(p:CellPos):Boolean{
+        val c=cell(p.x,p.y)?:return false
+        if(!c.explored || c.kind==RockKind.BEDROCK || c.passable)return false
+        c.ordered=!c.ordered
+        return c.ordered
+    }
     fun cancelOrders():Int {
         var count=0
         for(chunk in chunks.values)for(row in chunk.cells)for(c in row){
