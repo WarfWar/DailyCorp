@@ -20,6 +20,7 @@ import kotlin.math.PI
 class MineCanvasView(context:Context, private val game:GameEngine, val cityId:Int, val lotId:Int) : View(context) {
     var onCellTap: ((Int,Int)->Unit)? = null
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
+    private val art=GameArt(context)
     private var zoom=1f
     private var moveX=0f
     private var moveY=0f
@@ -77,13 +78,12 @@ class MineCanvasView(context:Context, private val game:GameEngine, val cityId:In
             val l=ox+x*t;val top=oy+y*t
             if(l+t<0f || l>width || top+t<0f || top>height)continue
             val block=floor.blocks[y][x]
-            fill(colorFor(block,y));canvas.drawRect(l,top,l+t+0.4f,top+t+0.4f,paint)
+            val artKey=art.mineKey(block,y)
+            if(!art.draw(canvas,artKey,l,top,l+t+0.4f,top+t+0.4f)){
+                fill(colorFor(block,y))
+                canvas.drawRect(l,top,l+t+0.4f,top+t+0.4f,paint)
+            }
             if(block.terrain==MineTerrain.ROCK || block.terrain==MineTerrain.ORE){
-                fill(Color.argb(85,9,22,30))
-                canvas.drawLine(l+2f,top+t*0.82f,l+t*0.73f,top+t*0.17f,paint)
-                if(block.terrain==MineTerrain.ORE){
-                    fill(Color.argb(210,235,215,140));canvas.drawCircle(l+t*0.56f,top+t*0.43f,t*0.12f,paint)
-                }
                 if(block.ordered){
                     fill(Color.argb(120,255,195,72));canvas.drawRect(l+2,top+2,l+t-2,top+t-2,paint)
                     paint.style=Paint.Style.STROKE;paint.strokeWidth=max(2f,t*0.06f)
@@ -91,16 +91,8 @@ class MineCanvasView(context:Context, private val game:GameEngine, val cityId:In
                     paint.style=Paint.Style.FILL
                 }
             }
-            if(block.terrain==MineTerrain.TUNNEL || block.terrain==MineTerrain.SHAFT){
-                fill(Color.rgb(144,117,87))
-                canvas.drawRect(l,top+t*0.82f,l+t,top+t*0.88f,paint)
-                fill(Color.rgb(98,114,120))
-                canvas.drawLine(l,top+t*0.89f,l+t,top+t*0.89f,paint)
-                if(block.terrain==MineTerrain.SHAFT){
-                    fill(Color.rgb(149,151,135))
-                    canvas.drawRect(l+t*0.22f,top,l+t*0.27f,top+t,paint)
-                    canvas.drawRect(l+t*0.74f,top,l+t*0.79f,top+t,paint)
-                }
+            if(block.terrain==MineTerrain.TUNNEL && y==MineWorld.ENTRANCE_Y) {
+                art.draw(canvas,"mine.track",l,top,l+t,top+t)
             }
         }
         for(pile in floor.piles){
