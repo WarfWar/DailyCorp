@@ -63,25 +63,65 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
     private fun cachedPlan():MapPlan=cache.getOrPut(cityId){ CityGenerator.plan(engine.city(cityId)) }
     private fun onScreen(x:Float,y:Float,margin:Float=140f):Boolean =
         x>=-margin && x<=width+margin && y>=-margin && y<=height+margin
-    private fun terrainSprite(x:Int,y:Int,seed:Long):String {
-        val value=(((x/3)*173+(y/4)*97+((seed xor (seed ushr 15)).toInt())) and 127)
-        return when {
-            value<=3 -> "continent.mountains"
-            value<=8 -> "continent.forest"
-            value==9 -> "continent.lake"
-            value==10 -> "continent.rocky_coast"
-            value==11 -> "continent.swamp"
-            else -> "continent.meadow"
+    private fun cityBiomes():Array<Array<Biome>> = biomeCache.getOrPut(cityId) {
+        val seed=engine.city(cityId).seed
+        Array(CityGenerator.HEIGHT){ y ->
+            Array(CityGenerator.WIDTH){ x -> BiomeGenerator.city(seed,x,y) }
         }
     }
-    private fun terrain(x:Int,y:Int,seed:Long):Int {
-        val v=(((x*17+y*29+((seed xor (seed ushr 16)).toInt())) xor ((x/4)*3079 + (y/5)*991)) and 31)
-        return when {
-            v==0 -> Color.rgb(116,171,115)
-            v<7 -> Color.rgb(133,188,120)
-            v<15 -> Color.rgb(141,197,123)
-            else -> Color.rgb(146,202,129)
+    private fun biomeColor(b:Biome,x:Int,y:Int,seed:Long):Int {
+        val base=BiomeGenerator.tint(b)
+        val n=x.toLong()*7919L+y.toLong()*3011L+seed
+        val jitter=(((n xor (n ushr 17)) and 7L).toInt()-3)*0.010f
+        return Color.rgb(
+            (Color.red(base)*(1f+jitter)).toInt().coerceIn(0,255),
+            (Color.green(base)*(1f+jitter)).toInt().coerceIn(0,255),
+            (Color.blue(base)*(1f+jitter)).toInt().coerceIn(0,255))
+    }
+    private fun biomeAccent(canvas:Canvas,b:Biome,x:Int,y:Int,
+        cx:Float,cy:Float,rx:Float,ry:Float) {
+        val signature=(x*47+y*31+cityId*13) and 15
+        if(signature>3)return
+        when(b){
+            Biome.FOREST -> {
+                fill(Color.rgb(26,84,55))
+                val shift=(signature-1.5f)*rx*0.14f
+                shape.reset();shape.moveTo(cx+shift,cy-ry*0.68f)
+                shape.lineTo(cx+shift+rx*0.17f,cy+ry*0.37f)
+                shape.lineTo(cx+shift-rx*0.17f,cy+ry*0.37f)
+                shape.close();canvas.drawPath(shape,paint)
+            }
+            Biome.MOUNTAINS -> {
+                fill(Color.rgb(104,113,112))
+                shape.reset();shape.moveTo(cx,cy-ry*0.66f)
+                shape.lineTo(cx+rx*0.38f,cy+ry*0.36f)
+                shape.lineTo(cx-rx*0.38f,cy+ry*0.36f)
+                shape.close();canvas.drawPath(shape,paint)
+            }
+            Biome.LAKE,Biome.RIVER -> line(canvas,cx-rx*0.26f,cy,
+                cx+rx*0.24f,cy,Color.argb(140,227,246,246),max(1f,ry*0.09f))
+            else -> {}
         }
+    }
+    private fun worldRect():RectF {
+        val w=width*0.94f*zoom;val h=w*0.75f
+        val cx=width*0.5f+panX;val cy=height*0.5f+panY
+        return RectF(cx-w/2f,cy-h/2f,cx+w/2f,cy+h/2f)
+    }
+    private fun cityWorldPoint(id:Int):Point {
+        val row=(id-1)/8;val col=(id-1)%8
+        val sx=9+col*11;val sy=10+row*10
+        var best=Point(sx,sy)
+        var score=Int.MAX_VALUE
+        for(dy in -10..10)for(dx in -10..10){
+            val x=(sx+dx).coerceIn(2,93)
+            val y=(sy+dy).coerceIn(2,69)
+            val biome=BiomeGenerator.world(engine.state.seed,x,y)
+            if(biome==Biome.OCEAN||biome==Biome.LAKE||biome==Biome.RIVER)continue
+            val distance=dx*dx+dy*dy+(if(biome==Biome.COAST)8 else 0)
+            if(distance<score){score=distance;best=Point(x,y)}
+        }
+        return best
     }
     override fun onDraw(canvas:Canvas) {
         super.onDraw(canvas)
