@@ -95,6 +95,10 @@ class MineActivity : Activity() {
         bar.addView(action("На поверхность"){finish()},LinearLayout.LayoutParams(-2,px(52)))
         scroll.addView(bar)
         root.addView(scroll,LinearLayout.LayoutParams(-1,px(62)))
+        root.setOnApplyWindowInsetsListener{view,insets->
+            view.setPadding(0,insets.systemWindowInsetTop,0,insets.systemWindowInsetBottom)
+            insets
+        }
         setContentView(root)
         updateInfo()
     }
