@@ -21,6 +21,9 @@ class MineCanvasView(context:Context, private val game:GameEngine, val cityId:In
     var onCellTap: ((Int,Int)->Unit)? = null
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
     private val art=GameArt(context)
+    private val sprites=MineSpriteFrames(context)
+    private val minerDirection=mutableMapOf<Int,Boolean>()
+    private val lastMinerX=mutableMapOf<Int,Int>()
     private var zoom=1f
     private var moveX=0f
     private var moveY=0f
@@ -106,42 +109,32 @@ class MineCanvasView(context:Context, private val game:GameEngine, val cityId:In
             val track=workerTracks.getOrPut(worker.id){
                 MotionTrack(worker.x.toFloat(),worker.y.toFloat(),950L)
             }
+            val oldX=lastMinerX.put(worker.id,worker.x)
+            if(oldX!=null && oldX!=worker.x)minerDirection[worker.id]=worker.x>oldX
             track.target(worker.x.toFloat(),worker.y.toFloat(),now)
             val moving=track.animating(now)
-            if(moving) hasMotion=true
+            if(moving || worker.striking)hasMotion=true
             val pos=track.position(now)
             val x=ox+(pos.x+0.5f)*t
-            val baseY=oy+(pos.y+0.42f)*t
-            val phase=(now%560L).toFloat()*((2.0*PI).toFloat()/560f)
-            val stride=if(moving)sin(phase)*t*0.10f else 0f
-            val bounce=if(moving)kotlin.math.abs(sin(phase))*t*0.035f else 0f
-            val y=baseY-bounce
-            // Cast shadow and alternating boots so walking is visually continuous.
-            fill(Color.argb(105,3,11,17))
-            canvas.drawOval(RectF(x-t*0.20f,baseY+t*0.25f,
-                x+t*0.20f,baseY+t*0.32f),paint)
-            paint.strokeWidth=t*0.06f
-            paint.strokeCap=Paint.Cap.ROUND
-            paint.color=Color.rgb(36,46,60)
-            canvas.drawLine(x-t*0.055f,y+t*0.17f,x-t*0.07f-stride,y+t*0.35f,paint)
-            canvas.drawLine(x+t*0.055f,y+t*0.17f,x+t*0.07f+stride,y+t*0.35f,paint)
-            fill(Color.rgb(253,209,151))
-            canvas.drawCircle(x,y-t*0.12f,t*0.13f,paint)
-            fill(if(worker.striking)Color.rgb(243,168,58) else Color.rgb(62,161,187))
-            canvas.drawRect(x-t*0.12f,y,x+t*0.12f,y+t*0.21f,paint)
-            fill(Color.rgb(249,196,63))
-            canvas.drawRoundRect(RectF(x-t*0.15f,y-t*0.25f,
-                x+t*0.15f,y-t*0.15f),t*0.04f,t*0.04f,paint)
-            // A visible oscillating mining arm and pick while striking rock.
-            if(worker.striking){
-                hasMotion=true
-                val angle=sin(phase)*t*0.14f
-                paint.color=Color.rgb(229,195,154);paint.strokeWidth=t*0.07f
-                canvas.drawLine(x+t*0.08f,y+t*0.03f,
-                    x+t*0.27f,y-t*0.09f+angle,paint)
-                paint.color=Color.rgb(178,188,189);paint.strokeWidth=t*0.045f
-                canvas.drawLine(x+t*0.25f,y-t*0.21f+angle,
-                    x+t*0.36f,y+t*0.03f+angle,paint)
+            val footY=oy+(pos.y+0.93f)*t
+            val right=minerDirection[worker.id]?:true
+            val state=when{
+                worker.striking && right -> "miner_mine_right"
+                worker.striking -> "miner_mine_left"
+                moving && right -> "miner_walk_right"
+                moving -> "miner_walk_left"
+                right -> "miner_idle_right"
+                else -> "miner_idle_left"
+            }
+            if(!sprites.draw(canvas,state,x,footY,t,now,worker.id)){
+                fill(Color.rgb(66,157,178))
+                canvas.drawRoundRect(RectF(x-t*0.12f,footY-t*0.55f,
+                    x+t*0.12f,footY-t*0.25f),t*0.05f,t*0.05f,paint)
+                fill(Color.rgb(244,197,131))
+                canvas.drawCircle(x,footY-t*0.67f,t*0.12f,paint)
+                fill(Color.rgb(246,195,64))
+                canvas.drawRect(x-t*0.15f,footY-t*0.83f,
+                    x+t*0.15f,footY-t*0.75f,paint)
             }
         }
         for(cart in floor.carts){
@@ -150,33 +143,28 @@ class MineCanvasView(context:Context, private val game:GameEngine, val cityId:In
             }
             track.target(cart.x.toFloat(),cart.y.toFloat(),now)
             val moving=track.animating(now)
-            if(moving) hasMotion=true
+            if(moving)hasMotion=true
             val pos=track.position(now)
             val x=ox+(pos.x+0.5f)*t
-            val y=oy+(pos.y+0.5f)*t
-            fill(Color.argb(95,2,12,18))
-            canvas.drawOval(RectF(x-t*0.38f,y+t*0.17f,
-                x+t*0.38f,y+t*0.29f),paint)
-            fill(Color.rgb(208,136,76))
-            canvas.drawRoundRect(RectF(x-t*0.29f,y-t*0.04f,
-                x+t*0.29f,y+t*0.19f),t*0.04f,t*0.04f,paint)
-            val wheelAngle=if(moving)(now%650L).toFloat()/650f*(2.0*PI).toFloat() else 0f
-            for(sign in listOf(-1f,1f)){
-                val cx=x+sign*t*0.19f
-                val cy=y+t*0.22f
-                fill(Color.rgb(48,60,64))
-                canvas.drawCircle(cx,cy,t*0.077f,paint)
-                paint.color=Color.rgb(215,208,173);paint.strokeWidth=t*0.022f
-                val spoke=t*0.057f
-                val vx=kotlin.math.cos(wheelAngle)*spoke
-                val vy=sin(wheelAngle)*spoke
-                canvas.drawLine(cx-vx,cy-vy,cx+vx,cy+vy,paint)
+            val footY=oy+(pos.y+0.95f)*t
+            val state=when{
+                moving && cart.amount>0 -> "cart_move_loaded"
+                moving -> "cart_move_empty"
+                cart.amount>0 -> "cart_idle_loaded"
+                else -> "cart_idle_empty"
             }
-            if(cart.amount>0){
-                fill(Color.rgb(245,209,93))
-                canvas.drawCircle(x,y-t*0.06f,t*0.115f,paint)
+            if(!sprites.draw(canvas,state,x,footY,t,now,cart.id)){
+                fill(Color.rgb(194,124,67))
+                canvas.drawRoundRect(RectF(x-t*0.33f,footY-t*0.5f,
+                    x+t*0.33f,footY-t*0.24f),t*0.05f,t*0.05f,paint)
+                for(side in listOf(-1f,1f)){
+                    fill(Color.rgb(51,53,56))
+                    canvas.drawCircle(x+side*t*0.22f,footY-t*0.22f,t*0.08f,paint)
+                }
             }
         }
+        if(sprites.loaded && (floor.carts.isNotEmpty() || floor.workers.isNotEmpty()))
+            hasMotion=true
         fill(Color.argb(235,7,28,42))
         canvas.drawRoundRect(RectF(12f,12f,width-12f,74f*resources.displayMetrics.density),13f,13f,paint)
         label(canvas,"ШАХТА #"+(lotId+1)+"  ·  ЭТАЖ "+u.activeFloor+"/"+mine.depth,22f,34f*resources.displayMetrics.density,15f)
