@@ -78,11 +78,12 @@ class MineCanvasView(context:Context, private val game:GameEngine, val cityId:In
             val l=ox+x*t;val top=oy+y*t
             if(l+t<0f || l>width || top+t<0f || top>height)continue
             val block=floor.blocks[y][x]
+            // Transparent gutters in the supplied atlas are filled with the
+            // local rock tone instead of exposing black bars between blocks.
+            fill(colorFor(block,y))
+            canvas.drawRect(l,top,l+t+0.6f,top+t+0.6f,paint)
             val artKey=art.mineKey(block,y+(u.activeFloor-1)*4)
-            if(!art.draw(canvas,artKey,l,top,l+t+0.4f,top+t+0.4f)){
-                fill(colorFor(block,y))
-                canvas.drawRect(l,top,l+t+0.4f,top+t+0.4f,paint)
-            }
+            art.draw(canvas,artKey,l,top,l+t+0.55f,top+t+0.55f)
             if(block.terrain==MineTerrain.ROCK || block.terrain==MineTerrain.ORE){
                 if(block.ordered){
                     fill(Color.argb(120,255,195,72));canvas.drawRect(l+2,top+2,l+t-2,top+t-2,paint)
