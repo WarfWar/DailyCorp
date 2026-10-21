@@ -29,6 +29,12 @@ class Mine2VeinAutomation:Serializable {
         private set
     private val plans=mutableListOf<Mine2VeinPlan>()
 
+    fun isPlanned(p:CellPos):Boolean=enabled && plans.any{p in it.cells}
+    fun pruneFinished(world:Mine2World){
+        plans.removeAll { plan ->
+            plan.cells.none{p->world.cell(p.x,p.y)?.ordered==true}
+        }
+    }
     fun activePlans():Int=plans.size
     fun pendingCells(world:Mine2World):Int=plans.sumOf{plan->
         plan.cells.count{p->world.cell(p.x,p.y)?.ordered==true}
