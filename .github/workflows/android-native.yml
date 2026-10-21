@@ -29,11 +29,38 @@ jobs:
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.1"
-      - name: Reuse native debug signing certificate
+      - name: Restore persistent DailyCorp signing store
+        id: signing-store
         uses: actions/cache@v4
         with:
-          path: ~/.android/debug.keystore
-          key: dailycorp-native-rebuilt-debug-v1
+          path: .android-signing/dailycorp.jks
+          key: dailycorp-native-alpha-constant-keystore-v1
+      - name: Initialize or verify persistent signing store
+        run: |
+          set -euo pipefail
+          mkdir -p .android-signing
+          FILE=".android-signing/dailycorp.jks"
+          EXPECTED=".github/dailycorp-signing-sha256.txt"
+          if [[ -f "$EXPECTED" && ! -s "$FILE" ]]; then
+            echo "::error::Pinned signing store is missing. Refusing to change APK identity."
+            exit 1
+          fi
+          if [[ ! -s "$FILE" ]]; then
+            keytool -genkeypair -noprompt -alias androiddebugkey -keyalg RSA \
+              -keysize 3072 -validity 10000 -storetype PKCS12 \
+              -keystore "$FILE" -storepass android -keypass android \
+              -dname "CN=DailyCorp Alpha, OU=Development, O=DailyCorp, C=SE"
+          fi
+          FINGERPRINT="$(keytool -exportcert -alias androiddebugkey \
+            -storetype PKCS12 -keystore "$FILE" -storepass android |
+            openssl x509 -inform DER -fingerprint -sha256 -noout |
+            cut -d= -f2 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          echo "DAILYCORP_SIGNER_SHA256=$FINGERPRINT" >> "$GITHUB_ENV"
+          echo "DailyCorp alpha certificate SHA-256: $FINGERPRINT"
+          if [[ -f "$EXPECTED" && "$FINGERPRINT" != "$(cat "$EXPECTED")" ]]; then
+            echo "::error::APK signer mismatch. Refusing update."
+            exit 1
+          fi
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
