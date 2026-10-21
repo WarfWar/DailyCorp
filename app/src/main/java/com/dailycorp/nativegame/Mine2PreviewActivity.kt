@@ -223,6 +223,7 @@ class Mine2PreviewActivity:Activity(){
                         " ед.\nДоступно: "+transport.carts.size+"/8"+
                         "\nВагонетка ездит только по построенным рельсам."+
                         "\nПосле возврата к стволу руда попадает в городскую погрузку.")
+                    .setSingleChoiceItems(depots.map{"Горизонт "+it.y*world.config.metersPerCell+" м"}.toTypedArray(),0){_,i->chosenDepot=i}
                     .setPositiveButton("Купить"){_,_->
                         if(game.state.money<price){
                             Toast.makeText(this,"Недостаточно денег",Toast.LENGTH_SHORT).show()
