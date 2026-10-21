@@ -159,6 +159,10 @@ class Mine2PreviewActivity:Activity(){
                 }
             }
         }
+        view.onAutoRail={p->
+            if(readOnly)Toast.makeText(this,"Сохранение недоступно",Toast.LENGTH_SHORT).show()
+            else showRailQuote(world.transport().quoteRailProject(world,p))
+        }
         view.onLift={p->showLiftConstruction(world.transport().quoteLift(world,p.x,p.y))}
         view.onSurvey={p->
             // Panning is always enabled. A paid scan is a one-shot tool.
