@@ -62,7 +62,9 @@ class WorldStyleBArt(context:Context) {
         val image=isometric?:return false
         // 4 variations per biome; 8 groups in the 128px source-cell atlas.
         val family=isoGroup(b)
-        val variation=(x*37+y*17+(x*y*3)) and 3
+        // 5x5-cell stable regions prevent checkerboard-like alternating
+        // material variants on adjacent isometric tiles.
+        val variation=((x/5)*7+(y/5)*3) and 3
         val index=family*4+variation
         val sx=index%8*128
         val sy=index/8*128

@@ -145,7 +145,7 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
     }
     override fun onDraw(canvas:Canvas) {
         super.onDraw(canvas)
-        canvas.drawColor(Color.rgb(31,75,95))
+        canvas.drawColor(if(continentMode)Color.rgb(31,75,95) else Color.rgb(52,88,74))
         if(continentMode)drawContinent(canvas) else drawCity(canvas)
     }
     private fun worldStyleBitmap():Bitmap? {
@@ -438,6 +438,7 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                     val labelW=max(56f*d,min(136f*d,name.length*5.7f*d))
                     val bx=x-labelW/2f
                     val by=y+23f*zoom*d
+                    if(by<59f*d)continue // top status panel owns this region
                     fill(Color.argb(235,14,48,65))
                     canvas.drawRoundRect(RectF(bx,by,bx+labelW,by+20f*d),5f*d,5f*d,paint)
                     text(canvas,name,bx+5f*d,by+14f*d,10f,Color.WHITE)
@@ -462,6 +463,27 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         fill(roof)
         shape.reset();shape.moveTo(x-w,y-height);shape.lineTo(x,y-h-height)
         shape.lineTo(x+w,y-height);shape.lineTo(x,y+h-height);shape.close();canvas.drawPath(shape,paint)
+        // Consistent window rhythm on both facades. All elements are drawn
+        // from the same geometry, unlike legacy 64px illustrations with captions.
+        if(zoom>0.70f){
+            val density=resources.displayMetrics.density
+            val windows=if(big)3 else 1
+            fill(Color.rgb(229,221,170))
+            for(i in 1..windows){
+                val t=i.toFloat()/(windows+1f)
+                val px=x+w*t
+                val py=y+h*(1f-t)-height*0.53f
+                val ww=max(1.2f,2.0f*zoom*density)
+                val wh=max(1.5f,2.5f*zoom*density)
+                canvas.drawRect(px-ww,py-wh,px+ww,py+wh,paint)
+            }
+            if(big){
+                fill(Color.rgb(84,107,110))
+                canvas.drawRect(x+w*0.50f-2f*zoom*density,
+                    y-h-height-1f*zoom*density,
+                    x+w*0.50f+2f*zoom*density,y-h-height+5f*zoom*density,paint)
+            }
+        }
         if(big && zoom>0.75f){
             val d=resources.displayMetrics.density
             fill(Color.rgb(240,232,191))
