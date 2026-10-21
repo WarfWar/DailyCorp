@@ -254,6 +254,8 @@ class Mine2World(val config:Mine2Config):Serializable {
     fun toggleVeinOrder(p:CellPos):Boolean=veinAutomation().tap(this,p)
     fun activeVeinPlans():Int=veinAutomationV6?.activePlans()?:0
     fun autoVeinPending():Int=veinAutomationV6?.pendingCells(this)?:0
+    fun isAutoVeinCell(x:Int,y:Int):Boolean =
+        veinAutomationV6?.isPlanned(CellPos(x,y))?:false
     private var minersV2:MutableList<Mine2Miner>?=null
     var timeTicks=0L
         private set
@@ -463,6 +465,7 @@ class Mine2World(val config:Mine2Config):Serializable {
             reveal(target.x,target.y,2)
         }
         transportV3?.step(this)
+        veinAutomationV6?.pruneFinished(this)
         recordOre(minedAmount)
         return Mine2StepResult(excavated,minedMaterial,minedAmount,pendingCount(),
             if(excavated)"Проходка завершена" else if(moved>0)"Шахтёры перемещаются"
