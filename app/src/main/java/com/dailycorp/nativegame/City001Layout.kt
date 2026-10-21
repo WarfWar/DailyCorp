@@ -1,6 +1,6 @@
 package com.dailycorp.nativegame
 
-import java.util.Random
+import kotlin.random.Random
 import kotlin.math.abs
 
 /**
