@@ -11,8 +11,8 @@ import android.view.View
 import com.dailycorp.minecore.*
 import kotlin.math.*
 
-/** Continuous pan and pinch. TWO taps on the same rock order/cancel extraction.
- * The only temporary tool is the paid scouting scanner.
+/** Continuous pan and pinch. A single tap toggles the ore-vein or rock order.
+ * Survey, rails and lift placement remain explicit tools.
  */
 class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
     enum class Mode { NORMAL, SURVEY, RAIL, LIFT }
