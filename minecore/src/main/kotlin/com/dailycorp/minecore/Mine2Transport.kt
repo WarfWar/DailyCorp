@@ -196,6 +196,7 @@ class Mine2Transport(private val depot:CellPos):Serializable {
                 loadedTripsV4++
             }
         }
+        liftNetworkV5?.step(world,this)
         if(waitingForRail)idleWithoutRailV4++
         if(congestion)liftCongestionTicksV4++
         return arrivals
