@@ -227,7 +227,7 @@ class Mine2PreviewActivity:Activity(){
                     .setPositiveButton("Купить"){_,_->
                         if(game.state.money<price){
                             Toast.makeText(this,"Недостаточно денег",Toast.LENGTH_SHORT).show()
-                        }else if(transport.hireCart()){
+                        }else if(transport.hireCart(depots[chosenDepot])){
                             game.state.money-=price
                             save()
                             Toast.makeText(this,"Вагонетка добавлена",Toast.LENGTH_SHORT).show()
