@@ -208,6 +208,7 @@ class Mine2PreviewActivity:Activity(){
                 Toast.LENGTH_SHORT).show()
             refresh()
         }
+        add("🏗 Грузовой ствол"){view.mode=Mine2PreviewView.Mode.LIFT;refresh()}
         add("＋ Вагонетка"){
             if(readOnly){
                 Toast.makeText(this,"Сохранение недоступно",Toast.LENGTH_SHORT).show()
