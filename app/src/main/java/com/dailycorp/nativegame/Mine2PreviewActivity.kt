@@ -479,10 +479,8 @@ class Mine2PreviewActivity:Activity(){
                 site.endY*world.config.metersPerCell+" м · "+state)
         }
         android.app.AlertDialog.Builder(this)
-            .setTitle("Диспетчерская · "+lifts.size+" доп. стволов")
-            .setMessage("Авто-рельсы в строительстве: "+projects+
-                "\nВагонетки: "+t.carts.size+"/8"+
-                "\nРазгружено на поверхность: "+t.delivered.values.sum()+" ед.")
+            .setTitle("Диспетчерская · "+lifts.size+
+                " стволов · Авто-рельсы: "+projects)
             .setItems(names.toTypedArray()){_,index->
                 if(index==0){
                     android.app.AlertDialog.Builder(this)
