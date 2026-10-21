@@ -69,7 +69,7 @@ class Mine2EconomyIntegrationTest {
         assertTrue(game.purchaseMine(1,mineLot.id))
         val mine=game.company(1).mines.getValue(mineLot.id)
         mine.mine2ProductionEnabled=true
-        val unexpected="salt"
+        val unexpected=(Catalog.basicMinerals.map{it.id}-mine.ores.toSet()).first()
         assertEquals(4,game.applyMine2Delivery(1,mineLot.id,mapOf(unexpected to 4)))
         assertTrue(unexpected in game.mineProducts(1,mineLot.id))
         val route=TruckRoute(RouteType.MINE_WAREHOUSE,1,mineLot.id,warehouse.id,
