@@ -15,11 +15,12 @@ import kotlin.math.*
  * The only temporary tool is the paid scouting scanner.
  */
 class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
-    enum class Mode { NORMAL, SURVEY, RAIL }
+    enum class Mode { NORMAL, SURVEY, RAIL, LIFT }
     var mode=Mode.NORMAL
     var onPlan:((CellPos,CellPos)->Unit)?=null
     var onSurvey:((CellPos)->Unit)?=null
     var onRail:((CellPos)->Unit)?=null
+    var onLift:((CellPos)->Unit)?=null
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val art=GameArt(context)
     private val blocks=MineBlockAtlas(context)
@@ -365,6 +366,8 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
                         onSurvey?.invoke(p)
                     }else if(mode==Mode.RAIL){
                         onRail?.invoke(p)
+                    }else if(mode==Mode.LIFT){
+                        onLift?.invoke(p)
                     }else{
                         val c=world.cell(p.x,p.y)
                         if(c?.explored==true && !c.passable && c.kind!=RockKind.BEDROCK){
