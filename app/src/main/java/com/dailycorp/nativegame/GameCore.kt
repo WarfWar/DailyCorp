@@ -310,6 +310,14 @@ class GameEngine(val state: GameState) {
         if(state.money<cost || state.trucks.size >= 40) return false
         state.money-=cost;state.trucks.add(Truck((state.trucks.maxOfOrNull{it.id}?:0)+1));return true
     }
+    /** Finished cargo of Mine2 may contain minerals not in the original
+     * Mine1 ore list; expose actually delivered minerals to truck contracts.
+     */
+    fun mineProducts(cityId:Int,lotId:Int):List<String>{
+        val mine=company(cityId).mines[lotId]?:return emptyList()
+        return (mine.ores + if(mine.mine2ProductionEnabled)mine.loading.keys.toList()
+            else emptyList()).distinct()
+    }
     fun canAssign(route: TruckRoute): Boolean {
         val c=company(route.cityId)
         val src=lot(route.cityId,route.sourceLot) ?: return false
@@ -318,11 +326,11 @@ class GameEngine(val state: GameState) {
         return when(route.mode) {
             RouteType.MINE_FACTORY -> src.kind==BuildingKind.MINE && src.id in c.mines &&
                 dst?.kind==BuildingKind.FACTORY && dst.id in c.factories &&
-                c.mines.getValue(src.id).ores.contains(material) &&
+                mineProducts(route.cityId,src.id).contains(material) &&
                 Catalog.recipes[c.factories.getValue(dst.id).recipeId]?.let{Catalog.accepts(it,material)}==true
             RouteType.MINE_WAREHOUSE -> src.kind==BuildingKind.MINE && src.id in c.mines &&
                 dst?.kind==BuildingKind.WAREHOUSE && dst.id in c.warehouses &&
-                c.mines.getValue(src.id).ores.contains(material)
+                mineProducts(route.cityId,src.id).contains(material)
             RouteType.WAREHOUSE_FACTORY -> src.kind==BuildingKind.WAREHOUSE && src.id in c.warehouses &&
                 dst?.kind==BuildingKind.FACTORY && dst.id in c.factories &&
                 Catalog.recipes[c.factories.getValue(dst.id).recipeId]?.let{Catalog.accepts(it,material)}==true

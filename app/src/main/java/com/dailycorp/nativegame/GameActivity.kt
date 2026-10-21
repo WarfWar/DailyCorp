@@ -378,7 +378,7 @@ class GameActivity : Activity() {
                 choices("Куда доставить?",destinations.map{it.second}){dstIndex ->
                     val dest=destinations[dstIndex]
                     val materials=when(mode){
-                        RouteType.MINE_FACTORY,RouteType.MINE_WAREHOUSE -> game.company(map.cityId).mines.getValue(source.id).ores
+                        RouteType.MINE_FACTORY,RouteType.MINE_WAREHOUSE -> game.mineProducts(map.cityId,source.id)
                         RouteType.WAREHOUSE_FACTORY -> Catalog.recipes[game.company(map.cityId).factories.getValue(dest.first).recipeId]?.ingredients?.keys?.toList()?:emptyList()
                         RouteType.WAREHOUSE_CONTRACT -> listOf(game.state.contracts.first{it.id==dest.first}.material)
                     }
