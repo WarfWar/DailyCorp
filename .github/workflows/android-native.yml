@@ -164,6 +164,21 @@ jobs:
         run: gradle --no-daemon :minecore:test :app:testDebugUnitTest
       - name: Build new Kotlin Android APK
         run: gradle --no-daemon :app:assembleDebug
+      - name: Verify Android APK signer before publishing
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          SIGNER_TOOL="$ANDROID_HOME/build-tools/35.0.1/apksigner"
+          test -x "$SIGNER_TOOL"
+          "$SIGNER_TOOL" verify --verbose --print-certs "$APK" |
+            tee /tmp/dailycorp-apk-signer.txt
+          ACTUAL="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' \
+            /tmp/dailycorp-apk-signer.txt | head -n1 | tr '[:upper:]' '[:lower:]')"
+          if [[ "$ACTUAL" != "$DAILYCORP_SIGNER_SHA256" ]]; then
+            echo "::error::APK differs from persistent signing key. No release."
+            exit 1
+          fi
+          echo "Verified permanent DailyCorp signer: $ACTUAL"
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
