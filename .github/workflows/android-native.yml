@@ -160,6 +160,25 @@ jobs:
           assert "tinFilter" in mine and "titaniumFilter" in mine
           print("STYLE B PACKS 01-10: 56 tiles, distinct tin and titanium palettes")
           PY
+      - name: Validate approved interactive City 001 artwork
+        run: |
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import struct
+          from pathlib import Path
+          path=Path('app/src/main/assets/dailycorp/world/city001_approved.webp.b64')
+          data=base64.b64decode(path.read_text(encoding='ascii'), validate=True)
+          assert data[:4]==b'RIFF' and data[8:12]==b'WEBP'
+          assert struct.unpack_from('<I',data,4)[0]+8==len(data)
+          assert len(data)==391698
+          expected='c652be5feab11397e515834a331a1f7ffdbba1f391296c5622fc538d0fc6061a'
+          assert hashlib.sha256(data).hexdigest()==expected
+          city=Path('app/src/main/java/com/dailycorp/nativegame/ApprovedCity001Art.kt').read_text()
+          assert city.count('Site(BuildingKind.')==13
+          assert 'hitLot(' in city and 'mappedSites(' in city
+          print('APPROVED CITY 001: high-resolution mirrored WebP, 13 interactive site anchors')
+          PY
       - name: Run mining, transport and research unit tests
         run: gradle --no-daemon :minecore:test :app:testDebugUnitTest
       - name: Build new Kotlin Android APK
