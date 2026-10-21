@@ -257,6 +257,8 @@ class Mine2PreviewActivity:Activity(){
                     }.setNegativeButton("Отмена",null).show()
             }
         }
+        add("↑ Грузовой лифт"){showLiftUpgrade()}
+        add("📊 Отчёт"){showMineStats()}
         add("↑ Улучшить шахту"){
             if(readOnly)Toast.makeText(this,"Сохранение недоступно",Toast.LENGTH_SHORT).show()
             else if(!world.canUpgrade())
@@ -324,6 +326,83 @@ class Mine2PreviewActivity:Activity(){
         setContentView(root)
         refresh()
     }
+    private fun showLiftUpgrade(){
+        if(readOnly){
+            Toast.makeText(this,"Сохранение недоступно",Toast.LENGTH_SHORT).show()
+            return
+        }
+        val transport=world.transport()
+        if(!transport.canUpgradeLift()){
+            Toast.makeText(this,"Подъёмник улучшен до максимума",Toast.LENGTH_SHORT).show()
+            return
+        }
+        val price=transport.liftUpgradeCost()
+        val inventory=game.company(cityId).storage
+        val needed=linkedMapOf(
+            "construction_kit" to transport.liftLevel,
+            "epoch_"+minOf(game.state.era,transport.liftLevel)+"_6" to 1
+        )
+        val detail=needed.entries.joinToString("\n"){(id,count)->
+            Catalog.name(id)+" ×"+count+" (на складе "+(inventory[id]?:0)+")"
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Грузовой лифт · уровень "+transport.liftLevel+" → "+
+                (transport.liftLevel+1))
+            .setMessage("Цена: "+price+" ₽\n"+detail+
+                "\n\nПропускная способность: "+transport.liftCapacity()+
+                " → "+(transport.liftCapacity()+1)+" вагонеток за 0,5 секунды.")
+            .setPositiveButton("Улучшить"){_,_->
+                when {
+                    game.state.money<price ->
+                        Toast.makeText(this,"Недостаточно денег",Toast.LENGTH_SHORT).show()
+                    needed.any{(id,count)->(inventory[id]?:0)<count} ->
+                        Toast.makeText(this,"Нужны заводские комплектующие",
+                            Toast.LENGTH_LONG).show()
+                    transport.upgradeLift() ->{
+                        game.state.money-=price
+                        for((id,count) in needed)
+                            inventory[id]=inventory.getValue(id)-count
+                        save()
+                        Toast.makeText(this,"Подъёмник улучшен",Toast.LENGTH_SHORT).show()
+                    }
+                }
+                refresh()
+            }.setNegativeButton("Отмена",null).show()
+    }
+    private fun showMineStats(){
+        val transport=world.existingTransport()
+        val piles=transport?.piles?.values?.sumOf{it.values.sum()}?:0
+        val totalWagons=transport?.carts?.size?:0
+        val loadedWagons=transport?.carts?.count{it.amount>0}?:0
+        val tasks=world.pendingCount()
+        val cause=when {
+            tasks==0 && piles==0 -> "Нет заказов на добычу"
+            totalWagons==0 && piles>0 -> "Не хватает вагонеток"
+            (transport?.idleWithoutRailV4?:0L)>0L && piles>0 ->
+                "Недостаточно рельсов к месту добычи"
+            tasks>0 && world.miners().none{it.mining} ->
+                "Проходчики в пути или нет доступного фронта"
+            loadedWagons>0 -> "Идёт вывоз руды"
+            else -> "Работа продолжается"
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Производственный отчёт")
+            .setMessage("Добыча за 60 секунд: "+world.orePerMinute()+
+                " ед.\nТоннелей пройдено: "+world.totalExcavated+
+                "\nЗаданий на проходку: "+tasks+
+                "\nПроходчики: "+world.miners().size+
+                "\nПод землёй: "+world.stockpile.values.sum()+" ед."+
+                "\nОткрытые штабели: "+piles+" ед."+
+                "\nВагонетки: "+totalWagons+", загружено: "+loadedWagons+
+                "\nПодъёмник: уровень "+(transport?.liftLevel?:1)+
+                ", "+(transport?.liftCapacity()?:1)+" ваг./такт"+
+                "\nРейсов с грузом: "+(transport?.loadedTripsV4?:0L)+
+                "\nШагов вагонеток: "+(transport?.cartTravelStepsV4?:0L)+
+                "\nТактов без рельсов: "+(transport?.idleWithoutRailV4?:0L)+
+                "\nТактов перегрузки лифта: "+(transport?.liftCongestionTicksV4?:0L)+
+                "\n\nСостояние: "+cause)
+            .setPositiveButton("Закрыть",null).show()
+    }
     private fun refresh(){
         val label=when(view.mode){
             Mine2PreviewView.Mode.SURVEY ->
@@ -342,6 +421,8 @@ class Mine2PreviewActivity:Activity(){
             "\nШахта ур."+world.shaftLevel+" · Проходчики "+world.miners().size+
             "/"+world.crewLimit+" · Разведок "+world.surveysPerformed+
             " · Баланс "+game.state.money+" ₽"+
+            "\nДобыча "+world.orePerMinute()+" ед/мин · Лифт ур."+
+            (transport?.liftLevel?:1)+
             "\nПод землёй "+world.stockpile.values.sum()+
             " · Доставлено "+delivered+" · Вагонетки "+carts+" · Рельсы "+rails+
             "\nРазведка: от 450 ₽, радиус 8 кл."+
