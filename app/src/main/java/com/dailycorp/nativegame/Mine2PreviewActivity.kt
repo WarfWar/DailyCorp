@@ -150,6 +150,7 @@ class Mine2PreviewActivity:Activity(){
                 }
             }
         }
+        view.onLift={p->showLiftConstruction(world.transport().quoteLift(world,p.x,p.y))}
         view.onSurvey={p->
             // Panning is always enabled. A paid scan is a one-shot tool.
             view.resetScanner()
