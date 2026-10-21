@@ -185,25 +185,8 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
             val py=rect.top+(y+0.5f)*th
             biomeAccent(canvas,biome,x,y,px,py,tw*2.4f,th*2.4f)
         }
-        if(zoom>=1f)for(y in 7 until 66 step 13)for(x in 7 until 90 step 17){
-            val signature=(x*23+y*11+engine.state.seed.toInt()) and 7
-            if(signature>2)continue
-            val b=continentBiomes[y][x]
-            val key=when(b){
-                Biome.PLAINS -> "landmark.meadow"
-                Biome.FOREST -> "landmark.forest"
-                Biome.MOUNTAINS -> "landmark.mountain"
-                Biome.COAST -> "landmark.coast"
-                Biome.RIVER -> "water.river_bend"
-                Biome.LAKE -> "water.small_island"
-                else -> null
-            }?:continue
-            val px=rect.left+(x+0.5f)*tw
-            val py=rect.top+(y+0.5f)*th
-            if(onScreen(px,py,tw*7f))
-                worldExtras.drawAccent(canvas,key,px,py+th*1.5f,
-                    tw*5.3f,th*7f)
-        }
+        // Whole-scene illustration cards don't belong on a 96x72 world map.
+        // Native biomes and city pins remain; object sprites stay in city scale.
         val d=resources.displayMetrics.density
         for(city in engine.state.cities){
             val (x,y)=cityPin(city.id)
@@ -245,8 +228,18 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                 val (sx,sy)=projected(pos)
                 if(!onScreen(sx,sy,halfW*2))continue
                 val occupied=pos in plan.roads || pos in occupiedLots
-                val b=biomes[y][x].let{
-                    if(occupied && (it==Biome.LAKE || it==Biome.RIVER)) Biome.COAST else it
+                val natural=biomes[y][x]
+                // Construction needs stable urban ground; a sandy surface tile
+                // on every city lot was producing huge patchy beige chessboards.
+                // Keep actual deserts away from settlements; do not mutate biome
+                // generation, building lots, or the saved map.
+                val urban=occupied || pos in plan.homes ||
+                    plan.roads.any{road->kotlin.math.abs(road.x-x)<=1 &&
+                        kotlin.math.abs(road.y-y)<=1}
+                val b=when {
+                    occupied && (natural==Biome.LAKE || natural==Biome.RIVER) -> Biome.COAST
+                    urban && (natural==Biome.DESERT || natural==Biome.COAST) -> Biome.PLAINS
+                    else -> natural
                 }
                 if(!styleB.drawCityTile(canvas,b,x,y,sx,sy,
                         halfW+0.62f,halfH+0.62f)) {
@@ -273,62 +266,55 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                 }
             }
         }
-        // Sparse environmental props from packs 3, 5, 8 and 10 do not alter
-        // city topography or the road/lot interaction hitboxes.
-        if(zoom>=0.9f)for(y in 2 until plan.height step 5)
-            for(x in 2 until plan.width step 5){
+        // Use only transparent, individually isolated native props.
+        // Large Pack 8/10 illustrations and relief chunks require a height-map;
+        // inserting them as stand-alone city sprites created the visible cuts.
+        if(zoom>=0.95f)for(y in 2 until plan.height step 6)
+            for(x in 2 until plan.width step 6){
                 val pos=Point(x,y)
-                if(pos in plan.roads || pos in occupiedLots)continue
+                if(pos in plan.roads || pos in occupiedLots || pos in plan.homes)continue
                 val b=biomes[y][x]
                 val marker=(x*31+y*19+cityId*13) and 7
-                val key=when{
-                    b==Biome.FOREST && marker==0 -> "nature.conifer"
-                    b==Biome.FOREST && marker==1 -> "nature.conifer_cluster"
-                    b==Biome.MOUNTAINS && marker==2 -> "elevation.cliff_rock_h1_both_v0"
-                    b==Biome.MOUNTAINS && marker==3 -> "accent.forest_mountain"
-                    b==Biome.MOUNTAINS && marker==4 -> "nature.rock"
-                    b==Biome.PLAINS && marker==5 -> "nature.shrub"
-                    b==Biome.COAST && marker==6 -> "accent.grass_rock"
-                    b==Biome.FOREST && marker==7 -> "relief.forest_01"
-                    else -> null
-                }?:continue
-                val (sx,sy)=projected(pos)
-                if(onScreen(sx,sy,halfW*2))
-                    worldExtras.drawAccent(canvas,key,sx,sy+halfH,
-                        halfW*1.7f,halfH*3.1f)
+                val decor=when{
+                    b==Biome.FOREST && marker<=2 -> 32 // small fir
+                    b==Biome.FOREST && marker==3 -> 33 // cluster
+                    b==Biome.MOUNTAINS && marker<=2 -> 37 // rock
+                    b==Biome.PLAINS && marker==1 -> 39 // flowers
+                    else -> -1
+                }
+                if(decor>=0){
+                    val (sx,sy)=projected(pos)
+                    if(onScreen(sx,sy,halfW*2f))
+                        styleB.drawDecor(canvas,decor,sx,sy+halfH*0.55f,
+                            halfW*0.75f,halfH*1.55f)
+                }
             }
-        // Every road occupies exactly one diamond. Do not stamp crossing decals
-        // on top of the paved graph: that was the cause of oversized road shapes.
+        // Roads follow the same saved graph but are DRAWN AS LANES, not
+        // full-width opaque tile diamonds. No intersecting illustrations,
+        // stamps, or marks over the buildings.
+        val asphalt=Color.rgb(85,99,103)
+        val edge=Color.rgb(57,72,75)
+        val roadWidth=max(5f,halfH*0.83f)
+        val roadDirs=listOf(Point(1,0),Point(0,1))
         for(p in plan.roads){
             val (sx,sy)=projected(p)
-            if(!onScreen(sx,sy,halfW*2))continue
-            diamond(canvas,sx,sy,halfW+0.62f,halfH+0.62f,Color.rgb(88,103,111))
-        }
-        for(p in plan.roads){
-            val (sx,sy)=projected(p)
-            if(!onScreen(sx,sy,halfW*2))continue
-            for(dir in listOf(Point(1,0),Point(0,1))){
-                val other=Point(p.x+dir.x,p.y+dir.y)
-                if(other !in plan.roads)continue
-                val (tx,ty)=projected(other)
-                line(canvas,sx,sy,tx,ty,Color.argb(170,232,226,204),
-                    max(1.1f,zoom*d*0.98f))
-            }
-        }
-        // Pack4 road modules are illustrated cards, not seamless asphalt.
-        // Show a single junction as a landmark instead of stamping the entire
-        // road network (which previously made streets appear over buildings).
-        if(zoom>=1.12f){
-            val cross=plan.roads.firstOrNull { p ->
-                p.x>3 && p.y>3 && p.x<plan.width-4 && p.y<plan.height-4 &&
-                listOf(Point(p.x-1,p.y),Point(p.x+1,p.y),
-                    Point(p.x,p.y-1),Point(p.x,p.y+1)).count{it in plan.roads}>=4
-            }
-            if(cross!=null){
-                val (sx,sy)=projected(cross)
-                if(onScreen(sx,sy,halfW*2))
-                    worldExtras.drawAccent(canvas,"road.road_cross",sx,sy+halfH,
-                        halfW*1.65f,halfH*2.5f)
+            if(!onScreen(sx,sy,halfW*2f))continue
+            val linked=roadDirs.map { Point(p.x+it.x,p.y+it.y) }
+                .filter{it in plan.roads}
+            if(linked.isEmpty()){
+                fill(asphalt)
+                canvas.drawCircle(sx,sy,roadWidth*0.53f,paint)
+            }else{
+                for(other in linked){
+                    val (tx,ty)=projected(other)
+                    line(canvas,sx,sy,tx,ty,edge,roadWidth+2.1f*d)
+                    line(canvas,sx,sy,tx,ty,asphalt,roadWidth)
+                    if(zoom>=1.15f){
+                        line(canvas,sx+(tx-sx)*0.42f,sy+(ty-sy)*0.42f,
+                            sx+(tx-sx)*0.58f,sy+(ty-sy)*0.58f,
+                            Color.argb(125,233,227,203),max(0.9f,zoom*d*0.65f))
+                    }
+                }
             }
         }
         val scenery=mutableListOf<Triple<Point,Lot?,Boolean>>()
@@ -339,44 +325,21 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
             val (x,y)=projected(at)
             if(!onScreen(x,y,100f*d))continue
             if(isHome){
-                if(zoom<0.72f)continue
-                val n=((at.x*47+at.y*19)%4)
-                // Non-interactive city scenery uses many supplied building and
-                // infrastructure sprites. Purchased lots retain their own logic.
-                val variety=(at.x*37+at.y*83+cityId*11) and 31
-                val key=when(variety){
-                    0->"buildings.school_10"
-                    1->"buildings.park_10"
-                    2->"buildings.hospital_10"
-                    3->"buildings.shop_10"
-                    4->"buildings.library_10"
-                    5->"buildings.fire_10"
-                    6->"buildings.police_10"
-                    7->"infra.fountain"
-                    8->"infra.playground"
-                    9->"infra.bench"
-                    10->"infra.bus_stop"
-                    11->"infra.alley"
-                    12->"infra.kiosk"
-                    13->"infra.parking"
-                    14->"buildings.quarter_10"
-                    15->"buildings.business_10"
-                    16->"buildings.hotel_10"
-                    17->"buildings.tourism_10"
-                    18->"buildings.stadium_10"
-                    19->"buildings.monument_10"
-                    20->"buildings.culture_10"
-                    else->when(n%3){
-                        0->"buildings.home_1"
-                        1->"buildings.home_5"
-                        else->"buildings.home_10"
-                    }
+                if(zoom<0.78f || at in plan.roads)continue
+                val variety=(at.x*37+at.y*83+cityId*11) and 7
+                // Source home_*.png includes labels printed INSIDE each sprite.
+                // Procedural houses avoid unreadable embedded captions and
+                // have a consistent physical footprint with nearby factories.
+                val wall=when(variety%4){
+                    0->Color.rgb(204,197,178)
+                    1->Color.rgb(174,190,177)
+                    2->Color.rgb(182,180,193)
+                    else->Color.rgb(199,180,166)
                 }
-                if(!art.draw(canvas,key,x-17f*zoom*d,y-22f*zoom*d,
-                        x+17f*zoom*d,y+9f*zoom*d)){
-                    drawBuilding(canvas,x,y,8*zoom*d,7*zoom*d,
-                        Color.rgb(210,206,182),11f*zoom*d,n,false)
-                }
+                val height=(9f+(variety%3)*2.8f)*zoom*d
+                drawBuilding(canvas,x,y,
+                    7.3f*zoom*d,4.8f*zoom*d,
+                    wall,height,variety,false)
             }else if(lot!=null){
                 val c=engine.company(cityId)
                 val owned=when(lot.kind){
@@ -398,36 +361,34 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                 diamond(canvas,x,y+5f*zoom*d,w*0.98f,h*0.98f,
                     if(owned)Color.rgb(142,158,121) else Color.rgb(188,181,144))
                 if(owned) {
-                    val sprite=art.buildingKey(lot.kind,lot.id)
-                    if(!art.draw(canvas,sprite,x-29f*zoom*d,y-40f*zoom*d,
-                            x+29f*zoom*d,y+10f*zoom*d)){
-                        drawBuilding(canvas,x,y,w,h,main,27f*zoom*d,lot.id%4,true)
+                    val height=when(lot.kind){
+                        BuildingKind.FACTORY -> 24f
+                        BuildingKind.MINE -> 16f
+                        BuildingKind.WAREHOUSE -> 16f
+                        BuildingKind.MARKET -> 14f
+                        BuildingKind.ENERGY -> 28f
+                        BuildingKind.MUNICIPAL -> 25f
+                        BuildingKind.RESEARCH -> 30f
                     }
+                    drawBuilding(canvas,x,y,w*0.70f,h*0.80f,
+                        main,height*zoom*d,lot.id%4,true)
                 } else {
-                    // Illustrated plot/outcrop accents from Pack6: small and
-                    // centered on the lot; keep ownership/touch geometry intact.
-                    val plotSprite=when(lot.kind){
-                        BuildingKind.MINE -> "site.metal_outcrop"
-                        BuildingKind.FACTORY -> "site.plot_available"
-                        BuildingKind.WAREHOUSE -> "site.stone_quarry"
-                        else -> "site.plot_available"
-                    }
-                    if(!worldExtras.drawAccent(canvas,plotSprite,x,y+9f*zoom*d,
-                            35f*zoom*d,32f*zoom*d)){
-                        line(canvas,x-6*zoom*d,y,x+6*zoom*d,y,
-                            Color.rgb(240,244,224),3f*zoom*d)
-                        line(canvas,x,y-6*zoom*d,x,y+6*zoom*d,
-                            Color.rgb(240,244,224),3f*zoom*d)
-                    }
+                    fill(Color.argb(75,236,207,149))
+                    diamond(canvas,x,y+3f*zoom*d,w*0.68f,h*0.78f,
+                        Color.rgb(154,164,139))
+                    line(canvas,x-5f*zoom*d,y,x+5f*zoom*d,y,
+                        Color.rgb(239,244,220),2.4f*zoom*d)
+                    line(canvas,x,y-5f*zoom*d,x,y+5f*zoom*d,
+                        Color.rgb(239,244,220),2.4f*zoom*d)
                 }
-                if(zoom>=0.83f){
+                if(zoom>=0.95f){
                     val name="${lot.kind.title} ${lot.id+1}"
-                    val labelW= max(75f*d,min(150f*d,name.length*7f*d))
+                    val labelW=max(56f*d,min(136f*d,name.length*5.7f*d))
                     val bx=x-labelW/2f
                     val by=y+23f*zoom*d
                     fill(Color.argb(235,14,48,65))
                     canvas.drawRoundRect(RectF(bx,by,bx+labelW,by+20f*d),5f*d,5f*d,paint)
-                    text(canvas,name,bx+6f*d,by+14f*d,11f,Color.WHITE)
+                    text(canvas,name,bx+5f*d,by+14f*d,10f,Color.WHITE)
                 }
             }
         }
