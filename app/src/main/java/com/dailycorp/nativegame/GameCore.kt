@@ -234,7 +234,9 @@ object CityGenerator {
         return (1..amount).map { id ->
             val citySeed = random.nextLong() and Long.MAX_VALUE
             val specialization = specials[(id-1)%specials.size]
-            val counts = mapOf(
+            // Consume the same RNG calls for every city as earlier releases:
+            // changing city 001 must not shift city 002..048 seed sequences.
+            val generatedCounts = mapOf(
                 BuildingKind.MINE to 3+random.nextInt(6),
                 BuildingKind.FACTORY to 2+random.nextInt(4),
                 BuildingKind.WAREHOUSE to 2+random.nextInt(3),
@@ -243,6 +245,13 @@ object CityGenerator {
                 BuildingKind.ENERGY to 1,
                 BuildingKind.RESEARCH to 1
             )
+            // Fixed gameplay manifest for the approved 13-site pilot. Old
+            // serialized City.lots remain untouched when a save is loaded.
+            val counts = if (id == 1) generatedCounts + mapOf(
+                BuildingKind.MINE to 3,
+                BuildingKind.FACTORY to 2,
+                BuildingKind.WAREHOUSE to 4
+            ) else generatedCounts
             val map = plan(citySeed,counts)
             City(id, "Город %03d".format(id),specialization,citySeed,3500+random.nextInt(24000),map.lots)
         }
