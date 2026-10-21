@@ -20,7 +20,14 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
     var cityId: Int = 1
         set(value) { field = value; panX = 0f; panY = 0f; zoom = 1.0f; selectedCity001LotId = null; invalidate() }
     var continentMode: Boolean = true
-        set(value) { field = value; panX = 0f; panY = 0f; zoom = if(value) 1.0f else 1.0f; invalidate() }
+        set(value) {
+            field = value
+            panX = 0f
+            panY = 0f
+            zoom = if(!value && cityId==1 && height > width) 1.65f else 1.0f
+            if(value) selectedCity001LotId = null
+            invalidate()
+        }
     var onCityTap: (Int) -> Unit = {}
     var onLotTap: (Lot) -> Unit = {}
     private val cache = mutableMapOf<Int, MapPlan>()
@@ -62,6 +69,7 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
     private val scale = ScaleGestureDetector(context,object:ScaleGestureDetector.SimpleOnScaleGestureListener(){
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             zoom = (zoom * detector.scaleFactor).coerceIn(if(continentMode)0.75f else 0.65f,if(continentMode)3f else 2.9f)
+            clampPilotPan()
             invalidate(); return true
         }
     })
@@ -83,6 +91,14 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         val halfH=14.5f*zoom*resources.displayMetrics.density
         return Pair(width/2f+panX+(p.x-p.y)*halfW,
             height/2f+panY+(p.x+p.y-33f)*halfH)
+    }
+    private fun clampPilotPan() {
+        if(continentMode || cityId!=1 || !approvedCity001.isAvailable) return
+        val bounds=approvedCity001.rect(width,height,zoom,0f,0f)
+        val maxX=max(0f,(bounds.width()-width)*0.5f)
+        val maxY=max(0f,(bounds.height()-height)*0.5f)
+        panX=panX.coerceIn(-maxX,maxX)
+        panY=panY.coerceIn(-maxY,maxY)
     }
     private fun cachedPlan():MapPlan=cache.getOrPut(cityId){
         val city = engine.city(cityId)
@@ -575,7 +591,7 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                 if(event.pointerCount==1 && !scale.isInProgress){
                     val dx=event.x-lastX;val dy=event.y-lastY
                     if(hypot(event.x-downX,event.y-downY)>12f*resources.displayMetrics.density)dragged=true
-                    if(dragged){panX+=dx;panY+=dy;invalidate()}
+                    if(dragged){panX+=dx;panY+=dy;clampPilotPan();invalidate()}
                     lastX=event.x;lastY=event.y
                 }
                 return true
