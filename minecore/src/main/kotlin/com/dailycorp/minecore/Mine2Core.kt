@@ -236,6 +236,15 @@ class Mine2World(val config:Mine2Config):Serializable {
         check(available>=amount){"Mine cargo accounting underflow"}
         stockpile[material]=available-amount
     }
+    // Mining rate history (two simulation ticks per real in-game second).
+    // Optional for saves prior to 0.15.
+    private var last120OreTicksV4:MutableList<Int>?=null
+    fun orePerMinute():Int=last120OreTicksV4?.sum()?:0
+    private fun recordOre(amount:Int){
+        val samples=last120OreTicksV4?:mutableListOf<Int>().also{last120OreTicksV4=it}
+        samples.add(amount)
+        while(samples.size>120)samples.removeAt(0)
+    }
     private var minersV2:MutableList<Mine2Miner>?=null
     var timeTicks=0L
         private set
@@ -441,6 +450,7 @@ class Mine2World(val config:Mine2Config):Serializable {
             reveal(target.x,target.y,2)
         }
         transportV3?.step(this)
+        recordOre(minedAmount)
         return Mine2StepResult(excavated,minedMaterial,minedAmount,pendingCount(),
             if(excavated)"Проходка завершена" else if(moved>0)"Шахтёры перемещаются"
                 else if(pendingCount()==0)"Нет заданий" else "Проходка или ожидание доступа",
