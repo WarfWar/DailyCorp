@@ -215,6 +215,8 @@ class Mine2PreviewActivity:Activity(){
             }else{
                 val transport=world.transport()
                 val price=transport.cartPrice()
+                val depots=listOf(CellPos(world.config.width/2,3))+transport.stationNodes()
+                var chosenDepot=0
                 android.app.AlertDialog.Builder(this)
                     .setTitle("Шахтная вагонетка · "+price+" ₽")
                     .setMessage("Вместимость: "+transport.cartCapacity()+
