@@ -245,6 +245,15 @@ class Mine2World(val config:Mine2Config):Serializable {
         samples.add(amount)
         while(samples.size>120)samples.removeAt(0)
     }
+    // Added after v0.16: nullable field keeps the previous Java save UID stable.
+    private var veinAutomationV6:Mine2VeinAutomation?=null
+    private fun veinAutomation():Mine2VeinAutomation =
+        veinAutomationV6?:Mine2VeinAutomation().also{veinAutomationV6=it}
+    val autoVeinEnabled:Boolean get()=veinAutomationV6?.enabled?:true
+    fun setAutoVeinEnabled(enabled:Boolean){veinAutomation().setEnabled(this,enabled)}
+    fun toggleVeinOrder(p:CellPos):Boolean=veinAutomation().tap(this,p)
+    fun activeVeinPlans():Int=veinAutomationV6?.activePlans()?:0
+    fun autoVeinPending():Int=veinAutomationV6?.pendingCells(this)?:0
     private var minersV2:MutableList<Mine2Miner>?=null
     var timeTicks=0L
         private set
@@ -270,6 +279,7 @@ class Mine2World(val config:Mine2Config):Serializable {
     }
     fun reveal(x:Int,y:Int,radius:Int,fromSurvey:Boolean=false):Int {
         var newly=0
+        val discovered=mutableListOf<CellPos>()
         val r=radius.coerceIn(0,12)
         for(py in max(0,y-r)..min(config.depthCells-1,y+r))
             for(px in max(0,x-r)..min(config.width-1,x+r)){
@@ -277,10 +287,12 @@ class Mine2World(val config:Mine2Config):Serializable {
                 if(dx*dx+dy*dy>r*r)continue
                 val target=cell(px,py)?:continue
                 if(!target.explored){target.explored=true;newly++
+                    discovered.add(CellPos(px,py))
                     if(fromSurvey)surveyFog().add(CellPos(px,py))
                 }
                 if(!fromSurvey)surveyFog().remove(CellPos(px,py))
             }
+        if(discovered.isNotEmpty())veinAutomationV6?.onReveal(this,discovered)
         return newly
     }
     /** The first survey costs 250 ₽. Each successive one costs 75 ₽
@@ -351,6 +363,7 @@ class Mine2World(val config:Mine2Config):Serializable {
         for(chunk in chunks.values)for(row in chunk.cells)for(c in row){
             if(c.ordered){c.ordered=false;count++}
         }
+        veinAutomationV6?.clear(this)
         return count
     }
     fun pendingCount():Int=chunks.values.sumOf{
