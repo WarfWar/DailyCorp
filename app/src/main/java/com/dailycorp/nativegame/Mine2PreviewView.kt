@@ -193,6 +193,20 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
                     py+16f*resources.displayMetrics.density,paint)
             }
         }
+        world.existingTransport()?.lifts()?.forEach{site->
+            if(site.x in x0..x1){
+                val l=left+site.x*t
+                val begin=max(3,y0)
+                val finish=min(site.builtToY,y1)
+                if(begin<=finish){
+                    fill(Color.rgb(100,82,55))
+                    canvas.drawRect(l+t*0.1f,top+begin*t,
+                        l+t*0.16f,top+(finish+1)*t,paint)
+                    canvas.drawRect(l+t*0.84f,top+begin*t,
+                        l+t*0.9f,top+(finish+1)*t,paint)
+                }
+            }
+        }
         // Rail infrastructure is overlaid on excavated passages, never on ore.
         world.existingTransport()?.let{transport->
             for(p in transport.rails){
