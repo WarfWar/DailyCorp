@@ -34,6 +34,8 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
     // Only the atlas with validated isolated diamonds/props is decoded.
     // Do not allocate the old postcard/diaroma atlases in this map renderer.
     private val styleB=WorldStyleBArt(context)
+    // Exact user-approved continent artwork plus the 48 hit regions from SVG.
+    private val approvedContinent=ApprovedContinentArt(context)
     // The first city is the isolated Style B design pilot. Other cities keep
     // their current renderers and unchanged economic/saved layouts.
     private val city001Art by lazy(LazyThreadSafetyMode.NONE) { GameArt(context) }
@@ -133,6 +135,15 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
             else -> {}
         }
     }
+    private fun approvedContinentRect():RectF {
+        val fitted = min(width*0.94f/ApprovedContinentArt.WIDTH,
+            height*0.94f/ApprovedContinentArt.HEIGHT)*zoom
+        val w=ApprovedContinentArt.WIDTH*fitted
+        val h=ApprovedContinentArt.HEIGHT*fitted
+        val cx=width*0.5f+panX
+        val cy=height*0.5f+panY
+        return RectF(cx-w/2f,cy-h/2f,cx+w/2f,cy+h/2f)
+    }
     private fun worldRect():RectF {
         val w=width*0.94f*zoom;val h=w*0.75f
         val cx=width*0.5f+panX;val cy=height*0.5f+panY
@@ -219,6 +230,10 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         }catch (_:Exception){null}
     }
     private fun drawContinent(canvas:Canvas){
+        // The approved image is never generated again: display its original pixels.
+        // City hit testing uses coordinates extracted from the same SVG viewBox.
+        if(approvedContinent.draw(canvas,approvedContinentRect(),paint))return
+        // Preserve the original procedural view as a safe fallback for missing assets.
         val rect=worldRect()
         val tw=rect.width()/96f
         val th=rect.height()/72f
@@ -271,6 +286,14 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
             11f,Color.rgb(198,223,232))
     }
     private fun cityPin(id:Int):Pair<Float,Float>{
+        if(approvedContinent.isAvailable){
+            val pixel=ApprovedContinentArt.pixelPoint(id)
+            if(pixel!=null){
+                val r=approvedContinentRect()
+                return Pair(r.left+pixel.x*r.width()/ApprovedContinentArt.WIDTH,
+                    r.top+pixel.y*r.height()/ApprovedContinentArt.HEIGHT)
+            }
+        }
         val cell=cityWorldPoint(id)
         val r=worldRect()
         return Pair(r.left+(cell.x+0.5f)*r.width()/96f,
@@ -551,7 +574,8 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                     if(continentMode){
                         val closest=engine.state.cities.map{it.id to cityPin(it.id)}
                             .minByOrNull{hypot(it.second.first-event.x,it.second.second-event.y)}
-                        if(closest!=null && hypot(closest.second.first-event.x,closest.second.second-event.y)<25f*resources.displayMetrics.density*zoom)
+                        if(closest!=null && hypot(closest.second.first-event.x,closest.second.second-event.y)<
+                            max(24f, min(42f,25f*zoom))*resources.displayMetrics.density)
                             onCityTap(closest.first)
                     }else{
                         val chosen=cachedPlan().lots.minByOrNull{ val (x,y)=projected(it.pos);hypot(x-event.x,y-event.y) }
