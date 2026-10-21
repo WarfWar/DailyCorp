@@ -409,6 +409,7 @@ class Mine2PreviewActivity:Activity(){
                 "Разведка: нажми на точку сканирования; обзор работает постоянно"
             Mine2PreviewView.Mode.RAIL ->
                 "Рельсы: нажми на доступный тоннель рядом с уже построенным путём"
+            Mine2PreviewView.Mode.LIFT -> "Лифт: выбери координату X и нужную глубину"
             else -> "Проведи пальцем — обзор; нажми на породу — назначить/отменить добычу"
         }
         val transport=world.existingTransport()
