@@ -19,6 +19,7 @@ class Mine2PreviewActivity:Activity(){
     private lateinit var world:Mine2World
     private lateinit var view:Mine2PreviewView
     private lateinit var status:TextView
+    private lateinit var autoVeinButton:Button
     private var cityId=1
     private var lotId=-1
     private var readOnly=false
@@ -118,13 +119,21 @@ class Mine2PreviewActivity:Activity(){
         root.addView(header)
         view=Mine2PreviewView(this,world)
         view.onPlan={a,_->
-            val c=world.cell(a.x,a.y)
-            val ordered=world.toggleCellOrder(a)
-            Toast.makeText(this,if(ordered)"Добыча назначена: "+
-                (c?.resource?.let{Catalog.name(it)} ?: "порода")+
-                " · осталось "+(c?.deposit?:0)+" ед."
-                else "Задание снято",Toast.LENGTH_SHORT).show()
-            refresh();view.invalidate()
+            if(readOnly){
+                Toast.makeText(this,"Сохранение недоступно",Toast.LENGTH_SHORT).show()
+            }else{
+                val c=world.cell(a.x,a.y)
+                val ordered=world.toggleVeinOrder(a)
+                val veinMode=world.autoVeinEnabled && c?.kind==RockKind.ORE
+                val text=when {
+                    !ordered -> if(veinMode)"Разработка пласта остановлена" else "Задание снято"
+                    veinMode -> "Автопласт: "+(c?.resource?.let{Catalog.name(it)}?:"Руда")+
+                        " · найдено "+world.autoVeinPending()+" клеток"
+                    else -> "Добыча назначена: "+(c?.resource?.let{Catalog.name(it)}?:"порода")
+                }
+                Toast.makeText(this,text,Toast.LENGTH_SHORT).show()
+                refresh();view.invalidate()
+            }
         }
         view.onRail={p->
             if(readOnly){
@@ -313,6 +322,22 @@ class Mine2PreviewActivity:Activity(){
                     }.setNegativeButton("Назад",null).show()
             }
         }
+        autoVeinButton=action("Автопласт: ВКЛ"){
+            if(readOnly){
+                Toast.makeText(this,"Сохранение недоступно",Toast.LENGTH_SHORT).show()
+            }else{
+                world.setAutoVeinEnabled(!world.autoVeinEnabled)
+                save()
+                refresh();view.invalidate()
+                Toast.makeText(this,
+                    if(world.autoVeinEnabled)"Автодобыча пласта включена"
+                    else "Автодобыча выключена, её задания сняты",
+                    Toast.LENGTH_SHORT).show()
+            }
+        }
+        bar.addView(autoVeinButton,LinearLayout.LayoutParams(-2,px(54)).apply{
+            marginEnd=px(5)
+        })
         add("Отмена задач"){
             val n=world.cancelOrders()
             Toast.makeText(this,"Снято задач: "+n,Toast.LENGTH_SHORT).show()
@@ -445,6 +470,9 @@ class Mine2PreviewActivity:Activity(){
             Mine2PreviewView.Mode.LIFT -> "Лифт: выбери координату X и нужную глубину"
             else -> "Проведи пальцем — обзор; нажми на породу — назначить/отменить добычу"
         }
+        if(::autoVeinButton.isInitialized)
+            autoVeinButton.text=if(world.autoVeinEnabled)"Автопласт: ВКЛ"
+                else "Автопласт: ВЫКЛ"
         val transport=world.existingTransport()
         val delivered=transport?.delivered?.values?.sum()?:0
         val carts=transport?.carts?.size?:0
@@ -455,7 +483,8 @@ class Mine2PreviewActivity:Activity(){
             "\nШахта ур."+world.shaftLevel+" · Проходчики "+world.miners().size+
             "/"+world.crewLimit+" · Разведок "+world.surveysPerformed+
             " · Баланс "+game.state.money+" ₽"+
-            "\nДобыча "+world.orePerMinute()+" ед/мин · Лифт ур."+
+            "\nАвтопласт: "+world.activeVeinPlans()+" активных пластов"+
+            " · Добыча "+world.orePerMinute()+" ед/мин · Лифт ур."+
             (transport?.liftLevel?:1)+
             "\nПод землёй "+world.stockpile.values.sum()+
             " · Доставлено "+delivered+" · Вагонетки "+carts+" · Рельсы "+rails+
