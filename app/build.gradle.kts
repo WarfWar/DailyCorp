@@ -9,15 +9,30 @@ android {
         applicationId = "com.dailycorp.nativegame.rebuilt"
         minSdk = 26
         targetSdk = 35
-        versionCode = 20
-        versionName = "0.20.0-alpha"
+        versionCode = 21
+        versionName = "0.20.1-alpha"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildTypes { getByName("release") { isMinifyEnabled = false } }
+    signingConfigs {
+        create("dailycorpAlpha") {
+            storeFile = rootProject.file(".android-signing/dailycorp.jks")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            storeType = "PKCS12"
+        }
+    }
+    buildTypes {
+        getByName("debug") { signingConfig = signingConfigs.getByName("dailycorpAlpha") }
+        getByName("release") {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("dailycorpAlpha")
+        }
+    }
 }
 
 dependencies {
