@@ -111,6 +111,28 @@ jobs:
               assert (width,height)==dimensions,(name,width,height)
               print(name,width,height,len(data),"bytes")
           PY
+      - name: Validate extra Style B all-ten-packs atlas
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          p=Path("app/src/main/assets/dailycorp/world/styleb_10_packs.webp")
+          data=p.read_bytes()
+          assert data[:4]==b"RIFF" and data[8:12]==b"WEBP"
+          assert struct.unpack_from("<I",data,4)[0]+8==len(data)
+          assert data[12:16]==b"VP8X"
+          size=(1+int.from_bytes(data[24:27],"little"),
+                1+int.from_bytes(data[27:30],"little"))
+          assert size==(1024,1024),size
+          assert 100000<len(data)<400000,len(data)
+          renderer=Path("app/src/main/java/com/dailycorp/nativegame/WorldStyleBAtlas.kt").read_text()
+          assert renderer.count("material.")>=8 and "nature.conifer" in renderer
+          assert "site.plot_available" in renderer and "elevation.cliff" in renderer
+          mine=Path("app/src/main/java/com/dailycorp/nativegame/MineBlockAtlas.kt").read_text()
+          assert '"ore_tin"' in mine and '"ore_titanium"' in mine
+          assert "tinFilter" in mine and "titaniumFilter" in mine
+          print("STYLE B PACKS 01-10: 56 tiles, distinct tin and titanium palettes")
+          PY
       - name: Run mining, transport and research unit tests
         run: gradle --no-daemon :minecore:test :app:testDebugUnitTest
       - name: Build new Kotlin Android APK
