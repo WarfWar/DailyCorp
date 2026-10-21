@@ -38,7 +38,12 @@ object City001Layout {
             roads.add(p)
         }
         // Residential sprites never paint a new boulevard or a saved lot.
-        val homes = base.homes.filter { it !in roads && it !in occupiedLots }
+        val homes = base.homes.filter {
+            it !in roads && it !in occupiedLots &&
+                // Reserve a walkable, green civic district instead of filling
+                // the test city center with randomly placed residential boxes.
+                !(abs(it.x - c.x) <= 5 && abs(it.y - c.y) <= 5)
+        }
         return MapPlan(base.width, base.height, roads, city.lots, homes, c)
     }
 
