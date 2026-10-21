@@ -44,7 +44,7 @@ jobs:
           assert len(points)==48 and [int(x[0]) for x in points]==list(range(1,49))
           coords=re.findall(r'\s*(\d+),\s*(\d+),?\s*// city_(\d{2})',k)
           assert len(coords)==48
-          assert [(x,y,i) for i,x,y in points]==[(i,x,y) for x,y,i in coords]
+          assert [(x,y,i) for i,x,y in points]==[(x,y,i) for x,y,i in coords]
           print("48 SVG hotspots match Kotlin")
           PY
       - name: Unit tests and compile Android
