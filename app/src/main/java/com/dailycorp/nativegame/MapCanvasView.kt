@@ -226,8 +226,9 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                 canvas.drawRect(sx,sy,sx+tw+0.55f,sy+th+0.55f,paint)
             }
         }
-        // Biome silhouettes are sparse and only placed inside their native regions.
-        for(y in 4 until 68 step 4)for(x in 4 until 92 step 4){
+        // Procedural triangle landmarks belong only to the no-asset fallback.
+        // The Style B continent already contains its own forest/rock patterns.
+        if(texture==null)for(y in 4 until 68 step 4)for(x in 4 until 92 step 4){
             val biome=continentBiomes[y][x]
             if(biome !in listOf(Biome.FOREST,Biome.MOUNTAINS,Biome.SNOW,Biome.DESERT))
                 continue
