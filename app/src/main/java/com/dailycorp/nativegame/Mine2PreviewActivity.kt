@@ -360,6 +360,33 @@ class Mine2PreviewActivity:Activity(){
         setContentView(root)
         refresh()
     }
+    private fun showRailQuote(q:Mine2RailQuote){
+        if(!q.valid){
+            Toast.makeText(this,q.reason,Toast.LENGTH_LONG).show()
+            return
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Автопрокладка рельсов · "+q.price+" ₽")
+            .setMessage("До участка X="+q.destination.x+
+                ", глубина "+q.destination.y*world.config.metersPerCell+
+                " м.\nСегментов: "+q.path.size+
+                "\nСтроительство: по одному сегменту за 0,5 с."+
+                "\nПроводится только по готовым тоннелям."+
+                "\nОплата проекта производится до начала работ.")
+            .setPositiveButton("Построить"){_,_->
+                val t=world.transport()
+                if(game.state.money<q.price){
+                    Toast.makeText(this,"Недостаточно денег",Toast.LENGTH_SHORT).show()
+                }else if(t.startRailProject(world,q)){
+                    game.state.money-=q.price
+                    view.mode=Mine2PreviewView.Mode.NORMAL
+                    save()
+                    refresh();view.invalidate()
+                }else Toast.makeText(this,"Маршрут изменился, попробуй снова",
+                    Toast.LENGTH_LONG).show()
+            }
+            .setNegativeButton("Отмена",null).show()
+    }
     private fun showLiftConstruction(q:Mine2LiftQuote){
         if(readOnly || !q.valid){
             Toast.makeText(this,if(readOnly)"Сохранение недоступно" else q.reason,
