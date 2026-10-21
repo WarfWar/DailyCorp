@@ -460,6 +460,66 @@ class Mine2PreviewActivity:Activity(){
                 refresh()
             }.setNegativeButton("Отмена",null).show()
     }
+    private fun showLiftDispatcher(){
+        val t=world.existingTransport()
+        if(t==null){
+            Toast.makeText(this,"Транспорт ещё не построен",Toast.LENGTH_SHORT).show()
+            return
+        }
+        val lifts=t.lifts().sortedBy{it.id}
+        val projects=t.railProjects().count{!it.completed && !it.blocked}
+        val names=mutableListOf(
+            "Главный ствол · ур."+t.liftLevel+" · "+
+                t.liftCapacity()+" ваг./такт"
+        )
+        for(site in lifts){
+            val state=if(site.completed)"РАБОТАЕТ" else
+                "Строится "+site.builtToY+"/"+site.endY+" кл."
+            names.add("Ствол №"+site.id+" · "+
+                site.endY*world.config.metersPerCell+" м · "+state)
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Диспетчерская · "+lifts.size+" доп. стволов")
+            .setMessage("Авто-рельсы в строительстве: "+projects+
+                "\nВагонетки: "+t.carts.size+"/8"+
+                "\nРазгружено на поверхность: "+t.delivered.values.sum()+" ед.")
+            .setItems(names.toTypedArray()){_,index->
+                if(index==0){
+                    android.app.AlertDialog.Builder(this)
+                        .setTitle("Главный грузовой ствол")
+                        .setMessage("Уровень: "+t.liftLevel+
+                            "\nВагонеток за такт: "+t.liftCapacity()+
+                            "\nПростой без рельсов: "+t.idleWithoutRailV4+
+                            "\nЗадержки разгрузки: "+t.liftCongestionTicksV4)
+                        .setPositiveButton("К главному стволу"){_,_->
+                            view.focusAt(CellPos(world.config.width/2,3))
+                        }.setNegativeButton("Закрыть",null).show()
+                }else{
+                    val site=lifts[index-1]
+                    val buffered=site.buffered.values.sumOf{v->v.values.sum()}
+                    val stations=site.stations.drop(1).joinToString(", "){
+                        (it*world.config.metersPerCell).toString()+" м"
+                    }
+                    android.app.AlertDialog.Builder(this)
+                        .setTitle("Грузовой ствол №"+site.id)
+                        .setMessage("Местоположение: X="+site.x+
+                            "\nГлубина: "+site.endY*world.config.metersPerCell+" м"+
+                            "\nГотовность: "+site.builtToY+"/"+site.endY+" кл."+
+                            "\nСтанции: "+stations+
+                            "\nРуда на платформах: "+buffered+" ед."+
+                            "\nСейчас в кабине: "+site.cargoAmount+" ед."+
+                            "\nОсталось тактов до доставки: "+site.tripTicksLeft+
+                            "\nВсего поднято: "+site.totalDelivered+" ед.")
+                        .setPositiveButton("Показать в шахте"){_,_->
+                            view.focusAt(CellPos(site.x,
+                                if(site.completed)site.endY else site.builtToY))
+                        }
+                        .setNeutralButton("К верхней станции"){_,_->
+                            view.focusAt(CellPos(site.x,3))
+                        }.setNegativeButton("Закрыть",null).show()
+                }
+            }.setNegativeButton("Закрыть",null).show()
+    }
     private fun showMineStats(){
         val transport=world.existingTransport()
         val piles=transport?.piles?.values?.sumOf{it.values.sum()}?:0
