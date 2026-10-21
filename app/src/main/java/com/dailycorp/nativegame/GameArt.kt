@@ -94,7 +94,7 @@ class GameArt(context: Context) {
                 listOf("bauxite","nickel","iron","silver","tungsten",
                     "cobalt","titanium","lithium","coal","quartz",
                     "sulfur","uranium","platinum","silver","iron",
-                    "rare_earth","tungsten","silver","quartz","rare_earth")
+                    "rare_earth","tungsten","quartz","quartz","rare_earth")
                     .getOrNull(index) ?: "stone"
             }
         }
