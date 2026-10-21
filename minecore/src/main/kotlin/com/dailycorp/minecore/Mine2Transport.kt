@@ -22,6 +22,8 @@ class Mine2Transport(private val depot:CellPos):Serializable {
     val carts:MutableList<Mine2Cart> = mutableListOf()
     /** Cumulative unloaded quantities. Replayed idempotently to the city ledger. */
     val delivered:MutableMap<String,Int> = mutableMapOf()
+    private var liftNetworkV5:Mine2LiftNetwork?=null
+    fun lifts():List<Mine2CargoLift> = liftNetworkV5?.lifts?:emptyList()
     var totalRailBuilt=0
         private set
     private var liftLevelV4=0
