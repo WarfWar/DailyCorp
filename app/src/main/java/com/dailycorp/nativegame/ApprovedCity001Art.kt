@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import android.util.Base64
 import kotlin.math.hypot
 import kotlin.math.min
 
@@ -62,16 +63,22 @@ internal class ApprovedCity001Art(private val context: Context) {
     }
 
     private val bitmap: Bitmap? by lazy(LazyThreadSafetyMode.NONE) {
-        try {
-            context.assets.open(ASSET).use { stream ->
-                BitmapFactory.decodeStream(stream, null, BitmapFactory.Options().apply {
-                    inScaled = false
-                    inPreferredConfig = Bitmap.Config.RGB_565
-                })
-            }?.takeIf { it.width.toFloat() / it.height.toFloat() in 1.48f..1.52f }
-        } catch (_: Exception) {
-            null
+        val options = BitmapFactory.Options().apply {
+            inScaled = false
+            inPreferredConfig = Bitmap.Config.RGB_565
         }
+        val rawImage = try {
+            context.assets.open(ASSET).use { BitmapFactory.decodeStream(it, null, options) }
+        } catch (_: Exception) { null }
+        // The approved art ships as Git-friendly base64 text, so no binary
+        // transfer tool or network permission is required to build the APK.
+        val encodedImage = if (rawImage != null) null else try {
+            val data = context.assets.open("$ASSET.b64").bufferedReader().use { it.readText() }
+            val decoded = Base64.decode(data, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(decoded, 0, decoded.size, options)
+        } catch (_: Exception) { null }
+        (rawImage ?: encodedImage)
+            ?.takeIf { it.width.toFloat() / it.height.toFloat() in 1.48f..1.52f }
     }
     val isAvailable: Boolean get() = bitmap != null
     private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
