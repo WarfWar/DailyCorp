@@ -1,0 +1,51 @@
+name: Validate Interactive Continent (no release)
+on:
+  pull_request:
+    branches: [native-rewrite]
+    paths:
+      - 'app/src/main/java/com/dailycorp/nativegame/MapCanvasView.kt'
+      - 'app/src/main/java/com/dailycorp/nativegame/ApprovedContinentArt.kt'
+      - 'app/src/main/assets/dailycorp/world/**'
+      - '.github/workflows/svg-continent-ci.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Android SDK
+        run: |
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.1"
+      - name: Use a temporary CI-only debug signing key
+        run: |
+          mkdir -p .android-signing
+          keytool -genkeypair -noprompt -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 7             -storetype PKCS12 -keystore .android-signing/dailycorp.jks             -storepass android -keypass android -dname "CN=CI-only, O=DailyCorp, C=SE"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Verify 48 SVG hotspots match Kotlin coordinates
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          s=Path('app/src/main/assets/dailycorp/world/continent_interactive.svg').read_text()
+          k=Path('app/src/main/java/com/dailycorp/nativegame/ApprovedContinentArt.kt').read_text()
+          points=re.findall(r'<g id="city_(\d{2})".*?<circle cx="(\d+)" cy="(\d+)"',s)
+          assert len(points)==48 and [int(x[0]) for x in points]==list(range(1,49))
+          coords=re.findall(r'\s*(\d+),\s*(\d+),?\s*// city_(\d{2})',k)
+          assert len(coords)==48
+          assert [(x,y,i) for i,x,y in points]==[(i,x,y) for x,y,i in coords]
+          print("48 SVG hotspots match Kotlin")
+          PY
+      - name: Unit tests and compile Android
+        run: gradle --no-daemon :minecore:test :app:testDebugUnitTest :app:assembleDebug
