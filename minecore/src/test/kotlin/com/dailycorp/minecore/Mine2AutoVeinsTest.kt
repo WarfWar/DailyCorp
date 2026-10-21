@@ -98,4 +98,26 @@ class Mine2AutoVeinsTest {
         assertFalse(restored.autoVeinEnabled)
         assertEquals(0,restored.activeVeinPlans())
     }
+    @Test fun veinPlansNeverCrossIntoDifferentNeighboringMinerals(){
+        val w=world()
+        var candidate:PairOfOre?=null
+        for(y in 5 until 90) for(x in 2 until 35){
+            val a=w.cell(x,y)!!
+            val b=w.cell(x+1,y)!!
+            if(a.kind==RockKind.ORE && b.kind==RockKind.ORE &&
+                a.resource!=null && b.resource!=null &&
+                Mine2VeinAutomation.family(a.resource!!)!=
+                    Mine2VeinAutomation.family(b.resource!!)){
+                candidate=PairOfOre(CellPos(x,y),CellPos(x+1,y))
+                break
+            }
+        }
+        val (a,b)=candidate?:error("Expected boundary between mineral families")
+        w.cell(a.x,a.y)!!.explored=true
+        w.cell(b.x,b.y)!!.explored=true
+        assertTrue(w.toggleVeinOrder(a))
+        assertFalse("Neighboring different mineral cannot be claimed",
+            w.cell(b.x,b.y)!!.ordered)
+    }
+
 }
