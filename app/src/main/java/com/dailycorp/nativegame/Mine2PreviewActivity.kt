@@ -560,6 +560,8 @@ class Mine2PreviewActivity:Activity(){
                 "Разведка: нажми на точку сканирования; обзор работает постоянно"
             Mine2PreviewView.Mode.RAIL ->
                 "Рельсы: нажми на доступный тоннель рядом с уже построенным путём"
+            Mine2PreviewView.Mode.AUTO_RAIL ->
+                "Авто-рельсы: выбери готовый тоннель, игра рассчитает кратчайший маршрут"
             Mine2PreviewView.Mode.LIFT -> "Лифт: выбери координату X и нужную глубину"
             else -> "Проведи пальцем — обзор; нажми на породу — назначить/отменить добычу"
         }
@@ -570,6 +572,11 @@ class Mine2PreviewActivity:Activity(){
         val delivered=transport?.delivered?.values?.sum()?:0
         val carts=transport?.carts?.size?:0
         val rails=transport?.rails?.size?:0
+        val activeRail=transport?.railProjects()?.firstOrNull{!it.completed}
+        val railwayStatus=activeRail?.let{p->
+            " · Авто-рельсы "+(p.path.size-p.remaining)+"/"+p.path.size+
+                if(p.blocked)" · ПРОБЛЕМА" else ""
+        }?:""
         status.text="Глубина "+(world.config.depthCells*world.config.metersPerCell)+
             " м · Пройдено "+world.totalExcavated+
             " · Заданий "+world.pendingCount()+
@@ -580,7 +587,7 @@ class Mine2PreviewActivity:Activity(){
             " · Добыча "+world.orePerMinute()+" ед/мин · Лифт ур."+
             (transport?.liftLevel?:1)+
             "\nПод землёй "+world.stockpile.values.sum()+
-            " · Доставлено "+delivered+" · Вагонетки "+carts+" · Рельсы "+rails+
+            " · Доставлено "+delivered+" · Вагонетки "+carts+" · Рельсы "+rails+railwayStatus+
             "\nРазведка: от 450 ₽, радиус 8 кл."+
             "\n"+(if(readOnly)"Ошибка сохранения: действия отключены"
                 else "Руда поступает в погрузку после рейса вагонетки")+
