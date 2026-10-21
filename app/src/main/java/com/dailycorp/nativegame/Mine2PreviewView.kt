@@ -177,10 +177,12 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
                     }
                 }
                 if(c.ordered){
-                    fill(Color.argb(73,245,178,56))
+                    fill(if(world.isAutoVeinCell(x,y))Color.argb(76,46,198,158)
+                        else Color.argb(73,245,178,56))
                     canvas.drawRect(l+2,p+2,l+t-2,p+t-2,paint)
                     paint.style=Paint.Style.STROKE;paint.strokeWidth=max(2f,t*0.045f)
-                    paint.color=Color.rgb(248,209,104)
+                    paint.color=if(world.isAutoVeinCell(x,y))Color.rgb(86,235,192)
+                        else Color.rgb(248,209,104)
                     canvas.drawRect(l+2,p+2,l+t-2,p+t-2,paint)
                     paint.style=Paint.Style.FILL
                 }
