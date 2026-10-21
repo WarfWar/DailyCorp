@@ -315,6 +315,22 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                     max(1.1f,zoom*d*0.98f))
             }
         }
+        // Pack4 road modules are illustrated cards, not seamless asphalt.
+        // Show a single junction as a landmark instead of stamping the entire
+        // road network (which previously made streets appear over buildings).
+        if(zoom>=1.12f){
+            val cross=plan.roads.firstOrNull { p ->
+                p.x>3 && p.y>3 && p.x<plan.width-4 && p.y<plan.height-4 &&
+                listOf(Point(p.x-1,p.y),Point(p.x+1,p.y),
+                    Point(p.x,p.y-1),Point(p.x,p.y+1)).count{it in plan.roads}>=4
+            }
+            if(cross!=null){
+                val (sx,sy)=projected(cross)
+                if(onScreen(sx,sy,halfW*2))
+                    worldExtras.drawAccent(canvas,"road.road_cross",sx,sy+halfH,
+                        halfW*1.65f,halfH*2.5f)
+            }
+        }
         val scenery=mutableListOf<Triple<Point,Lot?,Boolean>>()
         for(home in plan.homes)scenery.add(Triple(home,null,true))
         for(lot in plan.lots)scenery.add(Triple(lot.pos,lot,false))
@@ -388,8 +404,21 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                         drawBuilding(canvas,x,y,w,h,main,27f*zoom*d,lot.id%4,true)
                     }
                 } else {
-                    line(canvas,x-6*zoom*d,y,x+6*zoom*d,y,Color.rgb(240,244,224),3f*zoom*d)
-                    line(canvas,x,y-6*zoom*d,x,y+6*zoom*d,Color.rgb(240,244,224),3f*zoom*d)
+                    // Illustrated plot/outcrop accents from Pack6: small and
+                    // centered on the lot; keep ownership/touch geometry intact.
+                    val plotSprite=when(lot.kind){
+                        BuildingKind.MINE -> "site.metal_outcrop"
+                        BuildingKind.FACTORY -> "site.plot_available"
+                        BuildingKind.WAREHOUSE -> "site.stone_quarry"
+                        else -> "site.plot_available"
+                    }
+                    if(!worldExtras.drawAccent(canvas,plotSprite,x,y+9f*zoom*d,
+                            35f*zoom*d,32f*zoom*d)){
+                        line(canvas,x-6*zoom*d,y,x+6*zoom*d,y,
+                            Color.rgb(240,244,224),3f*zoom*d)
+                        line(canvas,x,y-6*zoom*d,x,y+6*zoom*d,
+                            Color.rgb(240,244,224),3f*zoom*d)
+                    }
                 }
                 if(zoom>=0.83f){
                     val name="${lot.kind.title} ${lot.id+1}"
