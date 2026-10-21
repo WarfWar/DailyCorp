@@ -31,6 +31,34 @@ class Mine2Transport(private val depot:CellPos):Serializable {
         val network=liftNetworkV5?:Mine2LiftNetwork().also{liftNetworkV5=it}
         return network.start(world,this,quote)
     }
+    // Optional in old Java saves: no compatibility-breaking UID change.
+    private var railProjectsV8:MutableList<Mine2RailProject>?=null
+    fun railProjects():List<Mine2RailProject> = railProjectsV8?:emptyList()
+    fun quoteRailProject(world:Mine2World,to:CellPos):Mine2RailQuote =
+        Mine2RailPlanner.quote(world,this,to)
+    fun startRailProject(world:Mine2World,quote:Mine2RailQuote):Boolean{
+        if(!quote.valid || quote.path.isEmpty())return false
+        val fresh=quoteRailProject(world,quote.destination)
+        if(!fresh.valid || fresh.path!=quote.path || fresh.price!=quote.price)
+            return false
+        val projects=railProjectsV8?:mutableListOf<Mine2RailProject>().also{railProjectsV8=it}
+        projects.add(Mine2RailProject(fresh.destination,fresh.path,fresh.price))
+        return true
+    }
+    private fun advanceRailProjects(world:Mine2World){
+        for(project in railProjects()){
+            if(project.completed || project.blocked)continue
+            val next=project.path[project.nextIndex]
+            // One paid segment per half-second, respecting current topology.
+            if(next in rails){
+                project.nextIndex++
+            }else if(buildRail(world,next)){
+                project.nextIndex++
+            }else{
+                project.blocked=true
+            }
+        }
+    }
     var totalRailBuilt=0
         private set
     private var liftLevelV4=0
@@ -119,6 +147,7 @@ class Mine2Transport(private val depot:CellPos):Serializable {
      */
     fun step(world:Mine2World):List<Mine2Delivery>{
         transportTicksV4++
+        advanceRailProjects(world)
         val arrivals=mutableListOf<Mine2Delivery>()
         var liftUsed=0
         var waitingForRail=false
