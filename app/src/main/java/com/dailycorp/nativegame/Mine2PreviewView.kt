@@ -15,11 +15,12 @@ import kotlin.math.*
  * Survey, rails and lift placement remain explicit tools.
  */
 class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
-    enum class Mode { NORMAL, SURVEY, RAIL, LIFT }
+    enum class Mode { NORMAL, SURVEY, RAIL, AUTO_RAIL, LIFT }
     var mode=Mode.NORMAL
     var onPlan:((CellPos,CellPos)->Unit)?=null
     var onSurvey:((CellPos)->Unit)?=null
     var onRail:((CellPos)->Unit)?=null
+    var onAutoRail:((CellPos)->Unit)?=null
     var onLift:((CellPos)->Unit)?=null
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val art=GameArt(context)
@@ -63,6 +64,12 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
     )
     fun moveDepth(cells:Int){panY-=cells*tile();invalidate()}
     fun surface(){panX=0f;panY=0f;invalidate()}
+    fun focusAt(p:CellPos){
+        val t=tile()
+        panX=(world.config.width/2f-p.x-0.5f)*t
+        panY=height*0.25f+(2.5f-p.y)*t
+        invalidate()
+    }
     private fun fill(color:Int){
         paint.color=color;paint.style=Paint.Style.FILL;paint.strokeWidth=1f
     }
@@ -396,6 +403,8 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
                         onSurvey?.invoke(p)
                     }else if(mode==Mode.RAIL){
                         onRail?.invoke(p)
+                    }else if(mode==Mode.AUTO_RAIL){
+                        onAutoRail?.invoke(p)
                     }else if(mode==Mode.LIFT){
                         onLift?.invoke(p)
                     }else{
