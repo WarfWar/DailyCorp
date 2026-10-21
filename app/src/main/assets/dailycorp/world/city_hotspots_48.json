@@ -1,0 +1,484 @@
+{
+  "hotspots": [
+    {
+      "city_id": "city_01",
+      "number": 1,
+      "name": "Индустрион",
+      "x_px": 305,
+      "y_px": 131,
+      "confidence": "illustration_labeled",
+      "world_x": 217,
+      "world_y": 257
+    },
+    {
+      "city_id": "city_02",
+      "number": 2,
+      "name": "Кварцбург",
+      "x_px": 453,
+      "y_px": 131,
+      "confidence": "illustration_labeled",
+      "world_x": 293,
+      "world_y": 269
+    },
+    {
+      "city_id": "city_03",
+      "number": 3,
+      "name": "Порт Лагуна",
+      "x_px": 587,
+      "y_px": 145,
+      "confidence": "illustration_labeled",
+      "world_x": 368,
+      "world_y": 260
+    },
+    {
+      "city_id": "city_04",
+      "number": 4,
+      "name": "Северная Долина",
+      "x_px": 670,
+      "y_px": 63,
+      "confidence": "illustration_duplicate_label",
+      "world_x": 424,
+      "world_y": 272
+    },
+    {
+      "city_id": "city_05",
+      "number": 5,
+      "name": "Зелёные Поля",
+      "x_px": 926,
+      "y_px": 54,
+      "confidence": "illustration_labeled",
+      "world_x": 231,
+      "world_y": 355
+    },
+    {
+      "city_id": "city_06",
+      "number": 6,
+      "name": "Солнечный Берег",
+      "x_px": 947,
+      "y_px": 133,
+      "confidence": "illustration_labeled",
+      "world_x": 286,
+      "world_y": 367
+    },
+    {
+      "city_id": "city_07",
+      "number": 7,
+      "name": "Стальград",
+      "x_px": 1111,
+      "y_px": 117,
+      "confidence": "illustration_labeled",
+      "world_x": 362,
+      "world_y": 358
+    },
+    {
+      "city_id": "city_08",
+      "number": 8,
+      "name": "Рудогорск",
+      "x_px": 1340,
+      "y_px": 139,
+      "confidence": "illustration_labeled",
+      "world_x": 437,
+      "world_y": 350
+    },
+    {
+      "city_id": "city_09",
+      "number": 9,
+      "name": "Техноград",
+      "x_px": 255,
+      "y_px": 249,
+      "confidence": "illustration_labeled",
+      "world_x": 224,
+      "world_y": 453
+    },
+    {
+      "city_id": "city_10",
+      "number": 10,
+      "name": "Лесогорск",
+      "x_px": 400,
+      "y_px": 269,
+      "confidence": "illustration_labeled",
+      "world_x": 300,
+      "world_y": 444
+    },
+    {
+      "city_id": "city_11",
+      "number": 11,
+      "name": "Новый Эльм",
+      "x_px": 602,
+      "y_px": 236,
+      "confidence": "illustration_labeled",
+      "world_x": 355,
+      "world_y": 456
+    },
+    {
+      "city_id": "city_12",
+      "number": 12,
+      "name": "Речной Порт",
+      "x_px": 811,
+      "y_px": 248,
+      "confidence": "illustration_labeled",
+      "world_x": 431,
+      "world_y": 448
+    },
+    {
+      "city_id": "city_13",
+      "number": 13,
+      "name": "Полярис",
+      "x_px": 918,
+      "y_px": 251,
+      "confidence": "illustration_unlabeled",
+      "world_x": 554,
+      "world_y": 262
+    },
+    {
+      "city_id": "city_14",
+      "number": 14,
+      "name": "Ледогорск",
+      "x_px": 1066,
+      "y_px": 232,
+      "confidence": "illustration_labeled",
+      "world_x": 630,
+      "world_y": 274
+    },
+    {
+      "city_id": "city_15",
+      "number": 15,
+      "name": "Белозёрск",
+      "x_px": 1268,
+      "y_px": 234,
+      "confidence": "illustration_labeled",
+      "world_x": 685,
+      "world_y": 265
+    },
+    {
+      "city_id": "city_16",
+      "number": 16,
+      "name": "Тундровск",
+      "x_px": 1441,
+      "y_px": 247,
+      "confidence": "illustration_labeled",
+      "world_x": 761,
+      "world_y": 257
+    },
+    {
+      "city_id": "city_17",
+      "number": 17,
+      "name": "Нордхейм",
+      "x_px": 228,
+      "y_px": 394,
+      "confidence": "illustration_labeled",
+      "world_x": 568,
+      "world_y": 360
+    },
+    {
+      "city_id": "city_18",
+      "number": 18,
+      "name": "Кристальный Пик",
+      "x_px": 443,
+      "y_px": 367,
+      "confidence": "illustration_labeled",
+      "world_x": 623,
+      "world_y": 352
+    },
+    {
+      "city_id": "city_19",
+      "number": 19,
+      "name": "Серебряная Долина",
+      "x_px": 596,
+      "y_px": 349,
+      "confidence": "illustration_labeled",
+      "world_x": 699,
+      "world_y": 363
+    },
+    {
+      "city_id": "city_20",
+      "number": 20,
+      "name": "Высокогорье",
+      "x_px": 814,
+      "y_px": 352,
+      "confidence": "illustration_labeled",
+      "world_x": 754,
+      "world_y": 355
+    },
+    {
+      "city_id": "city_21",
+      "number": 21,
+      "name": "Альпийск",
+      "x_px": 983,
+      "y_px": 376,
+      "confidence": "illustration_labeled",
+      "world_x": 561,
+      "world_y": 458
+    },
+    {
+      "city_id": "city_22",
+      "number": 22,
+      "name": "Сосновый Мыс",
+      "x_px": 1169,
+      "y_px": 329,
+      "confidence": "illustration_labeled",
+      "world_x": 617,
+      "world_y": 450
+    },
+    {
+      "city_id": "city_23",
+      "number": 23,
+      "name": "Заливный",
+      "x_px": 1316,
+      "y_px": 386,
+      "confidence": "illustration_labeled",
+      "world_x": 692,
+      "world_y": 441
+    },
+    {
+      "city_id": "city_24",
+      "number": 24,
+      "name": "Прибрежье",
+      "x_px": 1444,
+      "y_px": 387,
+      "confidence": "illustration_labeled",
+      "world_x": 768,
+      "world_y": 453
+    },
+    {
+      "city_id": "city_25",
+      "number": 25,
+      "name": "Новый Кварц",
+      "x_px": 151,
+      "y_px": 589,
+      "confidence": "illustration_labeled",
+      "world_x": 226,
+      "world_y": 579
+    },
+    {
+      "city_id": "city_26",
+      "number": 26,
+      "name": "Медеград",
+      "x_px": 341,
+      "y_px": 535,
+      "confidence": "illustration_labeled",
+      "world_x": 302,
+      "world_y": 570
+    },
+    {
+      "city_id": "city_27",
+      "number": 27,
+      "name": "Механополис",
+      "x_px": 537,
+      "y_px": 466,
+      "confidence": "illustration_labeled",
+      "world_x": 357,
+      "world_y": 582
+    },
+    {
+      "city_id": "city_28",
+      "number": 28,
+      "name": "Прометей",
+      "x_px": 710,
+      "y_px": 495,
+      "confidence": "illustration_labeled",
+      "world_x": 433,
+      "world_y": 573
+    },
+    {
+      "city_id": "city_29",
+      "number": 29,
+      "name": "Энергоград",
+      "x_px": 912,
+      "y_px": 479,
+      "confidence": "illustration_labeled",
+      "world_x": 220,
+      "world_y": 677
+    },
+    {
+      "city_id": "city_30",
+      "number": 30,
+      "name": "Центроград",
+      "x_px": 1159,
+      "y_px": 469,
+      "confidence": "illustration_labeled",
+      "world_x": 295,
+      "world_y": 668
+    },
+    {
+      "city_id": "city_31",
+      "number": 31,
+      "name": "Кремниевск",
+      "x_px": 1345,
+      "y_px": 508,
+      "confidence": "illustration_labeled",
+      "world_x": 371,
+      "world_y": 660
+    },
+    {
+      "city_id": "city_32",
+      "number": 32,
+      "name": "Наукоград",
+      "x_px": 1473,
+      "y_px": 520,
+      "confidence": "illustration_labeled",
+      "world_x": 426,
+      "world_y": 671
+    },
+    {
+      "city_id": "city_33",
+      "number": 33,
+      "name": "Гринпорт",
+      "x_px": 1026,
+      "y_px": 544,
+      "confidence": "illustration_unlabeled",
+      "world_x": 233,
+      "world_y": 754
+    },
+    {
+      "city_id": "city_34",
+      "number": 34,
+      "name": "Озёрный Берег",
+      "x_px": 459,
+      "y_px": 637,
+      "confidence": "illustration_labeled",
+      "world_x": 289,
+      "world_y": 766
+    },
+    {
+      "city_id": "city_35",
+      "number": 35,
+      "name": "Берёзовск",
+      "x_px": 668,
+      "y_px": 628,
+      "confidence": "illustration_labeled",
+      "world_x": 364,
+      "world_y": 758
+    },
+    {
+      "city_id": "city_36",
+      "number": 36,
+      "name": "Злаковые Поля",
+      "x_px": 829,
+      "y_px": 650,
+      "confidence": "illustration_labeled",
+      "world_x": 420,
+      "world_y": 769
+    },
+    {
+      "city_id": "city_37",
+      "number": 37,
+      "name": "Южный Маяк",
+      "x_px": 1074,
+      "y_px": 610,
+      "confidence": "illustration_labeled",
+      "world_x": 563,
+      "world_y": 584
+    },
+    {
+      "city_id": "city_38",
+      "number": 38,
+      "name": "Пескоград",
+      "x_px": 1167,
+      "y_px": 690,
+      "confidence": "illustration_labeled",
+      "world_x": 619,
+      "world_y": 575
+    },
+    {
+      "city_id": "city_39",
+      "number": 39,
+      "name": "Красный Каньон",
+      "x_px": 1272,
+      "y_px": 646,
+      "confidence": "illustration_labeled",
+      "world_x": 694,
+      "world_y": 587
+    },
+    {
+      "city_id": "city_40",
+      "number": 40,
+      "name": "Золотые Пески",
+      "x_px": 1448,
+      "y_px": 666,
+      "confidence": "illustration_labeled",
+      "world_x": 770,
+      "world_y": 579
+    },
+    {
+      "city_id": "city_41",
+      "number": 41,
+      "name": "Солнечный Оазис",
+      "x_px": 148,
+      "y_px": 758,
+      "confidence": "illustration_labeled",
+      "world_x": 557,
+      "world_y": 662
+    },
+    {
+      "city_id": "city_42",
+      "number": 42,
+      "name": "Урановые Скалы",
+      "x_px": 315,
+      "y_px": 795,
+      "confidence": "illustration_labeled",
+      "world_x": 632,
+      "world_y": 673
+    },
+    {
+      "city_id": "city_43",
+      "number": 43,
+      "name": "Восточный Риф",
+      "x_px": 543,
+      "y_px": 818,
+      "confidence": "illustration_labeled",
+      "world_x": 688,
+      "world_y": 665
+    },
+    {
+      "city_id": "city_44",
+      "number": 44,
+      "name": "Оникс-Сити",
+      "x_px": 864,
+      "y_px": 805,
+      "confidence": "illustration_labeled",
+      "world_x": 763,
+      "world_y": 677
+    },
+    {
+      "city_id": "city_45",
+      "number": 45,
+      "name": "Базальтовск",
+      "x_px": 1033,
+      "y_px": 862,
+      "confidence": "illustration_labeled",
+      "world_x": 550,
+      "world_y": 760
+    },
+    {
+      "city_id": "city_46",
+      "number": 46,
+      "name": "Черноречье",
+      "x_px": 1164,
+      "y_px": 837,
+      "confidence": "illustration_labeled",
+      "world_x": 626,
+      "world_y": 751
+    },
+    {
+      "city_id": "city_47",
+      "number": 47,
+      "name": "Порт Восток",
+      "x_px": 1270,
+      "y_px": 849,
+      "confidence": "illustration_labeled",
+      "world_x": 701,
+      "world_y": 763
+    },
+    {
+      "city_id": "city_48",
+      "number": 48,
+      "name": "Медная Бухта",
+      "x_px": 1350,
+      "y_px": 738,
+      "confidence": "illustration_unlabeled",
+      "world_x": 757,
+      "world_y": 754
+    }
+  ]
+}
