@@ -234,6 +234,21 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
         }
         // Rail infrastructure is overlaid on excavated passages, never on ore.
         world.existingTransport()?.let{transport->
+            for(project in transport.railProjects()){
+                if(project.completed)continue
+                for(i in project.nextIndex until project.path.size){
+                    val p=project.path[i]
+                    if(p.x !in x0..x1 || p.y !in y0..y1)continue
+                    val l=left+p.x*t;val y=top+p.y*t
+                    paint.style=Paint.Style.STROKE
+                    paint.strokeWidth=max(2f,t*0.06f)
+                    paint.color=if(project.blocked)Color.rgb(215,81,81)
+                        else Color.rgb(83,213,165)
+                    canvas.drawRect(l+t*0.14f,y+t*0.14f,
+                        l+t*0.86f,y+t*0.86f,paint)
+                    paint.style=Paint.Style.FILL
+                }
+            }
             for(p in transport.rails){
                 if(p.x !in x0..x1 || p.y !in y0..y1)continue
                 val cell=world.cell(p.x,p.y)?:continue
