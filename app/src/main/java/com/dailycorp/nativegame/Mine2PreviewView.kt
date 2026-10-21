@@ -198,6 +198,22 @@ class Mine2PreviewView(context:Context,val world:Mine2World):View(context) {
                 val l=left+site.x*t
                 val begin=max(3,y0)
                 val finish=min(site.builtToY,y1)
+                for(y in site.stations){
+                    if(y in begin..finish){
+                        fill(Color.rgb(232,185,93))
+                        canvas.drawRect(l+t*0.03f,top+(y+0.84f)*t,
+                            l+t*0.97f,top+(y+0.94f)*t,paint)
+                    }
+                }
+                if(site.completed){
+                    val cabin=site.carriageY()
+                    if(cabin>=y0 && cabin<=y1){
+                        fill(Color.rgb(240,183,64))
+                        val y=top+cabin*t
+                        canvas.drawRoundRect(RectF(l+t*0.22f,y+t*0.12f,
+                            l+t*0.78f,y+t*0.81f),3f,3f,paint)
+                    }
+                }
                 if(begin<=finish){
                     fill(Color.rgb(100,82,55))
                     canvas.drawRect(l+t*0.1f,top+begin*t,
