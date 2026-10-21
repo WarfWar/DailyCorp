@@ -24,6 +24,13 @@ class Mine2Transport(private val depot:CellPos):Serializable {
     val delivered:MutableMap<String,Int> = mutableMapOf()
     private var liftNetworkV5:Mine2LiftNetwork?=null
     fun lifts():List<Mine2CargoLift> = liftNetworkV5?.lifts?:emptyList()
+    fun stationNodes():List<CellPos> = liftNetworkV5?.stations()?:emptyList()
+    fun quoteLift(world:Mine2World,x:Int,y:Int):Mine2LiftQuote =
+        (liftNetworkV5?:Mine2LiftNetwork()).quote(world,this,x,y)
+    fun startLift(world:Mine2World,quote:Mine2LiftQuote):Boolean {
+        val network=liftNetworkV5?:Mine2LiftNetwork().also{liftNetworkV5=it}
+        return network.start(world,this,quote)
+    }
     var totalRailBuilt=0
         private set
     private var liftLevelV4=0
@@ -70,9 +77,9 @@ class Mine2Transport(private val depot:CellPos):Serializable {
         totalRailBuilt++
         return true
     }
-    fun hireCart():Boolean {
-        if(carts.size>=8)return false
-        carts.add(Mine2Cart((carts.maxOfOrNull{it.id}?:0)+1,depot.x,depot.y))
+    fun hireCart(at:CellPos=depot):Boolean {
+        if(carts.size>=8 || (at!=depot && at !in stationNodes()))return false
+        carts.add(Mine2Cart((carts.maxOfOrNull{it.id}?:0)+1,at.x,at.y))
         return true
     }
     fun addPile(at:CellPos,material:String,amount:Int) {
