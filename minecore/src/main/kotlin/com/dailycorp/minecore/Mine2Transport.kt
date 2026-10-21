@@ -124,28 +124,34 @@ class Mine2Transport(private val depot:CellPos):Serializable {
         var waitingForRail=false
         var congestion=false
         val reserved=mutableMapOf<CellPos,Int>()
+        val dropoffs=listOf(depot)+stationNodes()
         for(cart in carts){
             val at=CellPos(cart.x,cart.y)
             if(cart.amount>0){
-                if(at==depot){
-                    if(liftUsed>=liftCapacity()){congestion=true;continue}
+                val nearest=dropoffs.mapNotNull{drop->
+                    val path=route(at,drop)
+                    if(path.isEmpty())null else drop to path
+                }.minByOrNull{it.second.size}
+                if(nearest==null){waitingForRail=true;continue}
+                val (drop,path)=nearest
+                if(at==drop){
                     val material=cart.material?:continue
                     val amount=cart.amount
-                    // Remove first to avoid counting delivered cargo without
-                    // an equivalent reduction of underground inventory.
-                    world.removeFromUndergroundStockpile(material,amount)
-                    delivered[material]=(delivered[material]?:0)+amount
-                    arrivals.add(Mine2Delivery(material,amount))
+                    if(drop==depot){
+                        if(liftUsed>=liftCapacity()){congestion=true;continue}
+                        world.removeFromUndergroundStockpile(material,amount)
+                        delivered[material]=(delivered[material]?:0)+amount
+                        arrivals.add(Mine2Delivery(material,amount))
+                        liftUsed++
+                    }else if(liftNetworkV5?.deposit(drop,material,amount)!=true){
+                        continue
+                    }
                     cart.material=null
                     cart.amount=0
-                    liftUsed++
-                }else{
-                    val path=route(at,depot)
-                    if(path.size>1){
-                        cart.x=path[1].x
-                        cart.y=path[1].y
-                        cartTravelStepsV4++
-                    }else waitingForRail=true
+                }else if(path.size>1){
+                    cart.x=path[1].x
+                    cart.y=path[1].y
+                    cartTravelStepsV4++
                 }
                 continue
             }
