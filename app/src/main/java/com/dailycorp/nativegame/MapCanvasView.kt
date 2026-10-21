@@ -148,12 +148,55 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         // one time, not on every frame and zoom.
         val cell=12
         return try {
-            val result=Bitmap.createBitmap(96*cell,72*cell,Bitmap.Config.RGB_565)
+            val w=96*cell
+            val h=72*cell
+            val result=Bitmap.createBitmap(w,h,Bitmap.Config.RGB_565)
             val target=Canvas(result)
             for(y in 0 until 72)for(x in 0 until 96){
                 styleB.drawContinentCell(target,continentBiomes[y][x],x,y,
                     x*cell.toFloat(),y*cell.toFloat(),cell.toFloat())
             }
+            // The map is not pixel art: smooth only the transitions between
+            // ocean/river/lake and dry land. A coastline of 12-px boxes looked
+            // like a Minecraft stair-step at tablet resolution.
+            val pixels=IntArray(w*h)
+            result.getPixels(pixels,0,w,0,0,w,h)
+            fun wet(x:Int,y:Int):Float {
+                if(x !in 0..95 || y !in 0..71)return 1f
+                return when(continentBiomes[y][x]){
+                    Biome.OCEAN,Biome.RIVER,Biome.LAKE->1f
+                    else->0f
+                }
+            }
+            for(py in 0 until h){
+                val gy=py.toFloat()/cell-0.5f
+                val cy=kotlin.math.floor(gy).toInt()
+                val vy=gy-cy
+                for(px in 0 until w){
+                    val gx=px.toFloat()/cell-0.5f
+                    val cx=kotlin.math.floor(gx).toInt()
+                    val vx=gx-cx
+                    val top=wet(cx,cy)*(1f-vx)+wet(cx+1,cy)*vx
+                    val bottom=wet(cx,cy+1)*(1f-vx)+wet(cx+1,cy+1)*vx
+                    val water=top*(1f-vy)+bottom*vy
+                    if(water<=0.23f || water>=0.77f)continue
+                    val idx=py*w+px
+                    val base=pixels[idx]
+                    val amount=(kotlin.math.abs(water-0.5f)*2f)
+                        .coerceIn(0f,1f)
+                    val alpha=(1f-amount)*0.86f
+                    // Blend toward a shoreline palette; keep the original
+                    // surface texture visible away from the water boundary.
+                    val coast=if(water>0.52f) Color.rgb(47,119,153)
+                        else Color.rgb(192,188,136)
+                    val inv=1f-alpha
+                    pixels[idx]=Color.rgb(
+                        (Color.red(base)*inv+Color.red(coast)*alpha).toInt(),
+                        (Color.green(base)*inv+Color.green(coast)*alpha).toInt(),
+                        (Color.blue(base)*inv+Color.blue(coast)*alpha).toInt())
+                }
+            }
+            result.setPixels(pixels,0,w,0,0,w,h)
             result.also{worldTexture=it}
         }catch (_:Exception){null}
     }
@@ -196,8 +239,10 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
             canvas.drawCircle(x,y,(if(selected)6f else 4f)*d,paint)
             if(selected || city.id%8==0){
                 fill(Color.argb(218,11,41,56))
-                canvas.drawRoundRect(RectF(x+8*d,y-12*d,x+100*d,y+6*d),4*d,4*d,paint)
-                text(canvas,city.name,x+13*d,y+2*d,10f,Color.WHITE,selected)
+                val labelX=(x+8*d).coerceIn(7*d,width-102*d)
+                canvas.drawRoundRect(RectF(labelX,y-12*d,
+                    labelX+94*d,y+6*d),4*d,4*d,paint)
+                text(canvas,city.name,labelX+5*d,y+2*d,10f,Color.WHITE,selected)
             }
         }
         fill(Color.argb(235,7,34,49))
