@@ -75,7 +75,7 @@ class Mine2LiftNetwork:Serializable {
     }
     fun start(world:Mine2World,transport:Mine2Transport,quote:Mine2LiftQuote):Boolean {
         if(!quote.valid)return false
-        val fresh=quote(world,transport,quote.x,quote.endY)
+        val fresh=this.quote(world,transport,quote.x,quote.endY)
         if(!fresh.valid || fresh.price!=quote.price)return false
         val id=(lifts.maxOfOrNull{it.id}?:0)+1
         lifts.add(Mine2CargoLift(id,quote.x,quote.endY,fresh.stations.toMutableList()))
