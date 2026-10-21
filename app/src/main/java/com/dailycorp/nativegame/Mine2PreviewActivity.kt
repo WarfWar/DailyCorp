@@ -277,6 +277,7 @@ class Mine2PreviewActivity:Activity(){
             }
         }
         add("↑ Грузовой лифт"){showLiftUpgrade()}
+        add("⚙ Диспетчерская"){showLiftDispatcher()}
         add("📊 Отчёт"){showMineStats()}
         add("↑ Улучшить шахту"){
             if(readOnly)Toast.makeText(this,"Сохранение недоступно",Toast.LENGTH_SHORT).show()
