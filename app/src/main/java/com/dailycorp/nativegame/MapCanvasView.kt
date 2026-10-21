@@ -1,6 +1,7 @@
 package com.dailycorp.nativegame
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -31,6 +32,9 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
     }
     private val cityPins=mutableMapOf<Int,Point>()
     private val art = GameArt(context)
+    private val styleB=WorldStyleBArt(context)
+    private var worldTexture:Bitmap?=null
+    private var worldTexturePrepared=false
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val shape = Path()
     private var panX = 0f
@@ -134,16 +138,40 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         canvas.drawColor(Color.rgb(31,75,95))
         if(continentMode)drawContinent(canvas) else drawCity(canvas)
     }
+    private fun worldStyleBitmap():Bitmap? {
+        if(worldTexturePrepared)return worldTexture
+        worldTexturePrepared=true
+        if(!styleB.hasMaterials)return null
+        // Continent stays 96x72 top-down. Composite 6912 material squares
+        // one time, not on every frame and zoom.
+        val cell=12
+        return try {
+            val result=Bitmap.createBitmap(96*cell,72*cell,Bitmap.Config.RGB_565)
+            val target=Canvas(result)
+            for(y in 0 until 72)for(x in 0 until 96){
+                styleB.drawContinentCell(target,continentBiomes[y][x],x,y,
+                    x*cell.toFloat(),y*cell.toFloat(),cell.toFloat())
+            }
+            result.also{worldTexture=it}
+        }catch (_:Exception){null}
+    }
     private fun drawContinent(canvas:Canvas){
         val rect=worldRect()
         val tw=rect.width()/96f
         val th=rect.height()/72f
         val seed=engine.state.seed
-        // One procedural map. No disconnected collage of example biomes.
-        for(y in 0 until 72)for(x in 0 until 96){
-            fill(biomeColor(continentBiomes[y][x],x,y,seed))
-            val sx=rect.left+x*tw;val sy=rect.top+y*th
-            canvas.drawRect(sx,sy,sx+tw+0.55f,sy+th+0.55f,paint)
+        // Same geography and city coordinates, now with Style B materials.
+        val texture=worldStyleBitmap()
+        if(texture!=null){
+            fill(Color.WHITE)
+            paint.isFilterBitmap=true
+            canvas.drawBitmap(texture,null,rect,paint)
+        }else{
+            for(y in 0 until 72)for(x in 0 until 96){
+                fill(biomeColor(continentBiomes[y][x],x,y,seed))
+                val sx=rect.left+x*tw;val sy=rect.top+y*th
+                canvas.drawRect(sx,sy,sx+tw+0.55f,sy+th+0.55f,paint)
+            }
         }
         // Biome silhouettes are sparse and only placed inside their native regions.
         for(y in 4 until 68 step 4)for(x in 4 until 92 step 4){
@@ -199,8 +227,29 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                 val b=biomes[y][x].let{
                     if(occupied && (it==Biome.LAKE || it==Biome.RIVER)) Biome.COAST else it
                 }
-                diamond(canvas,sx,sy,halfW+0.62f,halfH+0.62f,biomeColor(b,x,y,seed))
-                if(!occupied)biomeAccent(canvas,b,x,y,sx,sy,halfW,halfH)
+                if(!styleB.drawCityTile(canvas,b,x,y,sx,sy,
+                        halfW+0.62f,halfH+0.62f)) {
+                    diamond(canvas,sx,sy,halfW+0.62f,halfH+0.62f,
+                        biomeColor(b,x,y,seed))
+                    if(!occupied)biomeAccent(canvas,b,x,y,sx,sy,halfW,halfH)
+                }
+                if(!occupied && zoom>=0.85f){
+                    val deco=(x*47+y*31+cityId*13) and 15
+                    when{
+                        b==Biome.FOREST && deco==0 ->
+                            styleB.drawDecor(canvas,33,sx,sy+halfH,
+                                halfW*1.10f,halfH*2.3f)
+                        b==Biome.FOREST && deco==1 ->
+                            styleB.drawDecor(canvas,40,sx,sy+halfH,
+                                halfW*1.65f,halfH*2.75f)
+                        b==Biome.MOUNTAINS && deco==2 ->
+                            styleB.drawDecor(canvas,41,sx,sy+halfH,
+                                halfW*1.6f,halfH*2.7f)
+                        b==Biome.PLAINS && deco==3 ->
+                            styleB.drawDecor(canvas,35,sx,sy+halfH,
+                                halfW*0.9f,halfH*2f)
+                    }
+                }
             }
         }
         // Every road occupies exactly one diamond. Do not stamp crossing decals
