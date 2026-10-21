@@ -34,6 +34,7 @@ class GameActivity : Activity() {
     private val uiTick = object : Runnable {
         override fun run() {
             game.tick()
+            Mine2Runtime.advance(this@GameActivity,game)
             ticks++
             if(ticks % 15 == 0) save()
             refresh()
@@ -57,6 +58,7 @@ class GameActivity : Activity() {
     }
     override fun onPause(){
         handler.removeCallbacks(uiTick)
+        if(::game.isInitialized)Mine2Runtime.leaveCityScreen(this,game)
         super.onPause()
         save()
     }
@@ -68,8 +70,11 @@ class GameActivity : Activity() {
         }
     } catch(_:Exception) { GameEngine.newGame() }
     private fun save(){
-        try { ObjectOutputStream(openFileOutput("dailycorp-native-v1.save",MODE_PRIVATE)).use{it.writeObject(game.state)} }
-        catch(_:Exception) { /* Never interrupt a live game for a failed local write. */ }
+        try{
+            Mine2Runtime.flush(this,game)
+            ObjectOutputStream(openFileOutput("dailycorp-native-v1.save",MODE_PRIVATE))
+                .use{it.writeObject(game.state)}
+        }catch(_:Exception) { /* Preserve existing save on unexpected errors. */ }
     }
     private fun density(value:Int):Int=(value*resources.displayMetrics.density).toInt()
     private fun text(size:Float,bold:Boolean=false):TextView=TextView(this).apply{
