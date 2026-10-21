@@ -20,6 +20,19 @@ class City001LayoutTest {
             assertTrue("Lot ${lot.id} lost its road gate", lot.gate in plan.roads)
         }
         assertTrue("City ring should change the map", plan.roads.size > base.roads.size)
+        val visited = mutableSetOf<Point>()
+        val pending = ArrayDeque<Point>()
+        val origin = base.roads.first()
+        visited.add(origin)
+        pending.add(origin)
+        while (pending.isNotEmpty()) {
+            val p = pending.removeFirst()
+            for (next in listOf(Point(p.x + 1, p.y), Point(p.x - 1, p.y),
+                Point(p.x, p.y + 1), Point(p.x, p.y - 1))) {
+                if (next in plan.roads && visited.add(next)) pending.add(next)
+            }
+        }
+        assertEquals("City 001 contains disconnected street segments", plan.roads.size, visited.size)
     }
 
     @Test fun pilotIsDeterministicAndDoesNotPlaceSceneryOnGameplaySites() {
