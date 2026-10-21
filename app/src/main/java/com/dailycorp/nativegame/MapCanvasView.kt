@@ -31,10 +31,10 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         }}
     }
     private val cityPins=mutableMapOf<Int,Point>()
-    private val art = GameArt(context)
+    // Only the atlas with validated isolated diamonds/props is decoded.
+    // Do not allocate the old postcard/diaroma atlases in this map renderer.
     private val styleB=WorldStyleBArt(context)
-    // Distinct sparse landmarks and infrastructure sourced from all ten packs.
-    private val worldExtras=WorldStyleBAtlas(context)
+    private val urbanCache=mutableMapOf<Int,Set<Point>>()
     private var worldTexture:Bitmap?=null
     private var worldTexturePrepared=false
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -73,6 +73,14 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
             height/2f+panY+(p.x+p.y-33f)*halfH)
     }
     private fun cachedPlan():MapPlan=cache.getOrPut(cityId){ CityGenerator.plan(engine.city(cityId)) }
+    private fun urbanZones(plan:MapPlan):Set<Point> = urbanCache.getOrPut(cityId) {
+        buildSet{
+            for(p in plan.roads)for(dy in -1..1)for(dx in -1..1)
+                add(Point(p.x+dx,p.y+dy))
+            addAll(plan.homes)
+            addAll(plan.lots.map{it.pos})
+        }
+    }
     private fun onScreen(x:Float,y:Float,margin:Float=140f):Boolean =
         x>=-margin && x<=width+margin && y>=-margin && y<=height+margin
     private fun cityBiomes():Array<Array<Biome>> = biomeCache.getOrPut(cityId) {
@@ -265,6 +273,7 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         val seed=engine.city(cityId).seed
         val biomes=cityBiomes()
         val occupiedLots=plan.lots.map{it.pos}.toHashSet()
+        val urbanLots=urbanZones(plan)
         // Continuous climate zones, with no noisy atlas photos per city cell.
         for(depth in 0 until plan.width+plan.height-1){
             for(x in max(0,depth-plan.height+1)..min(plan.width-1,depth)){
@@ -278,11 +287,9 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                 // on every city lot was producing huge patchy beige chessboards.
                 // Keep actual deserts away from settlements; do not mutate biome
                 // generation, building lots, or the saved map.
-                val urban=occupied || pos in plan.homes ||
-                    plan.roads.any{road->kotlin.math.abs(road.x-x)<=1 &&
-                        kotlin.math.abs(road.y-y)<=1}
+                val urban=pos in urbanLots
                 val b=when {
-                    occupied && (natural==Biome.LAKE || natural==Biome.RIVER) -> Biome.COAST
+                    occupied && (natural==Biome.LAKE || natural==Biome.RIVER) -> Biome.PLAINS
                     urban && (natural==Biome.DESERT || natural==Biome.COAST) -> Biome.PLAINS
                     else -> natural
                 }
