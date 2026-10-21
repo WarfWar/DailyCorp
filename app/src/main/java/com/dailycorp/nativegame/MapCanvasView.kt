@@ -34,6 +34,13 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
     // Only the atlas with validated isolated diamonds/props is decoded.
     // Do not allocate the old postcard/diaroma atlases in this map renderer.
     private val styleB=WorldStyleBArt(context)
+    // The first city is the isolated Style B design pilot. Other cities keep
+    // their current renderers and unchanged economic/saved layouts.
+    private val city001Art by lazy(LazyThreadSafetyMode.NONE) { GameArt(context) }
+    private val city001Decor by lazy(LazyThreadSafetyMode.NONE) {
+        val city = engine.city(1)
+        City001Layout.decorations(City001Layout.plan(city), city.seed)
+    }
     private val urbanCache=mutableMapOf<Int,Set<Point>>()
     private var worldTexture:Bitmap?=null
     private var worldTexturePrepared=false
@@ -72,7 +79,10 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         return Pair(width/2f+panX+(p.x-p.y)*halfW,
             height/2f+panY+(p.x+p.y-33f)*halfH)
     }
-    private fun cachedPlan():MapPlan=cache.getOrPut(cityId){ CityGenerator.plan(engine.city(cityId)) }
+    private fun cachedPlan():MapPlan=cache.getOrPut(cityId){
+        val city = engine.city(cityId)
+        if (cityId == 1) City001Layout.plan(city) else CityGenerator.plan(city)
+    }
     private fun urbanZones(plan:MapPlan):Set<Point> = urbanCache.getOrPut(cityId) {
         buildSet{
             for(p in plan.roads)for(dy in -1..1)for(dx in -1..1)
@@ -345,8 +355,8 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         // Roads follow the same saved graph but are DRAWN AS LANES, not
         // full-width opaque tile diamonds. No intersecting illustrations,
         // stamps, or marks over the buildings.
-        val asphalt=Color.rgb(85,99,103)
-        val edge=Color.rgb(57,72,75)
+        val asphalt=if(cityId==1) Color.rgb(94,107,110) else Color.rgb(85,99,103)
+        val edge=if(cityId==1) Color.rgb(55,75,75) else Color.rgb(57,72,75)
         val roadWidth=max(5f,halfH*0.83f)
         val roadDirs=listOf(Point(1,0),Point(0,1))
         for(p in plan.roads){
@@ -360,6 +370,8 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
             }else{
                 for(other in linked){
                     val (tx,ty)=projected(other)
+                    if(cityId==1)line(canvas,sx,sy,tx,ty,
+                        Color.rgb(201,196,160),roadWidth+5.1f*d)
                     line(canvas,sx,sy,tx,ty,edge,roadWidth+2.1f*d)
                     line(canvas,sx,sy,tx,ty,asphalt,roadWidth)
                     if(zoom>=1.15f){
@@ -369,6 +381,16 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                     }
                 }
             }
+        }
+        // Standalone benches, parks and industrial yards. They are drawn from
+        // the shipped isometric image atlas, never full-scene concept cards.
+        if(cityId==1 && zoom>=0.78f)for(prop in city001Decor){
+            val (sx,sy)=projected(prop.at)
+            if(!onScreen(sx,sy,halfW*2.7f))continue
+            val pw=halfW*1.52f*prop.size
+            val ph=halfH*3.35f*prop.size
+            city001Art.draw(canvas,prop.sprite,sx-pw*0.5f,sy-ph*0.76f,
+                sx+pw*0.5f,sy+ph*0.24f)
         }
         val scenery=mutableListOf<Triple<Point,Lot?,Boolean>>()
         for(home in plan.homes)scenery.add(Triple(home,null,true))
@@ -390,7 +412,15 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                     else->Color.rgb(199,180,166)
                 }
                 val height=(9f+(variety%3)*2.8f)*zoom*d
-                drawBuilding(canvas,x,y,
+                val homeKey=when(variety%3){
+                    0 -> "buildings.home_1"
+                    1 -> "buildings.home_5"
+                    else -> "buildings.home_10"
+                }
+                val painted=cityId==1 && city001Art.draw(canvas,homeKey,
+                    x-12f*zoom*d,y-20f*zoom*d,
+                    x+12f*zoom*d,y+8f*zoom*d)
+                if(!painted)drawBuilding(canvas,x,y,
                     7.3f*zoom*d,4.8f*zoom*d,
                     wall,height,variety,false)
             }else if(lot!=null){
@@ -423,7 +453,11 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                         BuildingKind.MUNICIPAL -> 25f
                         BuildingKind.RESEARCH -> 30f
                     }
-                    drawBuilding(canvas,x,y,w*0.70f,h*0.80f,
+                    val painted=cityId==1 && city001Art.draw(canvas,
+                        city001Art.buildingKey(lot.kind,lot.id),
+                        x-20f*zoom*d,y-42f*zoom*d,
+                        x+20f*zoom*d,y+9f*zoom*d)
+                    if(!painted)drawBuilding(canvas,x,y,w*0.70f,h*0.80f,
                         main,height*zoom*d,lot.id%4,true)
                 } else {
                     fill(Color.argb(75,236,207,149))
@@ -449,7 +483,8 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
         fill(Color.argb(236,8,41,59))
         canvas.drawRoundRect(RectF(8f*d,8f*d,width-8f*d,53f*d),12f*d,12f*d,paint)
         val city=engine.city(cityId)
-        text(canvas,"${city.name} · ${city.specialization}",20f*d,28f*d,15f,Color.WHITE,true)
+        val title = if(cityId==1) "${city.name} · STYLE B / ПИЛОТ" else "${city.name} · ${city.specialization}"
+        text(canvas,title,20f*d,28f*d,15f,Color.WHITE,true)
         text(canvas,"Жители ${city.population}  ·  Участков ${city.lots.size}  ·  шахт ${engine.company(cityId).mines.size}",20f*d,45f*d,10f,Color.rgb(191,216,221))
     }
     private fun drawBuilding(canvas:Canvas,x:Float,y:Float,w:Float,h:Float,color:Int,height:Float,style:Int,big:Boolean){
