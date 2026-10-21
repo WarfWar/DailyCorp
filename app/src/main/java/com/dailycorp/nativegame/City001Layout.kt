@@ -37,6 +37,24 @@ object City001Layout {
             if (occupiedLots.any { abs(it.x - p.x) <= 1 && abs(it.y - p.y) <= 1 }) continue
             roads.add(p)
         }
+        // A ring may be cut into islands by saved foundations. Only keep
+        // segments reachable from the original connected freight network.
+        // Never replace existing economic gates or add phantom truck roads.
+        val connected = mutableSetOf<Point>()
+        val frontier = ArrayDeque<Point>()
+        val first = base.roads.firstOrNull()
+        if (first != null) {
+            connected.add(first)
+            frontier.add(first)
+        }
+        while (frontier.isNotEmpty()) {
+            val p = frontier.removeFirst()
+            for (offset in listOf(Point(1, 0), Point(-1, 0), Point(0, 1), Point(0, -1))) {
+                val next = Point(p.x + offset.x, p.y + offset.y)
+                if (next in roads && connected.add(next)) frontier.add(next)
+            }
+        }
+        roads.retainAll(connected)
         // Residential sprites never paint a new boulevard or a saved lot.
         val homes = base.homes.filter {
             it !in roads && it !in occupiedLots &&
