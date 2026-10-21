@@ -33,6 +33,8 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
     private val cityPins=mutableMapOf<Int,Point>()
     private val art = GameArt(context)
     private val styleB=WorldStyleBArt(context)
+    // Distinct sparse landmarks and infrastructure sourced from all ten packs.
+    private val worldExtras=WorldStyleBAtlas(context)
     private var worldTexture:Bitmap?=null
     private var worldTexturePrepared=false
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -183,6 +185,25 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
             val py=rect.top+(y+0.5f)*th
             biomeAccent(canvas,biome,x,y,px,py,tw*2.4f,th*2.4f)
         }
+        if(zoom>=1f)for(y in 7 until 66 step 13)for(x in 7 until 90 step 17){
+            val signature=(x*23+y*11+engine.state.seed.toInt()) and 7
+            if(signature>2)continue
+            val b=continentBiomes[y][x]
+            val key=when(b){
+                Biome.PLAINS -> "landmark.meadow"
+                Biome.FOREST -> "landmark.forest"
+                Biome.MOUNTAINS -> "landmark.mountain"
+                Biome.COAST -> "landmark.coast"
+                Biome.RIVER -> "water.river_bend"
+                Biome.LAKE -> "water.small_island"
+                else -> null
+            }?:continue
+            val px=rect.left+(x+0.5f)*tw
+            val py=rect.top+(y+0.5f)*th
+            if(onScreen(px,py,tw*7f))
+                worldExtras.drawAccent(canvas,key,px,py+th*1.5f,
+                    tw*5.3f,th*7f)
+        }
         val d=resources.displayMetrics.density
         for(city in engine.state.cities){
             val (x,y)=cityPin(city.id)
@@ -252,6 +273,30 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                 }
             }
         }
+        // Sparse environmental props from packs 3, 5, 8 and 10 do not alter
+        // city topography or the road/lot interaction hitboxes.
+        if(zoom>=0.9f)for(y in 2 until plan.height step 5)
+            for(x in 2 until plan.width step 5){
+                val pos=Point(x,y)
+                if(pos in plan.roads || pos in occupiedLots)continue
+                val b=biomes[y][x]
+                val marker=(x*31+y*19+cityId*13) and 7
+                val key=when{
+                    b==Biome.FOREST && marker==0 -> "nature.conifer"
+                    b==Biome.FOREST && marker==1 -> "nature.conifer_cluster"
+                    b==Biome.MOUNTAINS && marker==2 -> "elevation.cliff_rock_h1_both_v0"
+                    b==Biome.MOUNTAINS && marker==3 -> "accent.forest_mountain"
+                    b==Biome.MOUNTAINS && marker==4 -> "nature.rock"
+                    b==Biome.PLAINS && marker==5 -> "nature.shrub"
+                    b==Biome.COAST && marker==6 -> "accent.grass_rock"
+                    b==Biome.FOREST && marker==7 -> "relief.forest_01"
+                    else -> null
+                }?:continue
+                val (sx,sy)=projected(pos)
+                if(onScreen(sx,sy,halfW*2))
+                    worldExtras.drawAccent(canvas,key,sx,sy+halfH,
+                        halfW*1.7f,halfH*3.1f)
+            }
         // Every road occupies exactly one diamond. Do not stamp crossing decals
         // on top of the paved graph: that was the cause of oversized road shapes.
         for(p in plan.roads){
