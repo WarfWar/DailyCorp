@@ -327,6 +327,34 @@ class Mine2PreviewActivity:Activity(){
         setContentView(root)
         refresh()
     }
+    private fun showLiftConstruction(q:Mine2LiftQuote){
+        if(readOnly || !q.valid){
+            Toast.makeText(this,if(readOnly)"Сохранение недоступно" else q.reason,
+                Toast.LENGTH_LONG).show()
+            return
+        }
+        val stops=q.stations.drop(1).joinToString(", "){
+            (it*world.config.metersPerCell).toString()+" м"
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Новый грузовой ствол · "+q.price+" ₽")
+            .setMessage("Место: X="+q.x+
+                "\nГлубина: "+q.endY*world.config.metersPerCell+" м"+
+                "\nСтанции: "+stops+"\nСегменты: "+q.newCells+
+                "\nПересекаемые рудные клетки: "+q.oreCellsAffected+
+                " (не добываются при строительстве)."+
+                "\nСтроится одна клетка за игровой такт.")
+            .setPositiveButton("Построить"){_,_->
+                val transport=world.transport()
+                if(game.state.money<q.price){
+                    Toast.makeText(this,"Недостаточно денег",Toast.LENGTH_SHORT).show()
+                }else if(transport.startLift(world,q)){
+                    game.state.money-=q.price
+                    view.resetScanner()
+                    save();refresh();view.invalidate()
+                }else Toast.makeText(this,"Недопустимое место",Toast.LENGTH_SHORT).show()
+            }.setNegativeButton("Отмена",null).show()
+    }
     private fun showLiftUpgrade(){
         if(readOnly){
             Toast.makeText(this,"Сохранение недоступно",Toast.LENGTH_SHORT).show()
