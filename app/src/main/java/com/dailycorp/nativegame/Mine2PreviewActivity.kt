@@ -221,6 +221,7 @@ class Mine2PreviewActivity:Activity(){
                 Toast.LENGTH_SHORT).show()
             refresh()
         }
+        add("➤ Авто-рельсы"){view.mode=Mine2PreviewView.Mode.AUTO_RAIL;refresh()}
         add("🏗 Грузовой ствол"){view.mode=Mine2PreviewView.Mode.LIFT;refresh()}
         add("＋ Вагонетка"){
             if(readOnly){
