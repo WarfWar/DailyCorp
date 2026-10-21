@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Rect
 import android.graphics.RectF
 
@@ -53,14 +54,34 @@ class MineBlockAtlas(context:Context) {
         }
     }catch(_:Exception){null}
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    // The supplied tin and titanium textures share nearly identical geometry.
+    // Separate tonal palettes without changing source atlas keys or saved IDs.
+    private val tinFilter=ColorMatrixColorFilter(floatArrayOf(
+        1.15f,0f,0f,0f,20f,
+        0f,1.02f,0f,0f,12f,
+        0f,0f,0.78f,0f,-5f,
+        0f,0f,0f,1f,0f
+    ))
+    private val titaniumFilter=ColorMatrixColorFilter(floatArrayOf(
+        0.82f,0f,0f,0f,-5f,
+        0f,1.04f,0f,0f,6f,
+        0f,0f,1.28f,0f,24f,
+        0f,0f,0f,1f,0f
+    ))
     val loaded get()=bitmap!=null
     fun draw(canvas:Canvas,key:String,left:Float,top:Float,right:Float,bottom:Float):Boolean {
         val image=bitmap?:return false
         val index=keys[key]?:return false
         val sx=index%COLS*CELL
         val sy=index/COLS*CELL
+        paint.colorFilter=when(key){
+            "ore_tin"->tinFilter
+            "ore_titanium"->titaniumFilter
+            else->null
+        }
         canvas.drawBitmap(image,Rect(sx,sy,sx+CELL,sy+CELL),
             RectF(left,top,right,bottom),paint)
+        paint.colorFilter=null
         return true
     }
 }
