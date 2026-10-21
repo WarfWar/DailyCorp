@@ -18,7 +18,7 @@ import kotlin.math.min
 /** A custom 2D renderer. No engine, no Android UI dependencies in game rules. */
 class MapCanvasView(context: Context, private val engine: GameEngine) : View(context) {
     var cityId: Int = 1
-        set(value) { field = value; panX = 0f; panY = 0f; zoom = 1.0f; invalidate() }
+        set(value) { field = value; panX = 0f; panY = 0f; zoom = 1.0f; selectedCity001LotId = null; invalidate() }
     var continentMode: Boolean = true
         set(value) { field = value; panX = 0f; panY = 0f; zoom = if(value) 1.0f else 1.0f; invalidate() }
     var onCityTap: (Int) -> Unit = {}
@@ -36,6 +36,9 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
     private val styleB=WorldStyleBArt(context)
     // Exact user-approved continent artwork plus the 48 hit regions from SVG.
     private val approvedContinent=ApprovedContinentArt(context)
+    // The city 001 painting is separate from its saved economic entities.
+    private val approvedCity001=ApprovedCity001Art(context)
+    private var selectedCity001LotId: Int? = null
     // The first city is the isolated Style B design pilot. Other cities keep
     // their current renderers and unchanged economic/saved layouts.
     private val city001Art by lazy(LazyThreadSafetyMode.NONE) { GameArt(context) }
@@ -300,6 +303,14 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
             r.top+(cell.y+0.5f)*r.height()/72f)
     }
     private fun drawCity(canvas:Canvas){
+        if(cityId == 1 && approvedCity001.isAvailable &&
+            approvedCity001.allBound(engine.city(1))) {
+            // Bitmap is immutable scenery. Every on-screen lot still binds to
+            // the company's saved Lot ID via the dedicated hit-test.
+            val bounds = approvedCity001.rect(width,height,zoom,panX,panY)
+            approvedCity001.draw(canvas,bounds,engine.city(1),engine,selectedCity001LotId)
+            return
+        }
         val d=resources.displayMetrics.density
         val plan=cachedPlan()
         val halfW=25f*zoom*d
@@ -578,9 +589,21 @@ class MapCanvasView(context: Context, private val engine: GameEngine) : View(con
                             max(24f, min(42f,25f*zoom))*resources.displayMetrics.density)
                             onCityTap(closest.first)
                     }else{
-                        val chosen=cachedPlan().lots.minByOrNull{ val (x,y)=projected(it.pos);hypot(x-event.x,y-event.y) }
-                        if(chosen!=null){val (x,y)=projected(chosen.pos)
-                            if(hypot(x-event.x,y-event.y)<34f*resources.displayMetrics.density*zoom)onLotTap(chosen)
+                        if(cityId==1 && approvedCity001.isAvailable &&
+                            approvedCity001.allBound(engine.city(1))) {
+                            val bounds=approvedCity001.rect(width,height,zoom,panX,panY)
+                            val lot=approvedCity001.hitLot(event.x,event.y,bounds,
+                                engine.city(1),resources.displayMetrics.density)
+                            if(lot!=null) {
+                                selectedCity001LotId=lot.id
+                                invalidate()
+                                onLotTap(lot)
+                            }
+                        }else{
+                            val chosen=cachedPlan().lots.minByOrNull{ val (x,y)=projected(it.pos);hypot(x-event.x,y-event.y) }
+                            if(chosen!=null){val (x,y)=projected(chosen.pos)
+                                if(hypot(x-event.x,y-event.y)<34f*resources.displayMetrics.density*zoom)onLotTap(chosen)
+                            }
                         }
                     }
                 }
