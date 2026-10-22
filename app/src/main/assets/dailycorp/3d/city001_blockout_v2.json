@@ -1841,9 +1841,9 @@
   "geometryStats": {
     "houses": 210,
     "trees": 392,
-    "bytes": 1009664,
+    "bytes": 1103560,
     "meshes": 99,
-    "triangles": 50026,
+    "triangles": 51410,
     "layers": 11,
     "longestParts": [
       [
@@ -1863,18 +1863,6 @@
         750
       ],
       [
-        "QUARRIES_mine1_quarry",
-        744
-      ],
-      [
-        "QUARRIES_mine2_quarry",
-        744
-      ],
-      [
-        "QUARRIES_mine3_quarry",
-        744
-      ],
-      [
         "HOUSING_upper_center",
         600
       ],
@@ -1892,6 +1880,18 @@
       ],
       [
         "HOUSING_central",
+        504
+      ],
+      [
+        "HOUSING_ROOFS_central",
+        504
+      ],
+      [
+        "HOUSING_east_center",
+        504
+      ],
+      [
+        "HOUSING_ROOFS_east_center",
         504
       ]
     ]
