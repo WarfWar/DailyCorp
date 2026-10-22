@@ -8,6 +8,8 @@ import android.util.Base64
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
+import java.util.zip.GZIPInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -139,15 +141,16 @@ class City3DPreviewView(
             colorLoc = GLES20.glGetAttribLocation(program,"aColor")
             mvpLoc = GLES20.glGetUniformLocation(program,"uMVP")
             meshes = loadGlb(ctx)
-            val json = JSONObject(ctx.assets.open("dailycorp/3d/city001_scene.json")
+            val json = JSONObject(ctx.assets.open("dailycorp/3d/city001_terrain_v3.json")
                 .bufferedReader().use { it.readText() })
             val parsed = mutableListOf<Site3D>()
             val nodes = json.getJSONArray("sites")
             for (i in 0 until nodes.length()) {
                 val site = nodes.getJSONObject(i)
+                val world = site.getJSONArray("world")
                 parsed.add(Site3D(site.getString("kind"), site.getInt("ordinal"),
-                    site.getDouble("x").toFloat(), site.getDouble("y").toFloat(),
-                    site.getDouble("z").toFloat()))
+                    world.getDouble(0).toFloat(), world.getDouble(1).toFloat(),
+                    world.getDouble(2).toFloat()))
             }
             sites = parsed
         }
@@ -219,9 +222,12 @@ class City3DPreviewView(
 
     /** Tiny offline subset of glTF 2.0; supports our indexed colored static GLB. */
     private fun loadGlb(context: Context): List<Mesh3D> {
-        val encoded=context.assets.open("dailycorp/3d/city001_v0_1.glb.b64")
+        // Genuine Terrain v3 GLB (gzip + base64 is a Git-friendly binary
+        // transport, not a PNG texture). Decode once on GL context creation.
+        val encoded=context.assets.open("dailycorp/3d/city001_terrain_v3.glb.gz.b64")
             .bufferedReader().use { it.readText().trim() }
-        val data=Base64.decode(encoded,Base64.DEFAULT)
+        val compressed=Base64.decode(encoded,Base64.DEFAULT)
+        val data=GZIPInputStream(ByteArrayInputStream(compressed)).use { it.readBytes() }
         val bytes=ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
         check(bytes.getInt(0)==0x46546c67 && bytes.getInt(4)==2) { "Invalid GLB header" }
         val jsonSize=bytes.getInt(12)
