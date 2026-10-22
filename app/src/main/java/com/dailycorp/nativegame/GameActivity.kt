@@ -12,6 +12,7 @@ import android.content.res.ColorStateList
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -23,6 +24,9 @@ import java.io.ObjectOutputStream
 class GameActivity : Activity() {
     private lateinit var game: GameEngine
     private lateinit var map: MapCanvasView
+    private lateinit var mapHolder: FrameLayout
+    private var preview3D: City3DPreviewView? = null
+    private var showing3D = false
     private lateinit var topText: TextView
     private lateinit var secondaryText: TextView
     private lateinit var actions: LinearLayout
@@ -51,12 +55,14 @@ class GameActivity : Activity() {
     }
     override fun onResume(){
         super.onResume()
+        if (showing3D) preview3D?.onResume()
         if(::game.isInitialized) {
             handler.removeCallbacks(uiTick)
             handler.postDelayed(uiTick,1000)
         }
     }
     override fun onPause(){
+        if (showing3D) preview3D?.onPause()
         handler.removeCallbacks(uiTick)
         if(::game.isInitialized)Mine2Runtime.leaveCityScreen(this,game)
         super.onPause()
@@ -106,7 +112,9 @@ class GameActivity : Activity() {
             updateActions();refresh()
         }
         map.onLotTap={lot -> showLot(lot)}
-        root.addView(map,LinearLayout.LayoutParams(-1,0,1f))
+        mapHolder=FrameLayout(this)
+        mapHolder.addView(map,FrameLayout.LayoutParams(-1,-1))
+        root.addView(mapHolder,LinearLayout.LayoutParams(-1,0,1f))
         val scroll=HorizontalScrollView(this).apply{
             isHorizontalScrollBarEnabled=false
             setBackgroundColor(bg)
@@ -139,7 +147,8 @@ class GameActivity : Activity() {
             add("Транспорт"){showTrucks()}
             add("Контракты"){showContracts()}
         } else {
-            add("← Континент"){map.continentMode=true;updateActions();refresh()}
+            add("← Континент"){if(showing3D)hide3D();map.continentMode=true;updateActions();refresh()}
+            if(map.cityId==1)add(if(showing3D)"2D-карта" else "3D-карта"){toggleCity3D()}
             add("Шахты"){showSites(BuildingKind.MINE)}
             add("Научный центр"){showResearch()}
             add("Заводы"){showSites(BuildingKind.FACTORY)}
@@ -149,6 +158,41 @@ class GameActivity : Activity() {
             add("Компания"){showCompany()}
         }
     }
+    /** City 001 only: opt-in GLES preview, keeping the legacy Canvas and saves. */
+    private fun toggleCity3D() {
+        if(map.continentMode || map.cityId!=1)return
+        if(showing3D) {
+            hide3D()
+        } else {
+            val city=game.city(1)
+            val kinds=city.lots.groupingBy{it.kind}.eachCount()
+            if(city.lots.size!=13 || kinds[BuildingKind.MINE]!=3 ||
+                kinds[BuildingKind.FACTORY]!=2 || kinds[BuildingKind.WAREHOUSE]!=4) {
+                message("Для старого сохранения сначала нужна безопасная миграция 3D-объектов")
+                return
+            }
+            val preview=preview3D?:City3DPreviewView(this,game){lot->showLot(lot)}
+                .also {
+                    preview3D=it
+                    mapHolder.addView(it,FrameLayout.LayoutParams(-1,-1))
+                }
+            map.visibility=View.GONE
+            preview.visibility=View.VISIBLE
+            preview.onResume()
+            showing3D=true
+        }
+        updateActions()
+        refresh()
+    }
+
+    private fun hide3D() {
+        if(!showing3D)return
+        preview3D?.onPause()
+        preview3D?.visibility=View.GONE
+        map.visibility=View.VISIBLE
+        showing3D=false
+    }
+
     private fun refresh(){
         topText.text="DAILYCORP · NATIVE"
         secondaryText.text="${money(game.state.money)}   ·  Эпоха ${game.state.era}/10   ·  Наука ${game.state.science}   ·  Груз ${game.state.totalShipped}"
