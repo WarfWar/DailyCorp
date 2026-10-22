@@ -1,0 +1,1899 @@
+{
+  "schema": "dailycorp.city001.blockout.v2",
+  "description": "Geometric tracing of manually approved mirrored reference; 2D location trusted, height estimates iterative",
+  "source": {
+    "referenceFile": "a_highly_detailed_isometric_game_map_illustration.png",
+    "pixelSize": [
+      1536,
+      1024
+    ],
+    "sha256": "b6c8ac0e1cf2c37aa115dea2671603bd5c2503894cb66c236c818ee70650a680"
+  },
+  "coordinateSystem": {
+    "glTF": "right handed Y up",
+    "pixelToWorld": {
+      "x": "(u-768)*0.1",
+      "z": "(v-512)*0.1",
+      "y": "terrainHeight(u,v)"
+    },
+    "worldFootprint": [
+      153.6,
+      102.4
+    ],
+    "projection": "ref layout, not inverse photogrammetry"
+  },
+  "camera": {
+    "type": "orthographic",
+    "azimuthDegrees": -30,
+    "elevationDegrees": 51,
+    "target": [
+      0,
+      5,
+      0
+    ],
+    "heightWorld": 148,
+    "compareView": "use the original reference as parallel overlay, no textured billboard"
+  },
+  "layers": [
+    "SEA",
+    "TERRAIN",
+    "CLIFFS",
+    "QUARRIES",
+    "RIVERS",
+    "WATERFALLS",
+    "BRIDGES",
+    "ROADS",
+    "FOREST",
+    "HOUSING",
+    "HARBOR",
+    "INTERACTABLE_SITES"
+  ],
+  "landOutlineReferencePixels": [
+    [
+      274,
+      0
+    ],
+    [
+      930,
+      0
+    ],
+    [
+      1428,
+      0
+    ],
+    [
+      1518,
+      44
+    ],
+    [
+      1460,
+      126
+    ],
+    [
+      1444,
+      223
+    ],
+    [
+      1510,
+      330
+    ],
+    [
+      1536,
+      472
+    ],
+    [
+      1522,
+      601
+    ],
+    [
+      1495,
+      710
+    ],
+    [
+      1411,
+      744
+    ],
+    [
+      1333,
+      775
+    ],
+    [
+      1222,
+      765
+    ],
+    [
+      1136,
+      783
+    ],
+    [
+      1050,
+      775
+    ],
+    [
+      970,
+      796
+    ],
+    [
+      861,
+      775
+    ],
+    [
+      769,
+      805
+    ],
+    [
+      673,
+      811
+    ],
+    [
+      574,
+      824
+    ],
+    [
+      504,
+      800
+    ],
+    [
+      413,
+      785
+    ],
+    [
+      330,
+      804
+    ],
+    [
+      260,
+      783
+    ],
+    [
+      195,
+      769
+    ],
+    [
+      153,
+      797
+    ],
+    [
+      88,
+      769
+    ],
+    [
+      0,
+      742
+    ],
+    [
+      0,
+      463
+    ],
+    [
+      63,
+      448
+    ],
+    [
+      117,
+      425
+    ],
+    [
+      126,
+      368
+    ],
+    [
+      84,
+      310
+    ],
+    [
+      29,
+      270
+    ],
+    [
+      0,
+      232
+    ],
+    [
+      84,
+      203
+    ],
+    [
+      153,
+      137
+    ],
+    [
+      188,
+      69
+    ]
+  ],
+  "seaCoves": [
+    [
+      [
+        0,
+        0
+      ],
+      [
+        274,
+        0
+      ],
+      [
+        210,
+        81
+      ],
+      [
+        159,
+        147
+      ],
+      [
+        98,
+        199
+      ],
+      [
+        0,
+        224
+      ]
+    ],
+    [
+      [
+        0,
+        463
+      ],
+      [
+        55,
+        457
+      ],
+      [
+        98,
+        480
+      ],
+      [
+        120,
+        551
+      ],
+      [
+        93,
+        628
+      ],
+      [
+        0,
+        662
+      ]
+    ],
+    [
+      [
+        1495,
+        96
+      ],
+      [
+        1536,
+        65
+      ],
+      [
+        1536,
+        458
+      ],
+      [
+        1521,
+        415
+      ],
+      [
+        1487,
+        354
+      ],
+      [
+        1458,
+        276
+      ]
+    ],
+    [
+      [
+        0,
+        738
+      ],
+      [
+        180,
+        763
+      ],
+      [
+        278,
+        788
+      ],
+      [
+        408,
+        796
+      ],
+      [
+        519,
+        831
+      ],
+      [
+        736,
+        825
+      ],
+      [
+        879,
+        801
+      ],
+      [
+        999,
+        819
+      ],
+      [
+        1197,
+        796
+      ],
+      [
+        1399,
+        770
+      ],
+      [
+        1536,
+        741
+      ],
+      [
+        1536,
+        1024
+      ],
+      [
+        0,
+        1024
+      ]
+    ]
+  ],
+  "rivers": [
+    {
+      "id": "river_east",
+      "points": [
+        [
+          992,
+          26
+        ],
+        [
+          995,
+          70
+        ],
+        [
+          1016,
+          108
+        ],
+        [
+          1030,
+          143
+        ],
+        [
+          1039,
+          185
+        ],
+        [
+          1025,
+          222
+        ],
+        [
+          1017,
+          265
+        ],
+        [
+          1000,
+          297
+        ],
+        [
+          1004,
+          338
+        ],
+        [
+          1014,
+          376
+        ],
+        [
+          1065,
+          416
+        ],
+        [
+          1051,
+          459
+        ],
+        [
+          1040,
+          501
+        ],
+        [
+          1077,
+          554
+        ],
+        [
+          1129,
+          598
+        ],
+        [
+          1158,
+          655
+        ],
+        [
+          1192,
+          721
+        ],
+        [
+          1188,
+          789
+        ]
+      ],
+      "width_px": 18
+    },
+    {
+      "id": "river_west",
+      "points": [
+        [
+          115,
+          185
+        ],
+        [
+          139,
+          240
+        ],
+        [
+          129,
+          282
+        ],
+        [
+          157,
+          332
+        ],
+        [
+          141,
+          381
+        ],
+        [
+          172,
+          428
+        ],
+        [
+          189,
+          471
+        ]
+      ],
+      "width_px": 12
+    }
+  ],
+  "bridges": [
+    {
+      "id": "west_river_bridge",
+      "p": [
+        155,
+        338
+      ],
+      "span_px": 28,
+      "class": "bridge"
+    },
+    {
+      "id": "north_culvert",
+      "p": [
+        1023,
+        125
+      ],
+      "span_px": 22,
+      "class": "culvert"
+    },
+    {
+      "id": "civic_bridge",
+      "p": [
+        1034,
+        160
+      ],
+      "span_px": 24,
+      "class": "bridge"
+    },
+    {
+      "id": "central_canyon_bridge",
+      "p": [
+        1007,
+        348
+      ],
+      "span_px": 33,
+      "class": "bridge"
+    },
+    {
+      "id": "warehouse_bridge",
+      "p": [
+        1049,
+        465
+      ],
+      "span_px": 28,
+      "class": "bridge"
+    },
+    {
+      "id": "eastern_quarry_bridge",
+      "p": [
+        1177,
+        693
+      ],
+      "span_px": 28,
+      "class": "bridge"
+    }
+  ],
+  "waterfalls": [
+    {
+      "id": "east_upper",
+      "p": [
+        1045,
+        424
+      ],
+      "drop": 6
+    },
+    {
+      "id": "east_lower",
+      "p": [
+        1184,
+        751
+      ],
+      "drop": 8
+    },
+    {
+      "id": "west_fall",
+      "p": [
+        148,
+        385
+      ],
+      "drop": 7
+    }
+  ],
+  "quarries": [
+    {
+      "id": "mine1_quarry",
+      "center": [
+        1190,
+        222
+      ],
+      "radius": [
+        95,
+        70
+      ]
+    },
+    {
+      "id": "mine2_quarry",
+      "center": [
+        553,
+        151
+      ],
+      "radius": [
+        94,
+        70
+      ]
+    },
+    {
+      "id": "mine3_quarry",
+      "center": [
+        1342,
+        641
+      ],
+      "radius": [
+        112,
+        76
+      ]
+    }
+  ],
+  "roads": [
+    {
+      "id": "B0_north_cross",
+      "pts": [
+        [
+          160,
+          198
+        ],
+        [
+          302,
+          265
+        ],
+        [
+          471,
+          345
+        ],
+        [
+          611,
+          420
+        ],
+        [
+          751,
+          485
+        ],
+        [
+          899,
+          558
+        ],
+        [
+          1031,
+          634
+        ],
+        [
+          1188,
+          722
+        ]
+      ],
+      "type": "arterial"
+    },
+    {
+      "id": "B1_central_cross",
+      "pts": [
+        [
+          100,
+          310
+        ],
+        [
+          240,
+          380
+        ],
+        [
+          390,
+          456
+        ],
+        [
+          545,
+          534
+        ],
+        [
+          695,
+          609
+        ],
+        [
+          866,
+          682
+        ],
+        [
+          1022,
+          749
+        ]
+      ],
+      "type": "arterial"
+    },
+    {
+      "id": "B2_south_cross",
+      "pts": [
+        [
+          145,
+          522
+        ],
+        [
+          274,
+          584
+        ],
+        [
+          410,
+          646
+        ],
+        [
+          555,
+          722
+        ],
+        [
+          704,
+          798
+        ]
+      ],
+      "type": "arterial"
+    },
+    {
+      "id": "A0_north_south",
+      "pts": [
+        [
+          243,
+          394
+        ],
+        [
+          393,
+          325
+        ],
+        [
+          548,
+          245
+        ],
+        [
+          695,
+          166
+        ],
+        [
+          827,
+          93
+        ]
+      ],
+      "type": "arterial"
+    },
+    {
+      "id": "A1_civic_axis",
+      "pts": [
+        [
+          205,
+          570
+        ],
+        [
+          340,
+          503
+        ],
+        [
+          492,
+          436
+        ],
+        [
+          629,
+          360
+        ],
+        [
+          781,
+          278
+        ],
+        [
+          910,
+          215
+        ],
+        [
+          1045,
+          155
+        ]
+      ],
+      "type": "arterial"
+    },
+    {
+      "id": "A2_center_axis",
+      "pts": [
+        [
+          321,
+          693
+        ],
+        [
+          452,
+          621
+        ],
+        [
+          609,
+          541
+        ],
+        [
+          765,
+          463
+        ],
+        [
+          916,
+          390
+        ],
+        [
+          1090,
+          310
+        ],
+        [
+          1224,
+          243
+        ]
+      ],
+      "type": "arterial"
+    },
+    {
+      "id": "A3_warehouse_axis",
+      "pts": [
+        [
+          415,
+          790
+        ],
+        [
+          558,
+          719
+        ],
+        [
+          702,
+          645
+        ],
+        [
+          845,
+          565
+        ],
+        [
+          1000,
+          492
+        ],
+        [
+          1141,
+          415
+        ],
+        [
+          1281,
+          347
+        ]
+      ],
+      "type": "arterial"
+    },
+    {
+      "id": "A4_power_access",
+      "pts": [
+        [          1086,
+          376
+        ],
+        [
+          1167,
+          312
+        ],
+        [
+          1258,
+          253
+        ],
+        [
+          1341,
+          227
+        ],
+        [
+          1440,
+          232
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "A5_east_mine_access",
+      "pts": [
+        [
+          1050,
+          730
+        ],
+        [
+          1170,
+          696
+        ],
+        [
+          1250,
+          658
+        ],
+        [
+          1340,
+          641
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "A6_north_mine_access",
+      "pts": [
+        [
+          845,
+          160
+        ],
+        [
+          949,
+          119
+        ],
+        [
+          1065,
+          129
+        ],
+        [
+          1170,
+          204
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "A7_mine2_access",
+      "pts": [
+        [
+          473,
+          344
+        ],
+        [
+          467,
+          248
+        ],
+        [
+          520,
+          176
+        ],
+        [
+          553,
+          151
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "A8_harbour_entrance",
+      "pts": [
+        [
+          395,
+          722
+        ],
+        [
+          422,
+          789
+        ],
+        [
+          482,
+          845
+        ],
+        [
+          560,
+          885
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "A9_warehouses",
+      "pts": [
+        [
+          232,
+          600
+        ],
+        [
+          308,
+          646
+        ],
+        [
+          396,
+          724
+        ],
+        [
+          489,
+          772
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "A10_lot1",
+      "pts": [
+        [
+          549,
+          407
+        ],
+        [
+          599,
+          435
+        ],
+        [
+          649,
+          451
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "A11_lot2",
+      "pts": [
+        [
+          337,
+          537
+        ],
+        [
+          392,
+          531
+        ],
+        [
+          427,
+          546
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "A12_municipal",
+      "pts": [
+        [
+          790,
+          262
+        ],
+        [
+          795,
+          312
+        ],
+        [
+          770,
+          356
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "A13_market",
+      "pts": [
+        [
+          831,
+          413
+        ],
+        [
+          807,
+          446
+        ],
+        [
+          765,
+          463
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "A14_research",
+      "pts": [
+        [
+          324,
+          254
+        ],
+        [
+          329,
+          319
+        ],
+        [
+          393,
+          325
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "A15_warehouse1",
+      "pts": [
+        [
+          1006,
+          700
+        ],
+        [
+          1022,
+          749
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "A16_warehouse2",
+      "pts": [
+        [
+          775,
+          572
+        ],
+        [
+          845,
+          565
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "A17_electric",
+      "pts": [
+        [
+          1070,
+          398
+        ],
+        [
+          1086,
+          376
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "C0_mine1_main_link",
+      "pts": [
+        [
+          1224,
+          243
+        ],
+        [
+          1239,
+          266
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "C1_north_road_link",
+      "pts": [
+        [
+          1045,
+          155
+        ],
+        [
+          1047,
+          127
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "C2_factory1_link",
+      "pts": [
+        [
+          549,
+          407
+        ],
+        [
+          544,
+          402
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "C3_factory2_link",
+      "pts": [
+        [
+          337,
+          537
+        ],
+        [
+          320,
+          506
+        ]
+      ],
+      "type": "access"
+    },
+    {
+      "id": "C4_mine1_gate",
+      "pts": [
+        [
+          1170,
+          204
+        ],
+        [
+          1190,
+          222
+        ]
+      ],
+      "type": "access"
+    }
+  ],
+  "residentialZones": [
+    {
+      "name": "west",
+      "polygon": [
+        [
+          166,
+          401
+        ],
+        [
+          283,
+          332
+        ],
+        [
+          440,
+          399
+        ],
+        [
+          357,
+          496
+        ],
+        [
+          263,
+          537
+        ]
+      ]
+    },
+    {
+      "name": "central",
+      "polygon": [
+        [
+          443,
+          453
+        ],
+        [
+          614,
+          450
+        ],
+        [
+          742,
+          520
+        ],
+        [
+          655,
+          637
+        ],
+        [
+          480,
+          587
+        ]
+      ]
+    },
+    {
+      "name": "upper_center",
+      "polygon": [
+        [
+          561,
+          253
+        ],
+        [
+          704,
+          202
+        ],
+        [
+          886,
+          287
+        ],
+        [
+          808,
+          378
+        ],
+        [
+          651,
+          388
+        ]
+      ]
+    },
+    {
+      "name": "south_center",
+      "polygon": [
+        [
+          461,
+          627
+        ],
+        [
+          659,
+          638
+        ],
+        [
+          795,
+          738
+        ],
+        [
+          624,
+          773
+        ]
+      ]
+    },
+    {
+      "name": "east_center",
+      "polygon": [
+        [
+          891,
+          417
+        ],
+        [
+          1026,
+          436
+        ],
+        [
+          1115,
+          518
+        ],
+        [
+          972,
+          605
+        ]
+      ]
+    }
+  ],
+  "forests": [
+    {
+      "name": "north_forest",
+      "polygon": [
+        [
+          0,
+          0
+        ],
+        [
+          1536,
+          0
+        ],
+        [
+          1501,
+          116
+        ],
+        [
+          1280,
+          87
+        ],
+        [
+          1090,
+          97
+        ],
+        [
+          925,
+          76
+        ],
+        [
+          765,
+          89
+        ],
+        [
+          599,
+          89
+        ],
+        [
+          388,
+          70
+        ],
+        [
+          193,
+          106
+        ],
+        [
+          0,
+          139
+        ]
+      ]
+    },
+    {
+      "name": "west_forest",
+      "polygon": [
+        [
+          0,
+          325
+        ],
+        [
+          162,
+          377
+        ],
+        [
+          253,
+          487
+        ],
+        [
+          155,
+          573
+        ],
+        [
+          0,
+          548
+        ]
+      ]
+    },
+    {
+      "name": "east_forest",
+      "polygon": [
+        [
+          1211,
+          330
+        ],
+        [
+          1490,
+          265
+        ],
+        [
+          1536,
+          387
+        ],
+        [
+          1420,
+          491
+        ],
+        [
+          1220,
+          459
+        ]
+      ]
+    },
+    {
+      "name": "south_ridge",
+      "polygon": [
+        [
+          662,
+          728
+        ],
+        [
+          822,
+          713
+        ],
+        [
+          986,
+          776
+        ],
+        [
+          1123,
+          752
+        ],
+        [
+          1360,
+          784
+        ],
+        [
+          1258,
+          855
+        ],
+        [
+          724,
+          869
+        ]
+      ]
+    }
+  ],
+  "piers": [
+    {
+      "id": "pier1",
+      "points": [
+        [
+          359,
+          786
+        ],
+        [
+          388,
+          846
+        ],
+        [
+          412,
+          887
+        ]
+      ]
+    },
+    {
+      "id": "pier2",
+      "points": [
+        [
+          477,
+          792
+        ],
+        [
+          499,
+          851
+        ],
+        [
+          522,
+          891
+        ]
+      ]
+    },
+    {
+      "id": "pier3",
+      "points": [
+        [
+          577,
+          826
+        ],
+        [
+          586,
+          881
+        ],
+        [
+          591,
+          907
+        ]
+      ]
+    }
+  ],
+  "sites": [
+    {
+      "id": "mine_1",
+      "kind": "MINE",
+      "ordinal": 0,
+      "name": "Шахта 1",
+      "referencePixel": [
+        1190,
+        222
+      ],
+      "referenceLabelPixel": [
+        1160,
+        145
+      ],
+      "world": [
+        42.2,
+        14.093,
+        -29.0
+      ],
+      "designPlateauY": 14.0,
+      "state": "FOR_SALE",
+      "gameplayBinding": {
+        "cityId": 1,
+        "kind": "MINE",
+        "ordinal": 0
+      },
+      "buildingFootprintWorld": [
+        10,
+        8
+      ]
+    },
+    {
+      "id": "mine_2",
+      "kind": "MINE",
+      "ordinal": 1,
+      "name": "Шахта 2",
+      "referencePixel": [
+        553,
+        151
+      ],
+      "referenceLabelPixel": [
+        520,
+        101
+      ],
+      "world": [
+        -21.5,
+        15.096,
+        -36.1
+      ],
+      "designPlateauY": 15.0,
+      "state": "FOR_SALE",
+      "gameplayBinding": {
+        "cityId": 1,
+        "kind": "MINE",
+        "ordinal": 1
+      },
+      "buildingFootprintWorld": [
+        10,
+        8
+      ]
+    },
+    {
+      "id": "mine_3",
+      "kind": "MINE",
+      "ordinal": 2,
+      "name": "Шахта 3",
+      "referencePixel": [
+        1342,
+        641
+      ],
+      "referenceLabelPixel": [
+        1350,
+        588
+      ],
+      "world": [
+        57.4,
+        11.13,
+        12.9
+      ],
+      "designPlateauY": 11.0,
+      "state": "FOR_SALE",
+      "gameplayBinding": {
+        "cityId": 1,
+        "kind": "MINE",
+        "ordinal": 2
+      },
+      "buildingFootprintWorld": [
+        10,
+        8
+      ]
+    },
+    {
+      "id": "factory_1",
+      "kind": "FACTORY",
+      "ordinal": 0,
+      "name": "Завод 1",
+      "referencePixel": [
+        549,
+        407
+      ],
+      "referenceLabelPixel": [
+        550,
+        348
+      ],
+      "world": [
+        -21.9,
+        3.582,
+        -10.5
+      ],
+      "designPlateauY": 3.4,
+      "state": "RUNTIME",
+      "gameplayBinding": {
+        "cityId": 1,
+        "kind": "FACTORY",
+        "ordinal": 0
+      },
+      "buildingFootprintWorld": [
+        6,
+        5
+      ]
+    },
+    {
+      "id": "factory_2",
+      "kind": "FACTORY",
+      "ordinal": 1,
+      "name": "Завод 2",
+      "referencePixel": [
+        337,
+        537
+      ],
+      "referenceLabelPixel": [
+        348,
+        465
+      ],
+      "world": [
+        -43.1,
+        3.675,
+        2.5
+      ],
+      "designPlateauY": 3.5,
+      "state": "RUNTIME",
+      "gameplayBinding": {
+        "cityId": 1,
+        "kind": "FACTORY",
+        "ordinal": 1
+      },
+      "buildingFootprintWorld": [
+        6,
+        5
+      ]
+    },
+    {
+      "id": "warehouse_1",
+      "kind": "WAREHOUSE",
+      "ordinal": 0,
+      "name": "Склад 1",
+      "referencePixel": [
+        1006,
+        700      ],
+      "referenceLabelPixel": [
+        981,
+        661
+      ],
+      "world": [
+        23.8,
+        3.594,
+        18.8
+      ],
+      "designPlateauY": 3.4,
+      "state": "RUNTIME",
+      "gameplayBinding": {
+        "cityId": 1,
+        "kind": "WAREHOUSE",
+        "ordinal": 0
+      },
+      "buildingFootprintWorld": [
+        6,
+        5
+      ]
+    },
+    {
+      "id": "warehouse_2",
+      "kind": "WAREHOUSE",
+      "ordinal": 1,
+      "name": "Склад 2",
+      "referencePixel": [
+        775,
+        572
+      ],
+      "referenceLabelPixel": [
+        744,
+        515
+      ],
+      "world": [
+        0.7,
+        3.585,
+        6.0
+      ],
+      "designPlateauY": 3.4,
+      "state": "RUNTIME",
+      "gameplayBinding": {
+        "cityId": 1,
+        "kind": "WAREHOUSE",
+        "ordinal": 1
+      },
+      "buildingFootprintWorld": [
+        6,
+        5
+      ]
+    },
+    {
+      "id": "warehouse_3",
+      "kind": "WAREHOUSE",
+      "ordinal": 2,
+      "name": "Склад 3",
+      "referencePixel": [
+        232,
+        600
+      ],
+      "referenceLabelPixel": [
+        226,
+        547
+      ],
+      "world": [
+        -53.6,
+        3.586,
+        8.8
+      ],
+      "designPlateauY": 3.4,
+      "state": "RUNTIME",
+      "gameplayBinding": {
+        "cityId": 1,
+        "kind": "WAREHOUSE",
+        "ordinal": 2
+      },
+      "buildingFootprintWorld": [
+        6,
+        5
+      ]
+    },
+    {
+      "id": "warehouse_4",
+      "kind": "WAREHOUSE",
+      "ordinal": 3,
+      "name": "Склад 4",
+      "referencePixel": [
+        396,
+        724
+      ],
+      "referenceLabelPixel": [
+        393,
+        677
+      ],
+      "world": [
+        -37.2,
+        3.578,
+        21.2
+      ],
+      "designPlateauY": 3.4,
+      "state": "RUNTIME",
+      "gameplayBinding": {
+        "cityId": 1,
+        "kind": "WAREHOUSE",
+        "ordinal": 3
+      },
+      "buildingFootprintWorld": [
+        6,
+        5
+      ]
+    },
+    {
+      "id": "research_1",
+      "kind": "RESEARCH",
+      "ordinal": 0,
+      "name": "Научный центр",
+      "referencePixel": [
+        324,
+        254
+      ],
+      "referenceLabelPixel": [
+        297,
+        198
+      ],
+      "world": [
+        -44.4,
+        5.245,
+        -25.8
+      ],
+      "designPlateauY": 5.1,
+      "state": "CIVIC",
+      "gameplayBinding": {
+        "cityId": 1,
+        "kind": "RESEARCH",
+        "ordinal": 0
+      },
+      "buildingFootprintWorld": [
+        6,
+        5
+      ]
+    },
+    {
+      "id": "municipal_1",
+      "kind": "MUNICIPAL",
+      "ordinal": 0,
+      "name": "Мэрия",
+      "referencePixel": [
+        790,
+        262
+      ],
+      "referenceLabelPixel": [
+        744,
+        197
+      ],
+      "world": [
+        2.2,
+        4.96,
+        -25.0
+      ],
+      "designPlateauY": 4.8,
+      "state": "CIVIC",
+      "gameplayBinding": {
+        "cityId": 1,
+        "kind": "MUNICIPAL",
+        "ordinal": 0
+      },
+      "buildingFootprintWorld": [
+        6,
+        5
+      ]
+    },
+    {
+      "id": "energy_1",
+      "kind": "ENERGY",
+      "ordinal": 0,
+      "name": "Электростанция",
+      "referencePixel": [
+        1070,
+        398
+      ],
+      "referenceLabelPixel": [
+        1075,
+        344
+      ],
+      "world": [
+        30.2,
+        2.701,
+        -11.4
+      ],
+      "designPlateauY": 6.0,
+      "state": "CIVIC",
+      "gameplayBinding": {
+        "cityId": 1,
+        "kind": "ENERGY",
+        "ordinal": 0
+      },
+      "buildingFootprintWorld": [
+        6,
+        5
+      ]
+    },
+    {
+      "id": "market_1",
+      "kind": "MARKET",
+      "ordinal": 0,
+      "name": "Рынок",
+      "referencePixel": [
+        831,
+        413
+      ],
+      "referenceLabelPixel": [
+        832,
+        374
+      ],
+      "world": [
+        6.3,
+        3.496,
+        -9.9
+      ],
+      "designPlateauY": 3.3,
+      "state": "CIVIC",
+      "gameplayBinding": {
+        "cityId": 1,
+        "kind": "MARKET",
+        "ordinal": 0
+      },
+      "buildingFootprintWorld": [
+        6,
+        5
+      ]
+    }
+  ],
+  "acceptance": {
+    "expectedSites": 13,
+    "noGameLogicMigration": true,
+    "keepOther47CitiesUntouched": true,
+    "roadGraphMustEventuallyBeValidated": true,
+    "heightIsEstimatedNotSurveyed": true,
+    "metric": "Compare projected 3D anchor screen coordinates against reference; area ratios / silhouette after camera lock"
+  },
+  "version": "2.0-blockout-draft",
+  "geometryStats": {
+    "houses": 210,
+    "trees": 392,
+    "bytes": 1009664,
+    "meshes": 99,
+    "triangles": 50026,
+    "layers": 11,
+    "longestParts": [
+      [
+        "TERRAIN_GEO",
+        35298
+      ],
+      [
+        "FOREST_east_forest",
+        1470
+      ],
+      [
+        "FOREST_north_forest",
+        1200
+      ],
+      [
+        "FOREST_west_forest",
+        750
+      ],
+      [
+        "QUARRIES_mine1_quarry",
+        744
+      ],
+      [
+        "QUARRIES_mine2_quarry",
+        744
+      ],
+      [
+        "QUARRIES_mine3_quarry",
+        744
+      ],
+      [
+        "HOUSING_upper_center",
+        600
+      ],
+      [
+        "HOUSING_ROOFS_upper_center",
+        600
+      ],
+      [
+        "HOUSING_west",
+        564
+      ],
+      [
+        "HOUSING_ROOFS_west",
+        564
+      ],
+      [
+        "HOUSING_central",
+        504
+      ]
+    ]
+  }
+}
