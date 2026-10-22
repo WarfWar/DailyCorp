@@ -1,7 +1,7 @@
 name: DailyCorp Native Android APK
 on:
   push:
-    branches: [native-rewrite]
+    branches: [native-rewrite, feature/city001-true-3d]
   workflow_dispatch:
 concurrency:
   group: dailycorp-native-debug-signing
@@ -206,6 +206,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Publish direct APK link
+        if: github.ref == 'refs/heads/native-rewrite'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

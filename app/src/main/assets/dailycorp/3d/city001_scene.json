@@ -1,0 +1,496 @@
+{
+  "schema": "dailycorp.city3d.v1",
+  "cityId": 1,
+  "reference": "approved mirrored City 001",
+  "units": "scene_units",
+  "world": {
+    "width": 96,
+    "depth": 88,
+    "seaHeight": 0.0,
+    "grid": [
+      36,
+      34
+    ],
+    "coordinateSystem": "right-handed; X east, Y up, Z south"
+  },
+  "camera": {
+    "projection": "perspective",
+    "azimuth": -40,
+    "elevation": 47,
+    "distance": 142,
+    "target": [
+      0,
+      2,
+      0
+    ],
+    "fovDegrees": 44,
+    "minDistance": 70,
+    "maxDistance": 245
+  },
+  "sites": [
+    {
+      "kind": "MINE",
+      "ordinal": 0,
+      "id": "mine_1",
+      "name": "Шахта 1",
+      "x": 32,
+      "z": -26,
+      "footprint": [
+        10,
+        9
+      ],
+      "state": "FOR_SALE",
+      "y": 2.503
+    },
+    {
+      "kind": "MINE",
+      "ordinal": 1,
+      "id": "mine_2",
+      "name": "Шахта 2",
+      "x": 6,
+      "z": -35,
+      "footprint": [
+        10,
+        9
+      ],
+      "state": "FOR_SALE",
+      "y": 8.867
+    },
+    {
+      "kind": "MINE",
+      "ordinal": 2,
+      "id": "mine_3",
+      "name": "Шахта 3",
+      "x": 35,
+      "z": 13,
+      "footprint": [
+        10,
+        9
+      ],
+      "state": "FOR_SALE",
+      "y": 1.852
+    },
+    {
+      "kind": "FACTORY",
+      "ordinal": 0,
+      "id": "factory_1",
+      "name": "Завод 1",
+      "x": -13,
+      "z": -5,
+      "footprint": [
+        10,
+        9
+      ],
+      "y": 1.2
+    },
+    {
+      "kind": "FACTORY",
+      "ordinal": 1,
+      "id": "factory_2",
+      "name": "Завод 2",
+      "x": -24,
+      "z": 9,
+      "footprint": [
+        10,
+        9
+      ],
+      "y": 1.2
+    },
+    {
+      "kind": "WAREHOUSE",
+      "ordinal": 0,
+      "id": "warehouse_1",
+      "name": "Склад 1",
+      "x": 18,
+      "z": 19,
+      "footprint": [
+        8,
+        7
+      ],
+      "y": 1.2
+    },
+    {
+      "kind": "WAREHOUSE",
+      "ordinal": 1,
+      "id": "warehouse_2",
+      "name": "Склад 2",
+      "x": -6,
+      "z": 9,
+      "footprint": [
+        8,
+        7
+      ],
+      "y": 1.2
+    },
+    {
+      "kind": "WAREHOUSE",
+      "ordinal": 2,
+      "id": "warehouse_3",
+      "name": "Склад 3",
+      "x": -35,
+      "z": 17,
+      "footprint": [
+        8,
+        7
+      ],
+      "y": 2.107
+    },
+    {
+      "kind": "WAREHOUSE",
+      "ordinal": 3,
+      "id": "warehouse_4",
+      "name": "Склад 4",
+      "x": -19,
+      "z": 24,
+      "footprint": [
+        8,
+        7
+      ],
+      "y": 1.2
+    },
+    {
+      "kind": "RESEARCH",
+      "ordinal": 0,
+      "id": "research_1",
+      "name": "Научный центр",
+      "x": -30,
+      "z": -26,
+      "footprint": [
+        9,
+        9
+      ],
+      "y": 1.68
+    },
+    {
+      "kind": "MUNICIPAL",
+      "ordinal": 0,
+      "id": "municipal_1",
+      "name": "Мэрия",
+      "x": 2,
+      "z": -19,
+      "footprint": [
+        8,
+        7
+      ],
+      "y": 1.2
+    },
+    {
+      "kind": "ENERGY",
+      "ordinal": 0,
+      "id": "energy_1",
+      "name": "Электростанция",
+      "x": 24,
+      "z": -7,
+      "footprint": [
+        10,
+        10
+      ],
+      "y": 1.2
+    },
+    {
+      "kind": "MARKET",
+      "ordinal": 0,
+      "id": "market_1",
+      "name": "Рынок",
+      "x": 3,
+      "z": -2,
+      "footprint": [
+        8,
+        7
+      ],
+      "y": 1.2
+    }
+  ],
+  "roads": [
+    [
+      [
+        -42,
+        -18
+      ],
+      [
+        -30,
+        -18
+      ],
+      [
+        -14,
+        -18
+      ],
+      [
+        3,
+        -19
+      ],
+      [
+        21,
+        -20
+      ],
+      [
+        40,
+        -17
+      ]
+    ],
+    [
+      [
+        -41,
+        -3
+      ],
+      [
+        -26,
+        -3
+      ],
+      [
+        -14,
+        -5
+      ],
+      [
+        3,
+        -7
+      ],
+      [
+        23,
+        -7
+      ],
+      [
+        40,
+        -7
+      ]
+    ],
+    [
+      [
+        -40,
+        12
+      ],
+      [
+        -24,
+        10
+      ],
+      [
+        -5,
+        9
+      ],
+      [
+        15,
+        10
+      ],
+      [
+        36,
+        13
+      ]
+    ],
+    [
+      [
+        -38,
+        26
+      ],
+      [
+        -22,
+        24
+      ],
+      [
+        -6,
+        22
+      ],
+      [
+        17,
+        20
+      ],
+      [
+        37,
+        22
+      ]
+    ],
+    [
+      [
+        -29,
+        -32
+      ],
+      [
+        -30,
+        -25
+      ],
+      [
+        -27,
+        -13
+      ],
+      [
+        -25,
+        0
+      ],
+      [
+        -24,
+        9
+      ],
+      [
+        -20,
+        24
+      ]
+    ],
+    [
+      [
+        -12,
+        -34
+      ],
+      [
+        -11,
+        -24
+      ],
+      [
+        -13,
+        -6
+      ],
+      [
+        -9,
+        9
+      ],
+      [
+        -7,
+        23
+      ]
+    ],
+    [
+      [
+        5,
+        -39
+      ],
+      [
+        5,
+        -32
+      ],
+      [
+        2,
+        -20
+      ],
+      [
+        1,
+        -9
+      ],
+      [
+        3,
+        0
+      ],
+      [
+        4,
+        12
+      ],
+      [
+        6,
+        28
+      ]
+    ],
+    [
+      [
+        24,
+        -34
+      ],
+      [
+        27,
+        -24
+      ],
+      [
+        25,
+        -13
+      ],
+      [
+        23,
+        -7
+      ],
+      [
+        19,
+        8
+      ],
+      [
+        18,
+        19
+      ],
+      [
+        18,
+        29
+      ]
+    ],
+    [
+      [
+        38,
+        -28
+      ],
+      [
+        34,
+        -24
+      ],
+      [
+        30,
+        -17
+      ],
+      [
+        34,
+        0
+      ],
+      [
+        36,
+        13
+      ]
+    ],
+    [
+      [
+        -42,
+        -1
+      ],
+      [
+        -38,
+        5
+      ],
+      [
+        -34,
+        13
+      ],
+      [
+        -30,
+        22
+      ]
+    ],
+    [
+      [
+        -30,
+        -28
+      ],
+      [
+        -17,
+        -23
+      ],
+      [
+        -3,
+        -14
+      ],
+      [
+        9,
+        -4
+      ],
+      [
+        22,
+        8
+      ],
+      [
+        34,
+        18
+      ]
+    ]
+  ],
+  "environment": {
+    "coast": "west_and_south",
+    "mountains": "north_and_east",
+    "river": "right-center",
+    "bridges": 3,
+    "forestCountTarget": 300,
+    "harbor": "south-west"
+  },
+  "binding": {
+    "mode": "BuildingKind+ordinal",
+    "idSource": "City.lots (saved game)",
+    "siteCount": 13,
+    "legacySavePolicy": "do not mutate saved Lot ids"
+  },
+  "renderHints": {
+    "materialStyle": "stylized low-poly industrial, vivid turquoise water",
+    "targetFPS": 30,
+    "textureDependency": "none",
+    "renderQuality": "prototype"
+  }
+}
