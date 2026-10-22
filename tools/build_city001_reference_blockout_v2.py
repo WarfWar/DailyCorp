@@ -199,16 +199,25 @@ def cylinder(name,cx,y,cz,radius,height,col,sections=8):
  m.apply_transform(trimesh.transformations.rotation_matrix(-math.pi/2,[1,0,0]));m.apply_translation([cx,y,cz]);add(name,m,col)
 
 def segment(name,a,b,width,col,yy=0.12):
- # long prism segment aligned to horizontal xz world; y follows sampled terrain below
+ # A draped tessellated road/river ribbon, unlike the previous midpoint flat
+ # boxes which poked through hillside geometry on long diagonal streets.
  x1,z1=map(float,a);x2,z2=map(float,b)
  dx=x2-x1;dz=z2-z1;dist=math.hypot(dx,dz)
  if dist<1e-5:return
- h1=surface_at(x1,z1)+yy;h2=surface_at(x2,z2)+yy
- # create prism averaged incline, sufficient to show the mapping
- avg=(h1+h2)/2
- m=trimesh.creation.box(extents=[dist,.095,width])
- m.apply_transform(trimesh.transformations.rotation_matrix(math.atan2(-dz,dx),[0,1,0]))
- m.apply_translation([(x1+x2)/2,avg,(z1+z2)/2]);add(name,m,col)
+ normal=(-dz/dist,dx/dist)
+ raise_y=.34 if name.startswith('ROADS_SHOULDER') else .47 if name.startswith('ROADS_ASPHALT') else .18
+ count=max(2,int(math.ceil(dist/.9))+1)
+ verts=[];faces=[]
+ for i in range(count):
+  t=i/(count-1);x=x1+dx*t;z=z1+dz*t
+  y=surface_at(x,z)+raise_y
+  verts.extend([(x+normal[0]*width/2,y,z+normal[1]*width/2),
+                (x-normal[0]*width/2,y,z-normal[1]*width/2)])
+ for i in range(count-1):
+  k=i*2
+  faces.extend([(k,k+2,k+1),(k+1,k+2,k+3)])
+ m=trimesh.Trimesh(vertices=verts,faces=faces,process=False)
+ add(name,m,col)
 
 def polygon_mask(pts,xx,yy):
  path=MplPath(np.array(pts,dtype=float),closed=True)
